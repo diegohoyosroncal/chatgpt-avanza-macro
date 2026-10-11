@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         AVANZA — Macro Maestro · Piloto Automático
 // @namespace    https://chatgpt.com/
-// @version      4.0.0
+// @version      4.0.1
 // @description  Un solo control inteligente para ChatGPT web: reevalúa cada respuesta, continúa de forma acotada y cambia de estrategia ante estancamiento.
 // @updateURL    https://raw.githubusercontent.com/diegohoyosroncal/chatgpt-avanza-macro/main/avanza_macro_maestro_v4.user.js
 // @downloadURL  https://raw.githubusercontent.com/diegohoyosroncal/chatgpt-avanza-macro/main/avanza_macro_maestro_v4.user.js
@@ -446,6 +446,14 @@
     if (stopReason) setStatus(stopReason);
     render();
   }
+  function hideLegacyPanels() {
+    // Do not delete, modify or overwrite legacy scripts: only hide older widgets
+    // while this new panel is visible. A browser reload without v4 restores them.
+    for (const id of ['avanza-universal-control-v1', 'avanza-macro-maestro-v2', 'avanza-macro-maestro-v3']) {
+      const old = document.getElementById(id);
+      if (old && old !== root && old.style.display !== 'none') old.style.display = 'none';
+    }
+  }
   function scheduleMount() {
     if (mountQueued) return;
     mountQueued=true;
@@ -455,12 +463,15 @@
     if (observer) return;
     observer = new MutationObserver(() => { if (!document.getElementById(APP)) scheduleMount(); });
     observer.observe(document.documentElement, { childList: true, subtree: true });
-    timer = setInterval(() => { if (!document.getElementById(APP)) scheduleMount(); tick(); }, CHECK_EVERY_MS);
+    timer = setInterval(() => { if (!document.getElementById(APP)) scheduleMount(); hideLegacyPanels(); tick(); }, CHECK_EVERY_MS);
     window.addEventListener('pagehide', () => { if (phase === STATES.READY || phase === STATES.WAITING) pause('Navegación de página: ciclo suspendido.'); });
     document.addEventListener('keydown', e => {
       if (e.repeat || !e.altKey || !e.shiftKey || e.ctrlKey || e.metaKey || String(e.key).toLowerCase() !== 'a') return;
-      e.preventDefault();toggle();
-    });
+      e.preventDefault();
+      // Legacy scripts also bind this shortcut on document bubble phase.
+      e.stopImmediatePropagation();
+      toggle();
+    }, true);
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => { mount(); observe(); }, { once: true });
   else { mount(); observe(); }
