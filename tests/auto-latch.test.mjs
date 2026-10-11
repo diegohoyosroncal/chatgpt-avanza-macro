@@ -47,8 +47,8 @@ test('completion is terminal but a previously untagged chat may run',()=>{
 });
 test('domain-specific learning instructions do not leak to business chats',()=>{
   const sourcePart=section('  function buildMessage(ticket, step) {','  function setStatus(');
-  const message=(learning)=>new Function('state','strategy','MARK','RECEIPT','looksLearningProcess','MAX_STALLED_CYCLES',sourcePart+'return buildMessage;')(
-    {processId:'',stalled:4,missingReceipts:0,lastPercent:null,lastDenominator:null,lastDelta:null},()=> 'REVISAR_RUTA_Y_CAMBIAR_ESTRATEGIA','AVANZA','AVANZA_CICLO_ID:',()=>learning,6)('TEST',1);
+  const message=(learning)=>new Function('state','strategy','MARK','RECEIPT','looksLearningProcess','MAX_STALLED_CYCLES','GLOBAL_RECOVERY_DOC_ID',sourcePart+'return buildMessage;')(
+    {processId:'',stalled:4,missingReceipts:0,lastPercent:null,lastDenominator:null,lastDelta:null},()=> 'REVISAR_RUTA_Y_CAMBIAR_ESTRATEGIA','AVANZA','AVANZA_CICLO_ID:',()=>learning,6,'1epHKEGs6SjTzrfDi5SeHNaxH7CHX09VTfmYNa7WxIcY')('TEST',1);
   assert.doesNotMatch(message(false),/LEARN QUEST:|CFI\/APRENDIZAJE:/);
   assert.match(message(true),/LEARN QUEST:/);
   assert.match(message(false),/NO reemplaza objetivo/);
