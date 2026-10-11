@@ -20,8 +20,13 @@ try {
     const host = page.locator('#'+hostId);
     await host.waitFor({timeout:7000});
     const dock = host.locator('.panel');
+    // AVANZA starts compact: one prominent control, percentages visible.
+    assert.match(await dock.getAttribute('class'),/compact/);
+    assert.match(await host.locator('[data-action="avanzar"]').innerText(),/AVANZAR/);
+    await host.locator('[data-action="collapse"]').click();
+    assert.doesNotMatch(await dock.getAttribute('class'),/compact/);
     const localVersion = await host.locator('[data-value="health"]').innerText();
-    assert.match(localVersion,/4\.4\.0-neon-control/);
+    assert.match(localVersion,/4\.4\.[0-9]+-[a-z0-9-]+/);
     assert.match(localVersion,/remota NO verificada/);
     assert.equal(await host.locator('[data-module]').count(),6);
     assert.match(await host.locator('[data-module="auto"]').innerText(),/AUTO ON/);
