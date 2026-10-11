@@ -280,6 +280,7 @@
     button.disabled = busy || conflicts().length > 0;
     button.setAttribute('aria-pressed', String(active));
     updateDashboard();
+    updateHealth();
   }
   function pause(reason, warn = false) {
     phase = STATES.PAUSED;
@@ -531,8 +532,18 @@
     window.addEventListener('pointerup', dragEnd);
     window.addEventListener('pointercancel', dragEnd);
   }
+  function updateHealth() {
+    const node = dashboard?.querySelector('[data-value="health"]');
+    if (!node) return;
+    const duplicates = conflicts();
+    node.dataset.warning = duplicates.length ? 'true' : 'false';
+    node.textContent = duplicates.length
+      ? '⚠ v' + INSTALLED_VERSION + ' · ' + duplicates.length + ' panel(es) antiguos · envíos bloqueados'
+      : 'v' + INSTALLED_VERSION + ' local · versión remota NO verificada';
+  }
   function checkConflicts() {
     const competing = conflicts();
+    updateHealth();
     const label = competing.join(', ');
     if (label === conflictSummary) return competing.length > 0;
     conflictSummary = label;
@@ -564,6 +575,8 @@
       .tinyrow{display:flex;align-items:center;justify-content:space-between;gap:6px;margin:12px 0 8px;color:#9eacc1;font-size:9px}.tone:before{content:'';display:inline-block;width:6px;height:6px;background:#94a3b8;border-radius:100%;margin-right:5px}.tone[data-level=live]:before{background:#34d399;box-shadow:0 0 9px #34d399aa}.tone[data-level=risk]:before{background:#fb923c}.next{color:#cbd5e1;font-size:10px;line-height:1.35;min-height:14px;max-height:42px;overflow:hidden;margin-bottom:12px}
       .go{position:relative;width:100%;border:0;border-radius:12px;min-height:47px;cursor:pointer;background:linear-gradient(120deg,var(--accent-light),var(--accent) 56%,var(--accent));color:#281b07;font:900 14px/1.2 ui-sans-serif,system-ui,sans-serif;letter-spacing:.08em;box-shadow:0 5px 19px #fbbf2440;transition:transform .15s,filter .15s}.go:hover{filter:brightness(1.06);transform:translateY(-1px)}.go.active{background:linear-gradient(120deg,#64748b,#475569);color:white;box-shadow:none}.go:focus-visible{outline:3px solid #38bdf8;outline-offset:3px}.go:disabled{opacity:.7;cursor:wait;transform:none}
       .status{font-size:9.5px;color:#cbd5e1;margin-top:10px;min-height:25px;max-height:56px;overflow:hidden}.status[data-warning=true]{color:#fdba74}.foot{font-size:9px;color:#8799ae;border-top:1px solid var(--stroke);padding-top:8px;margin-top:4px;display:flex;justify-content:space-between;gap:5px}.scope{font-weight:700;color:#9fc3d8}
+      .health{font-size:9px;line-height:1.3;margin:7px 0 0;padding:5px 7px;color:#a6cee7;border:1px solid var(--stroke);border-radius:8px;background:#0a1b2c}
+      .health[data-warning=true]{color:#fdba74;border-color:#c2410c}
       .top{cursor:move;touch-action:none;user-select:none}
       .top button{cursor:pointer;touch-action:manipulation;border:1px solid #41536c;border-radius:8px;color:#e2e8f0;background:#1a2a43;padding:4px 7px;font-size:12px}
       .top button:focus-visible{outline:2px solid var(--accent)}
@@ -581,6 +594,7 @@
     `;
     const panel=document.createElement('div');panel.className='panel';
     panel.innerHTML=`<div class="top"><span class="logo" aria-hidden="true">↗</span><div class="topname"><div class="brand">AVANZA</div><div class="sub">MACRO MAESTRO · v4</div></div><button type="button" data-action="theme" title="Cambiar color">◐</button><button type="button" data-action="collapse" title="Compactar / ampliar">▁</button><span class="pill">CON CONTROL</span></div>
+      <div class="health" data-value="health" data-warning="false">Versión remota sin verificar</div>
       <div class="title" data-value="objective">Objetivo del chat · por recuperar</div>
       <div class="metrics"><div class="ring"><div class="center"><span class="pct" data-value="percent" aria-label="Porcentaje actual">—</span><span class="caption">AVANCE</span></div></div><div class="stat"><div class="transition" data-value="transition">— → —</div><div class="delta" data-value="delta">Δ — pp</div><div class="frac" data-value="fraction">Base no validada</div><div class="pending" data-value="pending">Pendiente —</div></div></div>
       <div class="bar" role="progressbar" aria-label="Progreso reportado del objetivo del chat"><div class="bar-fill"></div></div>
@@ -606,6 +620,7 @@
     shadow.append(css,panel);
     document.body.appendChild(root);
     applyPresentation();
+    updateHealth();
     if (stopReason) setStatus(stopReason);
     checkConflicts();
     render();
