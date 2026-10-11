@@ -22,8 +22,8 @@ function harness(oldPrefs) {
   return window.__qa;
 }
 test('metadata and installed version are unique and update from main',()=>{
-  assert.match(src,/\/\/ @version\s+4\.3\.1/);
-  assert.match(src,/const INSTALLED_VERSION = '4\.3\.1-explicit-auto'/);
+  assert.match(src,/\/\/ @version\s+4\.4\.0/);
+  assert.match(src,/const INSTALLED_VERSION = '4\.4\.0-decision-optin'/);
   assert.match(src,/\/\/ @updateURL\s+https:\/\/raw\.githubusercontent\.com\/diegohoyosroncal\/chatgpt-avanza-macro\/main\/avanza_macro_maestro_v4\.user\.js/);
   assert.match(src,/\/\/ @noframes/);
 });
