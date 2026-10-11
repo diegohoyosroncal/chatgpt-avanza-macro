@@ -955,7 +955,7 @@
   }
   function renderModules() {
     if(!dashboard) return;
-    const labels={engine:'⚡ MOTOR',auto:'♾️ AUTO',progress:'📈 %',sync:'🌐 SYNC',game:'🎮 QUEST',aura:'🎨 AURA'};
+    const labels={engine:'⚡ MOTOR',auto:'♾️ AUTO',background:'🪟 FONDO',progress:'📈 %',sync:'🌐 SYNC',game:'🎮 QUEST',aura:'🎨 AURA'};
     for(const b of dashboard.querySelectorAll('[data-module]')){
       const name=b.dataset.module,on=moduleOn(name); b.dataset.on=on?'true':'false'; b.textContent=(labels[name]||name)+' '+(on?'ON':'OFF');
     }
@@ -1230,7 +1230,7 @@
     panel.innerHTML=`<div class="top"><span class="logo" aria-hidden="true">↗</span><div class="topname"><div class="brand">AVANZA</div><div class="sub">MACRO MAESTRO · v4</div></div><button type="button" data-action="cinema" title="Abrir Mission Control">🌌</button><button type="button" data-action="theme" title="Cambiar color">◐</button><button type="button" data-action="collapse" title="Compactar / ampliar">▁</button><span class="pill" data-value="live-indicator" data-live="false">◇ LISTO</span></div>
       <div class="health" data-value="health" data-warning="false">Versión remota sin verificar</div>
       <div class="progress-ribbon" data-value="progress-ribbon" aria-label="Porcentajes verificados de proyectos"></div>
-      <div class="section"><div class="section-title">🎛️ MACROS · ON/OFF</div><div class="modules"><button data-module="engine"></button><button data-module="auto"></button><button data-module="progress"></button><button data-module="sync"></button><button data-module="game"></button><button data-module="aura"></button></div></div>
+      <div class="section"><div class="section-title">🎛️ MACROS · ON/OFF</div><div class="modules"><button data-module="engine"></button><button data-module="auto"></button><button data-module="background"></button><button data-module="progress"></button><button data-module="sync"></button><button data-module="game"></button><button data-module="aura"></button></div></div>
       <div class="section"><div class="section-title">🗺️ PROYECTOS · PARALELO</div><div class="projects" data-value="projects"></div></div>
       <div class="game" data-value="game"></div>
       <div class="title" data-value="objective">Objetivo del chat · por recuperar</div>
@@ -1248,6 +1248,17 @@
       const mod=event.target.closest('[data-module]');
       if(mod){
         const name=mod.dataset.module; control.modules[name]=!moduleOn(name);
+        if(name==='auto') {
+          control.autoRunOptIn=moduleOn('auto');
+          if(!control.autoRunOptIn&&(phase===STATES.READY||phase===STATES.WAITING))
+            pause('AUTO OFF: ciclo detenido; estado conservado.');
+          else if(control.autoRunOptIn) setStatus('AUTO preparado. Pulsa AVANZAR para iniciar solo este chat.');
+        }
+        if(name==='background') {
+          control.backgroundOptIn=moduleOn('background');
+          control.backgroundAuto=control.backgroundOptIn;
+          setStatus(control.backgroundOptIn ? 'FONDO ON: solo mientras el navegador esté abierto.' : 'FONDO OFF: no enviar desde pestañas ocultas.');
+        }
         if(name==='sync') initChannel();
         if(name==='engine'&&!moduleOn('engine')&&(phase===STATES.READY||phase===STATES.WAITING)) pause('⚡ MOTOR OFF desde el cockpit.');
         saveControl(); render(); return;
@@ -1255,7 +1266,8 @@
       const en=event.target.closest('[data-project-enabled]');
       if(en){ const id=en.dataset.projectEnabled; setProjectMode(id,{enabled:!projectMode(id).enabled}); return; }
       const au=event.target.closest('[data-project-auto]');
-      if(au){ const id=au.dataset.projectAuto; setProjectMode(id,{auto:!projectMode(id).auto,enabled:true}); return; }
+      if(au){ const id=au.dataset.projectAuto; setProjectMode(id,{auto:!projectMode(id).auto,enabled:true});
+        if(id===projectKey()&&!projectMode(id).auto&&(phase===STATES.READY||phase===STATES.WAITING)) pause('Proyecto MANUAL: envío detenido.'); return; }
       const learn=event.target.closest('[data-learn-action]');
       if(learn){ sendLearningAction(learn.dataset.learnAction); return; }
       const choice=event.target.closest('[data-quest-choice]');
