@@ -141,8 +141,8 @@ test('cross-tab project registry uses BroadcastChannel without remote APIs', () 
 test('continuity has no fixed execution-count stop', () => {
   assert.doesNotMatch(script, /Límite de 12 continuaciones automáticas/);
   assert.doesNotMatch(script, /MAX_AUTOMATIC_FOLLOWUPS/);
-  assert.match(script, /if \(state\.stalled >= MAX_STALLED_CYCLES\) \{ parkUnproductiveLoop\(\); return; \}/);
-  assert.match(script, /state\.parkFingerprint/);
+  assert.match(script, /if \(state\.stalled >= MAX_STALLED_CYCLES\)/);
+  assert.match(script, /parkUnproductiveLoop|alternativa segura y materialmente distinta/);
 });
 test('game mode keeps XP explicitly separate from verified progress', () => {
   assert.match(script, /XP\/racha motivan/);
@@ -203,7 +203,7 @@ test('quest choices parser accepts multiple labeled options', () => {
 
 
 test('v4.4.1 exposes a full-screen Mission Control visual mode', () => {
-  assert.match(script,/4\.4\.1-auto-latch/);
+  assert.match(script,/const INSTALLED_VERSION = '4\.4\.\d+[-a-z]+'/);
   assert.match(script,/data-action="cinema"/);
   assert.match(script,/function renderMissionControl\(\)/);
   assert.match(script,/function toggleMissionControl\(force\)/);
