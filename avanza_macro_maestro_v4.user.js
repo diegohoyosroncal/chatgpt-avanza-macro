@@ -1,13 +1,14 @@
 // ==UserScript==
 // @name         AVANZA — Macro Maestro · Piloto Automático
 // @namespace    https://chatgpt.com/
-// @version      4.0.3
+// @version      4.0.4
 // @description  Un solo control inteligente para ChatGPT web: reevalúa cada respuesta, continúa de forma acotada y cambia de estrategia ante estancamiento.
 // @updateURL    https://raw.githubusercontent.com/diegohoyosroncal/chatgpt-avanza-macro/main/avanza_macro_maestro_v4.user.js
 // @downloadURL  https://raw.githubusercontent.com/diegohoyosroncal/chatgpt-avanza-macro/main/avanza_macro_maestro_v4.user.js
 // @match        https://chatgpt.com/*
 // @match        https://www.chatgpt.com/*
 // @match        https://chat.openai.com/*
+// @noframes
 // @run-at       document-idle
 // @grant        none
 // ==/UserScript==
@@ -17,6 +18,9 @@
   // Never auto-start on page load, after reload, or when navigating to another chat.
   // The userscript never calls a remote API, reads credentials or controls ChatGPT tools.
   const APP = 'avanza-macro-maestro-v4';
+  const INSTALLED_VERSION = '4.0.4-rc1';
+  const UI_KEY = 'avanza-master-ui-v4';
+  const LEGACY_IDS = ['avanza-universal-control-v1','avanza-macro-maestro-v2','avanza-macro-maestro-v3','diego-mision-autonomia-v1'];
   const MARK = 'MACRO MAESTRO — AVANZA AL OBJETIVO';
   const RECEIPT = 'AVANZA_CICLO_ID:';
   const MAX_AUTOMATIC_FOLLOWUPS = 12; // bounded safety budget, not claimed objective completion
@@ -47,6 +51,9 @@
   let restoreMeta = null;
   let lastAudit = 0;
   let stopReason = '';
+  let presentation = readPresentation();
+  let drag = null;
+  let conflictSummary = '';
 
   function currentChatKey() {
     // Route is scoped to this web chat, not a global prompt or another chat.
@@ -270,7 +277,7 @@
     const active = phase === STATES.READY || phase === STATES.WAITING;
     button.textContent = active ? '■  DETENER CICLO' : '▶  AVANZAR';
     button.classList.toggle('active',active);
-    button.disabled = busy;
+    button.disabled = busy || conflicts().length > 0;
     button.setAttribute('aria-pressed', String(active));
     updateDashboard();
   }
@@ -300,6 +307,7 @@
     render();
   }
   async function deliver(step) {
+    if (checkConflicts()) return;
     if (busy || phase !== STATES.READY || pending) return;
     busy = true; render();
     try {
@@ -441,6 +449,7 @@
   }
   function toggle() {
     syncRoute();
+    if (checkConflicts()) return;
     if (busy) return;
     if (phase === STATES.READY || phase === STATES.WAITING) {
       pause('Pausada manualmente. Ningún envío nuevo.', false);
@@ -457,6 +466,85 @@
     render();
     tick();
   }
+  function readPresentation() {
+    try {
+      const old = JSON.parse(localStorage.getItem(UI_KEY) || '{}');
+      return {
+        theme: ['amber','ocean','violet'].includes(old.theme) ? old.theme : 'amber',
+        compact: old.compact === true,
+        x: Number.isFinite(old.x) ? old.x : null,
+        y: Number.isFinite(old.y) ? old.y : null,
+      };
+    } catch { return { theme: 'amber', compact: false, x: null, y: null }; }
+  }
+  function savePresentation() {
+    try { localStorage.setItem(UI_KEY, JSON.stringify(presentation)); } catch {}
+  }
+  function conflicts() { return LEGACY_IDS.filter(id => !!document.getElementById(id)); }
+  function applyPresentation() {
+    if (!root || !dashboard) return;
+    root.dataset.theme = presentation.theme;
+    dashboard.classList.toggle('compact', presentation.compact);
+    const mini = dashboard.querySelector('[data-action="collapse"]');
+    if (mini) {
+      mini.textContent = presentation.compact ? '▣' : '▁';
+      mini.setAttribute('aria-expanded', String(!presentation.compact));
+      mini.setAttribute('aria-label', presentation.compact ? 'Expandir panel AVANZA' : 'Contraer panel AVANZA');
+    }
+    const theme = dashboard.querySelector('[data-action="theme"]');
+    if (theme) theme.setAttribute('aria-label', 'Cambiar color; actual ' + presentation.theme);
+    if (presentation.x !== null && presentation.y !== null) {
+      const w = Math.max(10, root.offsetWidth || 304);
+      const h = Math.max(10, root.offsetHeight || 120);
+      root.style.right = 'auto';
+      root.style.bottom = 'auto';
+      root.style.left = Math.max(0, Math.min(presentation.x, window.innerWidth - w)) + 'px';
+      root.style.top = Math.max(0, Math.min(presentation.y, window.innerHeight - h)) + 'px';
+    }
+  }
+  function dragMove(event) {
+    if (!drag || event.pointerId !== drag.pointerId || !root) return;
+    const x = Math.max(0, Math.min(drag.x + event.clientX - drag.startX, window.innerWidth - root.offsetWidth));
+    const y = Math.max(0, Math.min(drag.y + event.clientY - drag.startY, window.innerHeight - root.offsetHeight));
+    root.style.right = 'auto';
+    root.style.bottom = 'auto';
+    root.style.left = x + 'px'; root.style.top = y + 'px';
+    drag.moved = true;
+  }
+  function dragEnd(event) {
+    if (!drag || event.pointerId !== drag.pointerId) return;
+    if (drag.moved && root) {
+      presentation.x = parseFloat(root.style.left);
+      presentation.y = parseFloat(root.style.top);
+      savePresentation();
+    }
+    drag = null;
+    window.removeEventListener('pointermove', dragMove);
+    window.removeEventListener('pointerup', dragEnd);
+    window.removeEventListener('pointercancel', dragEnd);
+  }
+  function dragStart(event) {
+    if (event.button !== 0 || event.target.closest('button') || !root) return;
+    const rect = root.getBoundingClientRect();
+    drag = { pointerId: event.pointerId, startX: event.clientX, startY: event.clientY, x: rect.left, y: rect.top, moved: false };
+    window.addEventListener('pointermove', dragMove);
+    window.addEventListener('pointerup', dragEnd);
+    window.addEventListener('pointercancel', dragEnd);
+  }
+  function checkConflicts() {
+    const competing = conflicts();
+    const label = competing.join(', ');
+    if (label === conflictSummary) return competing.length > 0;
+    conflictSummary = label;
+    if (competing.length) {
+      if (phase === STATES.READY || phase === STATES.WAITING) pause('Conflicto: desactiva las macros antiguas en Tampermonkey antes de AVANZAR.', true);
+      setStatus('Detectadas macros simultáneas: ' + label + '. Desactívalas en Tampermonkey. No se enviará nada.', true);
+    } else if (!stopReason) {
+      setStatus('Lista. Versión local ' + INSTALLED_VERSION + '; versión remota no verificada.');
+    }
+    render();
+    return competing.length > 0;
+  }
   function mount() {
     if (!document.body || document.getElementById(APP)) return;
     root = document.createElement('aside');
@@ -466,19 +554,33 @@
     const shadow = root.attachShadow({mode:'open'});
     const css = document.createElement('style');
     css.textContent = `
-      :host{all:initial;--fg:#f8fafc;--muted:#a7b5c7;--accent:#fbbf24;--stroke:rgba(148,163,184,.21)}
+      :host{all:initial;--fg:#f8fafc;--muted:#a7b5c7;--accent:#fbbf24;--accent-light:#fde68a;--accent-halo:#fbbf2440;--stroke:rgba(148,163,184,.21)}
+      :host([data-theme=ocean]){--accent:#38bdf8;--accent-light:#a5f3fc;--accent-halo:#38bdf840}
+      :host([data-theme=violet]){--accent:#c4b5fd;--accent-light:#ede9fe;--accent-halo:#a78bfa40}
       *{box-sizing:border-box} .panel{font:12px/1.45 ui-sans-serif,system-ui,-apple-system,Segoe UI,sans-serif;color:var(--fg);background:linear-gradient(152deg,rgba(31,44,66,.98),rgba(9,15,26,.99) 64%);border:1px solid rgba(212,231,252,.19);box-shadow:0 21px 55px rgba(0,0,0,.35),0 0 0 1px rgba(255,255,255,.035) inset;border-radius:21px;padding:16px;max-height:75vh;overflow:auto;backdrop-filter:blur(16px);}
       .top{display:flex;align-items:center;gap:9px}.logo{display:grid;place-items:center;width:34px;height:34px;flex:0 0 auto;border-radius:11px;background:linear-gradient(130deg,#ffe28d,#f59e0b);color:#201508;font-size:21px;font-weight:900;box-shadow:0 0 24px #fbbf2440}.topname{flex:1;min-width:0}.brand{font-weight:850;letter-spacing:.09em;font-size:12px}.sub{font-size:10px;color:var(--muted);letter-spacing:.05em}.pill{font-size:8.5px;letter-spacing:.05em;font-weight:850;border:1px solid #4c5b73;border-radius:20px;padding:5px 6px;background:#172335;white-space:nowrap}
-      .title{font-size:10.5px;letter-spacing:.02em;color:#cbd5e1;margin:14px 0 7px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.metrics{display:flex;gap:13px;align-items:center}.ring{--fill:0;--angle:calc(var(--fill) * 3.6deg);width:100px;height:100px;flex:0 0 100px;border-radius:50%;background:conic-gradient(#facc15 0deg,#f59e0b var(--angle),#334155 var(--angle),#334155 360deg);display:grid;place-items:center;box-shadow:0 0 20px #f59e0b22;}.center{display:flex;flex-direction:column;align-items:center;justify-content:center;border-radius:50%;width:79px;height:79px;background:#111c2d;border:2px solid #182841;text-align:center}.pct{font-size:22px;line-height:1.1;font-weight:820;font-variant-numeric:tabular-nums;letter-spacing:-.06em}.caption{color:#a7b5c7;font-size:9px;margin-top:4px}
-      .stat{flex:1;min-width:0}.transition{font-weight:800;font-size:14px;font-variant-numeric:tabular-nums;white-space:nowrap}.delta{font-size:11px;font-weight:800;color:#facc15;margin:7px 0}.frac,.pending{font-size:10px;color:#bac9d9}.bar{margin:13px 0 0;height:6px;background:#334155;border-radius:99px;overflow:hidden}.bar-fill{height:100%;background:linear-gradient(90deg,#fbbf24,#fde68a);border-radius:99px;transition:width .35s ease}
+      .title{font-size:10.5px;letter-spacing:.02em;color:#cbd5e1;margin:14px 0 7px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.metrics{display:flex;gap:13px;align-items:center}.ring{--fill:0;--angle:calc(var(--fill) * 3.6deg);width:100px;height:100px;flex:0 0 100px;border-radius:50%;background:conic-gradient(var(--accent-light) 0deg,var(--accent) var(--angle),#334155 var(--angle),#334155 360deg);display:grid;place-items:center;box-shadow:0 0 20px #f59e0b22;}.center{display:flex;flex-direction:column;align-items:center;justify-content:center;border-radius:50%;width:79px;height:79px;background:#111c2d;border:2px solid #182841;text-align:center}.pct{font-size:22px;line-height:1.1;font-weight:820;font-variant-numeric:tabular-nums;letter-spacing:-.06em}.caption{color:#a7b5c7;font-size:9px;margin-top:4px}
+      .stat{flex:1;min-width:0}.transition{font-weight:800;font-size:14px;font-variant-numeric:tabular-nums;white-space:nowrap}.delta{font-size:11px;font-weight:800;color:#facc15;margin:7px 0}.frac,.pending{font-size:10px;color:#bac9d9}.bar{margin:13px 0 0;height:6px;background:#334155;border-radius:99px;overflow:hidden}.bar-fill{height:100%;background:linear-gradient(90deg,var(--accent),var(--accent-light));border-radius:99px;transition:width .35s ease}
       .tinyrow{display:flex;align-items:center;justify-content:space-between;gap:6px;margin:12px 0 8px;color:#9eacc1;font-size:9px}.tone:before{content:'';display:inline-block;width:6px;height:6px;background:#94a3b8;border-radius:100%;margin-right:5px}.tone[data-level=live]:before{background:#34d399;box-shadow:0 0 9px #34d399aa}.tone[data-level=risk]:before{background:#fb923c}.next{color:#cbd5e1;font-size:10px;line-height:1.35;min-height:14px;max-height:42px;overflow:hidden;margin-bottom:12px}
-      .go{position:relative;width:100%;border:0;border-radius:12px;min-height:47px;cursor:pointer;background:linear-gradient(120deg,#fde68a,#fbbf24 56%,#f59e0b);color:#281b07;font:900 14px/1.2 ui-sans-serif,system-ui,sans-serif;letter-spacing:.08em;box-shadow:0 5px 19px #fbbf2440;transition:transform .15s,filter .15s}.go:hover{filter:brightness(1.06);transform:translateY(-1px)}.go.active{background:linear-gradient(120deg,#64748b,#475569);color:white;box-shadow:none}.go:focus-visible{outline:3px solid #38bdf8;outline-offset:3px}.go:disabled{opacity:.7;cursor:wait;transform:none}
+      .go{position:relative;width:100%;border:0;border-radius:12px;min-height:47px;cursor:pointer;background:linear-gradient(120deg,var(--accent-light),var(--accent) 56%,var(--accent));color:#281b07;font:900 14px/1.2 ui-sans-serif,system-ui,sans-serif;letter-spacing:.08em;box-shadow:0 5px 19px #fbbf2440;transition:transform .15s,filter .15s}.go:hover{filter:brightness(1.06);transform:translateY(-1px)}.go.active{background:linear-gradient(120deg,#64748b,#475569);color:white;box-shadow:none}.go:focus-visible{outline:3px solid #38bdf8;outline-offset:3px}.go:disabled{opacity:.7;cursor:wait;transform:none}
       .status{font-size:9.5px;color:#cbd5e1;margin-top:10px;min-height:25px;max-height:56px;overflow:hidden}.status[data-warning=true]{color:#fdba74}.foot{font-size:9px;color:#8799ae;border-top:1px solid var(--stroke);padding-top:8px;margin-top:4px;display:flex;justify-content:space-between;gap:5px}.scope{font-weight:700;color:#9fc3d8}
+      .top{cursor:move;touch-action:none;user-select:none}
+      .top button{cursor:pointer;touch-action:manipulation;border:1px solid #41536c;border-radius:8px;color:#e2e8f0;background:#1a2a43;padding:4px 7px;font-size:12px}
+      .top button:focus-visible{outline:2px solid var(--accent)}
+      .panel.compact{padding:10px}
+      .panel.compact .title,.panel.compact .stat,.panel.compact .bar,.panel.compact .tinyrow,.panel.compact .next,.panel.compact .status,.panel.compact .foot{display:none}
+      .panel.compact .ring{width:62px;height:62px;flex:0 0 62px;margin:8px auto}
+      .panel.compact .center{width:50px;height:50px}
+      .panel.compact .pct{font-size:15px}
+      .panel.compact .go{min-height:35px;font-size:11px}
+      .panel.compact .metrics{justify-content:center}
+      :host([data-theme=ocean]) .delta,:host([data-theme=violet]) .delta{color:var(--accent-light)}
+      @media(max-width:460px){:host{max-width:calc(100vw - 16px)}}
       @media(max-width:460px){.panel{padding:12px;border-radius:18px}.ring{width:88px;height:88px;flex-basis:88px}.center{width:69px;height:69px}.pct{font-size:19px}}
       @media(prefers-reduced-motion:reduce){.go,.bar-fill{transition:none}}
     `;
     const panel=document.createElement('div');panel.className='panel';
-    panel.innerHTML=`<div class="top"><span class="logo" aria-hidden="true">↗</span><div class="topname"><div class="brand">AVANZA</div><div class="sub">MACRO MAESTRO · v4</div></div><span class="pill">CON CONTROL</span></div>
+    panel.innerHTML=`<div class="top"><span class="logo" aria-hidden="true">↗</span><div class="topname"><div class="brand">AVANZA</div><div class="sub">MACRO MAESTRO · v4</div></div><button type="button" data-action="theme" title="Cambiar color">◐</button><button type="button" data-action="collapse" title="Compactar / ampliar">▁</button><span class="pill">CON CONTROL</span></div>
       <div class="title" data-value="objective">Objetivo del chat · por recuperar</div>
       <div class="metrics"><div class="ring"><div class="center"><span class="pct" data-value="percent" aria-label="Porcentaje actual">—</span><span class="caption">AVANCE</span></div></div><div class="stat"><div class="transition" data-value="transition">— → —</div><div class="delta" data-value="delta">Δ — pp</div><div class="frac" data-value="fraction">Base no validada</div><div class="pending" data-value="pending">Pendiente —</div></div></div>
       <div class="bar" role="progressbar" aria-label="Progreso reportado del objetivo del chat"><div class="bar-fill"></div></div>
@@ -486,23 +588,27 @@
       <div class="next" data-value="next">El siguiente hito se decide según evidencia del chat.</div>
       <button class="go" data-action="avanzar" type="button" aria-label="Avanzar según el contexto o detener el ciclo">▶  AVANZAR</button>
       <div class="status" data-warning="false" role="status" aria-live="polite">Un botón. Decide la ruta según cada respuesta.</div>
-      <div class="foot"><span>Informe del asistente ≠ prueba independiente</span><span class="scope">POR CHAT · SIN DUPLICAR</span></div>`;
+      <div class="foot"><span>Informe del asistente ≠ prueba independiente</span><span class="scope">v${INSTALLED_VERSION} · POR CHAT</span></div>`;
     button=panel.querySelector('[data-action="avanzar"]');
     statusNode=panel.querySelector('.status');
     button.addEventListener('click',toggle);
+    panel.querySelector('[data-action="theme"]').addEventListener('click', () => {
+      const themes = ['amber','ocean','violet'];
+      presentation.theme = themes[(themes.indexOf(presentation.theme) + 1) % themes.length];
+      savePresentation(); applyPresentation();
+    });
+    panel.querySelector('[data-action="collapse"]').addEventListener('click', () => {
+      presentation.compact = !presentation.compact;
+      savePresentation(); applyPresentation();
+    });
+    panel.querySelector('.top').addEventListener('pointerdown',dragStart);
     dashboard=panel;
     shadow.append(css,panel);
     document.body.appendChild(root);
+    applyPresentation();
     if (stopReason) setStatus(stopReason);
+    checkConflicts();
     render();
-  }
-  function hideLegacyPanels() {
-    // Do not delete, modify or overwrite legacy scripts: only hide older widgets
-    // while this new panel is visible. A browser reload without v4 restores them.
-    for (const id of ['avanza-universal-control-v1', 'avanza-macro-maestro-v2', 'avanza-macro-maestro-v3']) {
-      const old = document.getElementById(id);
-      if (old && old !== root && old.style.display !== 'none') old.style.display = 'none';
-    }
   }
   function scheduleMount() {
     if (mountQueued) return;
@@ -513,7 +619,7 @@
     if (observer) return;
     observer = new MutationObserver(() => { if (!document.getElementById(APP)) scheduleMount(); });
     observer.observe(document.documentElement, { childList: true, subtree: true });
-    timer = setInterval(() => { if (!document.getElementById(APP)) scheduleMount(); hideLegacyPanels(); tick(); }, CHECK_EVERY_MS);
+    timer = setInterval(() => { if (!document.getElementById(APP)) scheduleMount(); checkConflicts(); tick(); }, CHECK_EVERY_MS);
     window.addEventListener('pagehide', () => { if (phase === STATES.READY || phase === STATES.WAITING) pause('Navegación de página: ciclo suspendido.'); });
     document.addEventListener('keydown', e => {
       if (e.repeat || !e.altKey || !e.shiftKey || e.ctrlKey || e.metaKey || String(e.key).toLowerCase() !== 'a') return;
