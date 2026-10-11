@@ -1,21 +1,21 @@
 {
   "schema_version": 2,
-  "updated_at": "2026-10-10T23:50:00-05:00",
+  "updated_at": "2026-10-10T23:58:00-05:00",
   "purpose": "Single macro source of truth; user projects, economic state and native app execution are independent",
   "primary_repository": "diegohoyosroncal/chatgpt-avanza-macro",
   "channels": {
     "stable": {
       "path": "avanza_macro_maestro_v4.user.js",
       "branch": "main",
-      "version_verified_in_repository": "4.1.0",
+      "version_verified_in_repository": "4.1.1",
       "installed_profiles": "not_verified",
-      "ci": "18/18 offline + Chromium HUD PASS before merge"
+      "ci": "19/19 offline + Chromium HUD PASS before merge"
     },
     "candidate": {
       "path": "avanza_macro_maestro_v4.user.js",
       "branch": "feat/seed-active-projects-20261010",
       "version": "4.1.1",
-      "status": "draft_seeded_catalog",
+      "status": "promoted_to_stable",
       "installed_profiles": "not_verified"
     }
   },
@@ -85,9 +85,9 @@
   ],
   "rollback": "Restore avanza_macro_maestro_v4.user.js from commit ad812155a070654770508cfae6f677bd8d8fdecf (v4.0.3); never delete project state.",
   "release_evidence": {
-    "pr": 4,
-    "merge_commit": "1b0d0f410d196af50d77d914c3e0363f28e52bbb",
-    "offline_tests": "18/18 PASS",
+    "pr": 5,
+    "merge_commit": "c13cf2e80bf81e1e2f727990a50947310253632b",
+    "offline_tests": "19/19 PASS",
     "chromium_hud": "PASS",
     "authenticated_profile": "not_verified"
   }
