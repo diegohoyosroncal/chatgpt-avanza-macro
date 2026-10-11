@@ -221,3 +221,23 @@ test('Mission Control keeps project percentages and Learn Quest interactions wir
   assert.match(script,/data-learn-action="boss"/);
   assert.match(script,/formatPercent\(projects\['CFI-E2-2026-10-16'\]\?\.current_pct\)/);
 });
+
+
+test('MUNDO VIVO is presentation-only: GAME toggle and XP cannot gate AUTO', () => {
+  const body = script.slice(script.indexOf('  function shouldAutoStart()'), script.indexOf('  function maybeAutoStart()'));
+  assert.ok(body.length > 200, 'AUTO policy function must be present');
+  assert.doesNotMatch(body, /moduleOn\('game'\)|learningFor\(|AWAITING_USER/);
+  assert.match(body, /state\.autoConsented !== true/);
+  assert.match(body, /draft\(findComposer\(\)\)/);
+  assert.match(script, /Learn Quest is display-only/);
+});
+test('Mission Control is scoped by process: no academic fallback in non-CFI chats', () => {
+  const body = script.slice(script.indexOf('  function renderMissionControl()'), script.indexOf('  function toggleMissionControl('));
+  assert.ok(body.length > 200, 'visual mission control must remain available');
+  assert.match(body, /const liveId=projectKey\(\)/);
+  assert.match(body, /if\(!liveId \|\| !\/\^CFI/);
+  assert.match(body, /SIN OBJETIVO/);
+  assert.match(body, /NO hay cuestionarios|No hay cuestionarios/);
+  assert.match(body, /const id=liveId/);
+  assert.doesNotMatch(body, /projectKey\(\)\|\|'CFI-E2-2026-10-16'/);
+});
