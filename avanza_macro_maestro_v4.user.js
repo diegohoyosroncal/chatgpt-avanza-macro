@@ -310,7 +310,7 @@
   function escapeText(value, max=100) { return String(value || '').replace(/[\u0000-\u001f]/g, ' ').slice(0,max); }
   function updateDashboard() {
     if (!dashboard) return;
-    const pct = state.lastPercent;
+    const pct = moduleOn('progress') ? state.lastPercent : null;
     const known = typeof pct === 'number' && Number.isFinite(pct) && pct >= 0 && pct <= 100;
     const circle = dashboard.querySelector('.ring');
     if (circle) circle.style.setProperty('--fill', known ? Math.min(100, Math.max(0, pct)) : 0);
@@ -328,11 +328,12 @@
     const bar = dashboard.querySelector('.bar-fill'); if (bar) { bar.style.width = known ? `${pct}%` : '0%'; if (known) { bar.parentElement.setAttribute('aria-valuemin','0'); bar.parentElement.setAttribute('aria-valuemax','100'); bar.parentElement.setAttribute('aria-valuenow',String(pct)); bar.parentElement.removeAttribute('aria-valuetext'); } else { bar.parentElement.removeAttribute('aria-valuenow'); bar.parentElement.setAttribute('aria-valuetext','Progreso aún no verificable'); } }
     const tone = dashboard.querySelector('.tone');
     if (tone) tone.dataset.level=state.stalled>=3?'risk':phase===STATES.WAITING||phase===STATES.READY?'live':'idle';
+    renderGame(); renderModules(); renderProjects();
   }
   function render() {
     if (!button) return;
     const active = phase === STATES.READY || phase === STATES.WAITING;
-    button.textContent = active ? '■  DETENER CICLO' : '▶  AVANZAR';
+    button.textContent = active ? '■  DETENER CICLO' : (moduleOn('auto') ? '▶  AVANZAR · AUTO' : '▶  AVANZAR · MANUAL');
     button.classList.toggle('active',active);
     button.disabled = busy || conflicts().length > 0;
     button.setAttribute('aria-pressed', String(active));
@@ -365,16 +366,15 @@
     render();
   }
   async function deliver(step) {
-    if (checkConflicts()) return;
+    if (checkConflicts() || !moduleOn('engine')) return;
     if (busy || phase !== STATES.READY || pending) return;
     busy = true; render();
     try {
       syncRoute();
       if (phase !== STATES.READY) return;
       if (!renewLease()) { pause('Otro panel tiene el control de este chat; no duplico envíos.', true); return; }
-      if (document.hidden) { pause('Pausada: pestaña no visible. Evita envíos inesperados.', true); return; }
+      if (document.hidden && !control.backgroundAuto) { setStatus('Pestaña en segundo plano: AUTO-background está OFF.'); return; }
       if (isGenerating()) { setStatus('Respuesta en curso; no duplico mensajes.'); return; }
-      if (state.totalSent >= MAX_AUTOMATIC_FOLLOWUPS + 1) { pause('Límite de seguridad alcanzado: revisa el resultado antes de reactivar.', true); return; }
       const c = findComposer();
       if (!c) { pause('No encuentro el cuadro de mensaje; no se envió nada.', true); return; }
       if (draft(c)) { pause('Hay un borrador escrito. Se conservó intacto.', true); return; }
@@ -407,7 +407,7 @@
     syncRoute();
     if (phase !== STATES.READY && phase !== STATES.WAITING) return;
     if (!renewLease()) { pause('El control de este chat está activo en otra pestaña; no duplico mensajes.', true); return; }
-    if (document.hidden) return; // hidden tab cannot surprise-send
+    if (document.hidden && !control.backgroundAuto) return;
     if (phase === STATES.READY) {
       if (now() - lastAudit < MIN_SEND_GAP_MS) return;
       lastAudit = now();
@@ -429,7 +429,7 @@
       return;
     }
     const reply = assistantAfter(pending.ticket);
-    if (reply === '<<USER_INTERRUPTED>>') { pause('Intervención humana detectada. No continúo automáticamente.', true); return; }
+    if (reply === '<<USER_INTERRUPTED>>') { pending=null; phase=STATES.IDLE; replyCandidate={fingerprint:'',firstSeen:0}; state.lastUpdated=new Date().toISOString(); saveState(); setStatus('Intervención humana detectada: conservo el proyecto y re-evalúo tras la respuesta.'); return; }
     if (!reply || isGenerating()) return;
     const key = fingerprint(reply);
     if (key !== replyCandidate.fingerprint) {
@@ -451,6 +451,7 @@
     } else {
       state.missingReceipts = 0;
       state.lastStatus = receipt.status;
+      if (receipt.processId) { if (!state.processId) state.processId=receipt.processId; else if (state.processId!==receipt.processId) state.blocker='PROCESS_ID cambió: conservar '+state.processId+' sin mezclar métricas'; }
       const previousObjective = state.objective;
       const changedObjective = Boolean(receipt.objective && previousObjective && receipt.objective.trim().toLocaleLowerCase() !== previousObjective.trim().toLocaleLowerCase());
       if (receipt.objective && !changedObjective) state.objective = receipt.objective;
@@ -478,11 +479,7 @@
     }
     state.lastUpdated = new Date().toISOString();
     pending = null;
-    if (state.repeatedResponses >= 4) {
-      saveState();
-      pause('Cuatro respuestas consecutivas repetidas: ya intenté cambio de ruta. No repito un bucle inútil.', true);
-      return;
-    }
+    if (state.repeatedResponses >= 4) { state.stalled=Math.max(state.stalled,3); state.lastStrategy='FORZAR_RUTA_MATERIALMENTE_DISTINTA'; setStatus('Respuesta repetida: cambio material de estrategia obligatorio; continúo.', true); }
     saveState();
     if (receipt && EXIT.has(receipt.status)) {
       pause(receipt.status === 'VERIFIED_COMPLETE' ? 'El asistente declaró objetivo completado: revisa recibos independientes.' :
@@ -490,19 +487,13 @@
         'No quedan acciones seguras verificadas; detengo el ciclo.', true);
       return;
     }
-    if (state.missingReceipts >= MAX_NO_RECEIPT_CYCLES) {
-      pause('Faltan metadatos verificables durante tres respuestas. No continúo a ciegas.', true); return;
-    }
-    if (state.stalled >= MAX_STALLED_CYCLES) {
-      pause('Seis ciclos sin progreso acreditable. Revisión requerida; no más bucle.', true); return;
-    }
-    if (state.totalSent >= MAX_AUTOMATIC_FOLLOWUPS + 1) {
-      pause('Límite de 12 continuaciones automáticas alcanzado. Revisa el resultado.', true); return;
-    }
-    if (draft(findComposer())) { pause('Hay un borrador nuevo; no lo sobrescribo.', true); return; }
-    phase = STATES.READY;
+    if (state.missingReceipts >= MAX_NO_RECEIPT_CYCLES) { state.stalled=Math.max(state.stalled,3); setStatus('Faltan metadatos: fuerzo recuperación de métrica/objetivo y continúo con ruta distinta.', true); }
+    if (state.stalled >= MAX_STALLED_CYCLES) { setStatus('Estancamiento alto: auditoría profunda y cambio de estrategia; NO es señal de STOP.', true); }
+    if (draft(findComposer())) { setStatus('Hay un borrador nuevo: lo respeto y reanudo después.'); phase=STATES.IDLE; render(); return; }
+    const id=projectKey(), mode=id?projectMode(id):{auto:false};
+    phase = moduleOn('auto') && mode.auto ? STATES.READY : STATES.IDLE;
     replyCandidate = { fingerprint: '', firstSeen: 0 };
-    setStatus(state.stalled >= 3 ? `Ciclo ${state.cycles}: cambio de estrategia por estancamiento…` : `Ciclo ${state.cycles}: evaluando siguiente acción…`);
+    setStatus(phase===STATES.READY ? (state.stalled >= 3 ? `Ciclo ${state.cycles}: cambio de estrategia por estancamiento…` : `Ciclo ${state.cycles}: evaluando siguiente acción…`) : '✋ MANUAL: checkpoint guardado; pulsa AVANZAR cuando quieras.');
     render();
   }
   function toggle() {
