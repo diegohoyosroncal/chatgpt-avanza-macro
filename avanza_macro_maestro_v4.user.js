@@ -100,22 +100,68 @@
     catch { /* inaccessible profile storage */ }
   }
 
+  function readControl() {
+    const defaults = { modules:{engine:true,auto:true,progress:true,sync:true,game:true,aura:true}, backgroundAuto:true, projectModes:{} };
+    try {
+      const raw = JSON.parse(localStorage.getItem(CONTROL_KEY) || 'null');
+      return raw && typeof raw === 'object' ? { ...defaults, ...raw, modules:{...defaults.modules,...(raw.modules||{})}, projectModes:{...(raw.projectModes||{})} } : defaults;
+    } catch { return defaults; }
+  }
+  function saveControl() {
+    try { localStorage.setItem(CONTROL_KEY, JSON.stringify(control)); } catch {}
+    renderModules(); renderProjects(); applyAura(); broadcast({type:'control',control});
+  }
+  function moduleOn(name) { return control.modules?.[name] !== false; }
+  function projectMode(id) {
+    const row=control.projectModes?.[id]||{};
+    return { enabled:row.enabled!==false, auto:row.auto!==false };
+  }
+  function setProjectMode(id,patch) {
+    if(!id) return;
+    control.projectModes[id]={...projectMode(id),...patch};
+    saveControl();
+  }
+  function readProjects() {
+    try { const raw=JSON.parse(localStorage.getItem(PROJECTS_KEY)||'{}'); return raw&&typeof raw==='object'?raw:{}; } catch { return {}; }
+  }
+  function saveProjects() {
+    try { localStorage.setItem(PROJECTS_KEY,JSON.stringify(projects)); } catch {}
+    renderProjects(); broadcast({type:'projects',projects});
+  }
+  function safeId(value) { return String(value||'').replace(/[^A-Za-z0-9._:-]/g,'-').replace(/-+/g,'-').slice(0,96); }
+  function projectKey() { return safeId(state.processId)||''; }
+  function upsertProjectSnapshot() {
+    const id=projectKey(); if(!id) return;
+    const prev=projects[id]||{};
+    projects[id]={...prev,id,chatKey,objective:state.objective||prev.objective||id,current_pct:state.lastPercent,previous_pct:state.lastDelta!==null&&state.lastPercent!==null?state.lastPercent-state.lastDelta:(prev.previous_pct??null),delta_pp:state.lastDelta,numerator:state.lastNumerator,denominator:state.lastDenominator,next_action:state.nextAction||prev.next_action||'',blocker:state.blocker||'',updated_at:state.lastUpdated||new Date().toISOString(),status:state.lastStatus||prev.status||'CONTINUE'};
+    saveProjects();
+  }
   function freshState() {
-    return { cycles: 0, totalSent: 0, stalled: 0, missingReceipts: 0,
-      lastPercent: null, lastDenominator: null, lastDelta: null,
-      lastResponseFingerprint: '', repeatedResponses: 0, lastStrategy: '', lastStatus: '',
-      objective: '', nextAction: '', blocker: '', lastNumerator: null,
-      lastProof: '', lastUpdated: '', lastTicket: '' };
+    return { cycles:0,totalSent:0,stalled:0,missingReceipts:0,lastPercent:null,lastDenominator:null,lastDelta:null,lastResponseFingerprint:'',repeatedResponses:0,lastStrategy:'',lastStatus:'',objective:'',nextAction:'',blocker:'',lastNumerator:null,lastProof:'',lastUpdated:'',lastTicket:'',processId:'' };
   }
   function recoverState() {
     try {
-      const raw = sessionStorage.getItem(storageKey());
-      const parsed = raw && JSON.parse(raw);
-      return parsed && typeof parsed === 'object' ? { ...freshState(), ...parsed } : freshState();
+      const raw=localStorage.getItem(storageKey())||sessionStorage.getItem(storageKey());
+      const parsed=raw&&JSON.parse(raw);
+      return parsed&&typeof parsed==='object'?{...freshState(),...parsed}:freshState();
     } catch { return freshState(); }
   }
   function saveState() {
-    try { sessionStorage.setItem(storageKey(), JSON.stringify(state)); } catch { /* storage disabled */ }
+    try { localStorage.setItem(storageKey(),JSON.stringify(state)); } catch {}
+    try { sessionStorage.setItem(storageKey(),JSON.stringify(state)); } catch {}
+    upsertProjectSnapshot();
+  }
+  function broadcast(payload) { if(!moduleOn('sync')||!channel) return; try { channel.postMessage({source:TAB_OWNER,at:Date.now(),...payload}); } catch {} }
+  function initChannel() {
+    if(!moduleOn('sync')||typeof BroadcastChannel==='undefined') return;
+    try {
+      channel?.close?.(); channel=new BroadcastChannel(CHANNEL_NAME);
+      channel.onmessage=event=>{
+        const msg=event.data||{}; if(msg.source===TAB_OWNER) return;
+        if(msg.type==='projects'&&msg.projects&&typeof msg.projects==='object'){ projects={...projects,...msg.projects}; try{localStorage.setItem(PROJECTS_KEY,JSON.stringify(projects));}catch{} renderProjects(); }
+        if(msg.type==='control'&&msg.control&&typeof msg.control==='object'){ control={...control,...msg.control,modules:{...control.modules,...(msg.control.modules||{})},projectModes:{...control.projectModes,...(msg.control.projectModes||{})}}; try{localStorage.setItem(CONTROL_KEY,JSON.stringify(control));}catch{} renderModules();renderProjects();applyAura(); }
+      };
+    } catch { channel=null; }
   }
   state = recoverState();
   function fingerprint(s) {
