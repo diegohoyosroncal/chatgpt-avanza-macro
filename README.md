@@ -21,4 +21,4 @@ Si no aparece la pantalla de instalación, abre Tampermonkey > Utilities > Insta
 
 ## Estado de verificación
 
-Versión 1.0.0: **7/7 pruebas automatizadas en navegador aislado** (botón, un toque, protección de borrador, protección durante generación, persistencia al cambiar chat, atajo y autoreparación de DOM). GitHub readback coincide exactamente con la versión probada. No se ha probado ni instalado en la sesión real del usuario, por lo que ese hito continúa pendiente. No se ha creado un cron, runtime ni servicio de pago adicional.
+Versión 1.0.1: **7/7 pruebas automatizadas en navegador aislado** (botón, un toque, protección de borrador, protección durante generación, persistencia al cambiar chat, atajo y autoreparación de DOM). GitHub readback y hash Git Blob coinciden byte a byte con la versión probada (v1.0.1, SHA-1 424eaa52c78ba62910b2826bc02238eec8426dc5). El enlace @updateURL permite buscar actualizaciones desde Tampermonkey. No se ha probado ni instalado en la sesión real del usuario, por lo que ese hito continúa pendiente. No se ha creado un cron, runtime ni servicio de pago adicional.
