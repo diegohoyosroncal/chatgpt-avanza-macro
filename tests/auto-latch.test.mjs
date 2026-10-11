@@ -31,13 +31,15 @@ test('pending unique ticket blocks duplicate action on reload',()=>{
   assert.ok(source.indexOf('state.inFlightTicket=ticket')<source.indexOf('liveSend.click();'));
   assert.match(source,/restoreOutstanding\(\)/);
 });
-test('six zero-progress cycles park; changed evidence reopens the gate',()=>{
+test('deep review precedes idle park; changed evidence reopens the gate',()=>{
   assert.equal(makeAuto({autoConsented:true,parkFingerprint:'old'}).start,false);
   const woke=makeAuto({autoConsented:true,parkFingerprint:'old',newFingerprint:'changed'});
   assert.equal(woke.start,true);
   assert.equal(woke.state.parkFingerprint,'');
   assert.equal(woke.saves,1);
-  assert.match(source,/state\.stalled >= MAX_STALLED_CYCLES\) \{ parkUnproductiveLoop\(\); return;/);
+  assert.match(source,/state\.stalled > MAX_STALLED_CYCLES/);
+  assert.match(source,/state\.lastStrategy === 'AUDITORIA_PROFUNDA_CREAR_O_SUSTITUIR_CAPACIDAD'/);
+  assert.match(source,/parkUnproductiveLoop\(\)/);
 });
 test('completion is terminal but a previously untagged chat may run',()=>{
   assert.equal(makeAuto({autoConsented:true,lastStatus:'VERIFIED_COMPLETE'}).start,false);
@@ -45,12 +47,12 @@ test('completion is terminal but a previously untagged chat may run',()=>{
 });
 test('domain-specific learning instructions do not leak to business chats',()=>{
   const sourcePart=section('  function buildMessage(ticket, step) {','  function setStatus(');
-  const message=(learning)=>new Function('state','strategy','MARK','RECEIPT','looksLearningProcess',sourcePart+'return buildMessage;')(
-    {processId:'',stalled:4,missingReceipts:0,lastPercent:null,lastDenominator:null,lastDelta:null},()=> 'REVISAR_RUTA_Y_CAMBIAR_ESTRATEGIA','AVANZA','AVANZA_CICLO_ID:',()=>learning)('TEST',1);
+  const message=(learning)=>new Function('state','strategy','MARK','RECEIPT','looksLearningProcess','MAX_STALLED_CYCLES',sourcePart+'return buildMessage;')(
+    {processId:'',stalled:4,missingReceipts:0,lastPercent:null,lastDenominator:null,lastDelta:null},()=> 'REVISAR_RUTA_Y_CAMBIAR_ESTRATEGIA','AVANZA','AVANZA_CICLO_ID:',()=>learning,6)('TEST',1);
   assert.doesNotMatch(message(false),/LEARN QUEST:|CFI\/APRENDIZAJE:/);
   assert.match(message(true),/LEARN QUEST:/);
   assert.match(message(false),/NO reemplaza objetivo/);
-  assert.match(message(false),/AUDITORÍA DE ESTANCAMIENTO OBLIGATORIA/);
+  assert.match(message(false),/AUDITORÍA DE ESTANCAMIENTO:/);
 });
 test('only one active chat writer and no shell/network API introduced',()=>{
   assert.match(source,/function acquireLease\(\)/);
