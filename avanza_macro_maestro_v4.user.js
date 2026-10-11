@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         AVANZA — Macro Maestro · Piloto Automático
 // @namespace    https://chatgpt.com/
-// @version      4.4.0
+// @version      4.4.1
 // @description  Cockpit multiproyecto + Learn Quest: módulos ON/OFF, AUTO/MANUAL, progreso serio independiente, misiones jugables y sincronización entre pestañas.
 // @updateURL    https://raw.githubusercontent.com/diegohoyosroncal/chatgpt-avanza-macro/main/avanza_macro_maestro_v4.user.js
 // @downloadURL  https://raw.githubusercontent.com/diegohoyosroncal/chatgpt-avanza-macro/main/avanza_macro_maestro_v4.user.js
@@ -22,7 +22,7 @@
   const SINGLETON = 'data-avanza-maestro-v4-runner';
   if (document.documentElement?.getAttribute(SINGLETON) === '1') return;
   document.documentElement?.setAttribute(SINGLETON, '1');
-  const INSTALLED_VERSION = '4.4.0-neon-control';
+  const INSTALLED_VERSION = '4.4.1-auto-latch';
   const LEARN_KEY = 'avanza-v4-learn-quest-v1';
   const CONTROL_KEY = 'avanza-v4-control-center-v1';
   const PROJECTS_KEY = 'avanza-v4-project-registry-v1';
@@ -255,7 +255,7 @@
     saveProjects();
   }
   function freshState() {
-    return { cycles:0,totalSent:0,stalled:0,missingReceipts:0,lastPercent:null,lastDenominator:null,lastDelta:null,lastResponseFingerprint:'',repeatedResponses:0,lastStrategy:'',lastStatus:'',objective:'',nextAction:'',blocker:'',lastNumerator:null,lastProof:'',lastUpdated:'',lastTicket:'',processId:'',autoConsented:false };
+    return { cycles:0,totalSent:0,stalled:0,missingReceipts:0,lastPercent:null,lastDenominator:null,lastDelta:null,lastResponseFingerprint:'',repeatedResponses:0,lastStrategy:'',lastStatus:'',objective:'',nextAction:'',blocker:'',lastNumerator:null,lastProof:'',lastUpdated:'',lastTicket:'',processId:'',autoConsented:false,inFlightTicket:'',inFlightSentAt:0,parkFingerprint:'',parkSince:0 };
   }
   function recoverState() {
     try {
@@ -479,7 +479,7 @@
   function render() {
     if (!button) return;
     const active = phase === STATES.READY || phase === STATES.WAITING;
-    button.textContent = active ? '■  DETENER CICLO' : (moduleOn('auto') ? '▶  AVANZAR · AUTO' : '▶  AVANZAR · MANUAL');
+    button.textContent = active ? '■  AUTO ACTIVO · DETENER' : '▶  AVANZAR · AUTO';
     button.classList.toggle('active',active);
     button.disabled = busy || conflicts().length > 0;
     button.setAttribute('aria-pressed', String(active));
@@ -508,6 +508,7 @@
     replyCandidate = { fingerprint: '', firstSeen: 0 };
     phase = STATES.IDLE;
     stopReason = '';
+    if (state.inFlightTicket) restoreOutstanding();
     if (wasRunning) setStatus('Chat cambiado: pausé el ciclo anterior. AVANZAR funciona aquí.', true);
     else setStatus('Lista en este chat. Se activa solo al pulsar AVANZAR.');
     render();
@@ -534,6 +535,8 @@
       if (!renewLease() || phase !== STATES.READY || isGenerating() || currentChatKey() !== chatKey) { pause('El estado cambió antes de enviar. Se detuvo por seguridad.', true); return; }
       const liveSend = findSend();
       if (!liveSend) { pause('El botón Enviar dejó de estar disponible.', true); return; }
+      state.inFlightTicket=ticket; state.inFlightSentAt=now();
+      saveState(); // Durable intent BEFORE click; refresh never blindly resends.
       liveSend.click();
       // Click is not proof of delivery. Wait for the unique user-message receipt in the DOM.
       pending = { ticket, sentAt: now(), lastCheckAt: 0, receiptSeen: false };
@@ -576,7 +579,7 @@
       return;
     }
     const reply = assistantAfter(pending.ticket);
-    if (reply === '<<USER_INTERRUPTED>>') { pending=null; phase=STATES.IDLE; state.autoConsented=false; replyCandidate={fingerprint:'',firstSeen:0}; state.lastUpdated=new Date().toISOString(); saveState(); setStatus('Intervención humana detectada: conservo el proyecto y re-evalúo tras la respuesta.'); return; }
+    if (reply === '<<USER_INTERRUPTED>>') { pending=null; phase=STATES.IDLE; state.autoConsented=false; state.inFlightTicket=''; state.inFlightSentAt=0; replyCandidate={fingerprint:'',firstSeen:0}; state.lastUpdated=new Date().toISOString(); saveState(); setStatus('Intervención humana detectada: conservo el proyecto y re-evalúo tras la respuesta.'); return; }
     if (!reply || isGenerating()) return;
     const key = fingerprint(reply);
     if (key !== replyCandidate.fingerprint) {
@@ -625,7 +628,7 @@
       state.lastProof = receipt.evidence || '';
     }
     state.lastUpdated = new Date().toISOString();
-    pending = null;
+    pending = null; state.inFlightTicket=''; state.inFlightSentAt=0;
     if (state.repeatedResponses >= 4) { state.stalled=Math.max(state.stalled,3); state.lastStrategy='FORZAR_RUTA_MATERIALMENTE_DISTINTA'; setStatus('Respuesta repetida: cambio material de estrategia obligatorio; continúo.', true); }
     saveState();
     if (receipt && EXIT.has(receipt.status)) {
@@ -635,10 +638,10 @@
       return;
     }
     if (state.missingReceipts >= MAX_NO_RECEIPT_CYCLES) { state.stalled=Math.max(state.stalled,3); setStatus('Faltan metadatos: fuerzo recuperación de métrica/objetivo y continúo con ruta distinta.', true); }
-    if (state.stalled >= MAX_STALLED_CYCLES) { setStatus('Estancamiento alto: auditoría profunda y cambio de estrategia; NO es señal de STOP.', true); }
+    if (state.stalled >= MAX_STALLED_CYCLES) { parkUnproductiveLoop(); return; }
     if (draft(findComposer())) { setStatus('Hay un borrador nuevo: lo respeto y reanudo después.'); phase=STATES.IDLE; render(); return; }
-    const id=projectKey(), mode=id?projectMode(id):{auto:false};
-    phase = moduleOn('auto') && mode.auto ? STATES.READY : STATES.IDLE;
+    const id=projectKey(), mode=id?projectMode(id):{enabled:true,auto:true};
+    phase = state.autoConsented===true && moduleOn('auto') && mode.enabled && mode.auto ? STATES.READY : STATES.IDLE;
     replyCandidate = { fingerprint: '', firstSeen: 0 };
     setStatus(phase===STATES.READY ? (state.stalled >= 3 ? `Ciclo ${state.cycles}: cambio de estrategia por estancamiento…` : `Ciclo ${state.cycles}: evaluando siguiente acción…`) : '✋ MANUAL: checkpoint guardado; pulsa AVANZAR cuando quieras.');
     render();
@@ -649,17 +652,18 @@
     if (busy) return;
     const id=projectKey();
     if (phase === STATES.READY || phase === STATES.WAITING) {
-      if (id) setProjectMode(id,{auto:false});
-      state.autoConsented=false;
+      state.autoConsented=false; // Per-chat stop; do not disable other chats sharing process ID.
       pause('Pausada manualmente. El proyecto queda en MANUAL hasta reactivar AUTO.', false);
       return;
     }
     if (!moduleOn('engine')) { setStatus('⚡ MOTOR está OFF. Enciéndelo desde MACROS.', true); return; }
+    if (!moduleOn('auto')) { control.modules.auto=true; saveControl(); }
     if (!acquireLease()) { setStatus('Este chat ya está controlado por otra pestaña; no duplico acciones.', true); return; }
-    if (id) setProjectMode(id,{enabled:true,auto:true});
-    state.autoConsented=true;
+    if (id && !projectMode(id).enabled) setProjectMode(id,{enabled:true});
+    state.autoConsented=true; state.parkFingerprint=''; state.parkSince=0;
     saveState();
     state.stalled=0; state.missingReceipts=0;
+    if (state.inFlightTicket) { restoreOutstanding(); render(); return; }
     phase=STATES.READY; lastAudit=0;
     setStatus('Evaluando el contexto para avanzar…'); render(); tick();
   }
@@ -740,12 +744,19 @@
   }
   function shouldAutoStart() {
     // Autonomy is scoped to an explicitly started CHAT; project-wide mode is not enough.
-    if (state.autoConsented !== true) return false;
+    if (state.autoConsented !== true || state.inFlightTicket) return false;
+    if (state.parkFingerprint) {
+      const fresh=lastVisibleAssistantFingerprint();
+      if (!fresh || fresh===state.parkFingerprint) return false;
+      state.parkFingerprint=''; state.parkSince=0;
+      state.stalled=0; state.missingReceipts=0; saveState();
+    }
     if(!moduleOn('engine')||!moduleOn('auto')||checkConflicts()||isGenerating()) return false;
     discoverVisibleProjects();
-    const id=projectKey(); if(!id) return false;
-    const mode=projectMode(id); if(!mode.enabled||!mode.auto) return false;
-    const L=learningFor(id); if(moduleOn('game')&&L?.status==='AWAITING_USER') return false;
+    const id=projectKey();
+    const mode=id?projectMode(id):{enabled:true,auto:true};
+    if(!mode.enabled||!mode.auto) return false;
+    const L=id?learningFor(id):null; if(moduleOn('game')&&L?.status==='AWAITING_USER') return false;
     if(draft(findComposer())) return false;
     if(state.lastStatus&&EXIT.has(state.lastStatus)) return false;
     if(typeof state.lastPercent==='number'&&state.lastPercent>=100) return false;
@@ -760,16 +771,37 @@
     setStatus(document.hidden?'♾️ AUTO multiproyecto en segundo plano…':'♾️ AUTO multiproyecto activo…');
     render();
   }
+  // Automatic mode never retries a delivery whose receipt is unknown.
+  function lastVisibleAssistantFingerprint() {
+    const nodes=document.querySelectorAll('[data-message-author-role="assistant"]');
+    if (!nodes.length) return '';
+    const node=nodes[nodes.length-1];
+    return fingerprint((node.innerText||node.textContent||'').slice(-5000));
+  }
+  function restoreOutstanding() {
+    if (!state.inFlightTicket) return false;
+    if (!acquireLease()) { phase=STATES.PAUSED; setStatus('Otro panel controla este chat; no reenvío.',true); return false; }
+    pending={ticket:state.inFlightTicket,sentAt:now(),lastCheckAt:0,receiptSeen:false};
+    phase=STATES.WAITING;
+    setStatus('♾️ Recuperando respuesta anterior sin duplicar envíos…');
+    return true;
+  }
+  function parkUnproductiveLoop() {
+    state.parkFingerprint=lastVisibleAssistantFingerprint();
+    state.parkSince=now(); phase=STATES.PAUSED; releaseLease(); saveState();
+    setStatus('⏳ AUTO espera evidencia nueva: no repito rutas improductivas.',true);
+    render();
+  }
   function readPresentation() {
     try {
       const old = JSON.parse(localStorage.getItem(UI_KEY) || '{}');
       return {
         theme: ['amber','ocean','violet'].includes(old.theme) ? old.theme : 'amber',
-        compact: old.compact === true,
+        compact: old.compact !== false,
         x: Number.isFinite(old.x) ? old.x : null,
         y: Number.isFinite(old.y) ? old.y : null,
       };
-    } catch { return { theme: 'amber', compact: false, x: null, y: null }; }
+    } catch { return { theme: 'amber', compact: true, x: null, y: null }; }
   }
   function savePresentation() {
     try { localStorage.setItem(UI_KEY, JSON.stringify(presentation)); } catch {}
@@ -1055,7 +1087,7 @@
       @media(max-width:720px){.mc-overlay{inset:4px}.mc-grid{grid-template-columns:1fr}.mc-left,.mc-right{grid-template-columns:1fr}.mc-topchips{display:none}.mc-orb{width:120px;height:120px}.mc-orb>div{width:92px;height:92px}.mc-hero h2{font-size:17px}.mc-actions{grid-template-columns:1fr 1fr}}
 
       .panel.compact{padding:10px}
-      .panel.compact .title,.panel.compact .stat,.panel.compact .bar,.panel.compact .tinyrow,.panel.compact .next,.panel.compact .status,.panel.compact .foot{display:none}
+      .panel.compact .title,.panel.compact .section,.panel.compact .game,.panel.compact .health,.panel.compact .tinyrow,.panel.compact .next,.panel.compact .foot{display:none}
       .panel.compact .ring{width:62px;height:62px;flex:0 0 62px;margin:8px auto}
       .panel.compact .center{width:50px;height:50px}
       .panel.compact .pct{font-size:15px}
@@ -1181,6 +1213,11 @@
     }, true);
   }
   initChannel();
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => { mount(); observe(); discoverLearning(); maybeAutoStart(); }, { once: true });
-  else { mount(); observe(); discoverLearning(); maybeAutoStart(); }
+  function boot() {
+    mount(); observe(); discoverLearning();
+    if (state.inFlightTicket) restoreOutstanding();
+    else maybeAutoStart();
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded',boot,{once:true});
+  else boot();
 })();
