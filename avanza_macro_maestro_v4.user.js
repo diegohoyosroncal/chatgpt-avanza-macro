@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         AVANZA — Macro Maestro · Piloto Automático
 // @namespace    https://chatgpt.com/
-// @version      4.3.1
+// @version      4.3.2
 // @description  Cockpit multiproyecto + Learn Quest: módulos ON/OFF, AUTO/MANUAL, progreso serio independiente, misiones jugables y sincronización entre pestañas.
 // @updateURL    https://raw.githubusercontent.com/diegohoyosroncal/chatgpt-avanza-macro/main/avanza_macro_maestro_v4.user.js
 // @downloadURL  https://raw.githubusercontent.com/diegohoyosroncal/chatgpt-avanza-macro/main/avanza_macro_maestro_v4.user.js
@@ -22,7 +22,7 @@
   const SINGLETON = 'data-avanza-maestro-v4-runner';
   if (document.documentElement?.getAttribute(SINGLETON) === '1') return;
   document.documentElement?.setAttribute(SINGLETON, '1');
-  const INSTALLED_VERSION = '4.3.1-visible-progress';
+  const INSTALLED_VERSION = '4.3.2-context-guard';
   const LEARN_KEY = 'avanza-v4-learn-quest-v1';
   const CONTROL_KEY = 'avanza-v4-control-center-v1';
   const PROJECTS_KEY = 'avanza-v4-project-registry-v1';
@@ -254,7 +254,7 @@
     saveProjects();
   }
   function freshState() {
-    return { cycles:0,totalSent:0,stalled:0,missingReceipts:0,lastPercent:null,lastDenominator:null,lastDelta:null,lastResponseFingerprint:'',repeatedResponses:0,lastStrategy:'',lastStatus:'',objective:'',nextAction:'',blocker:'',lastNumerator:null,lastProof:'',lastUpdated:'',lastTicket:'',processId:'' };
+    return { cycles:0,totalSent:0,stalled:0,missingReceipts:0,lastPercent:null,lastDenominator:null,lastDelta:null,lastResponseFingerprint:'',repeatedResponses:0,lastStrategy:'',lastStatus:'',objective:'',nextAction:'',blocker:'',lastNumerator:null,lastProof:'',lastUpdated:'',lastTicket:'',processId:'',autoConsented:false };
   }
   function recoverState() {
     try {
@@ -408,10 +408,12 @@
       'La continuidad fuera del chat requiere el ejecutor externo existente AUTORIZADO y sus recibos; no basta enviar mensajes con la macro ni crear más cron/tareas. No simules persistencia o cumplimiento universal en otros chats. Esta macro puede proponer una continuación del hilo web abierto, pero la ejecución real debe comprobarse en herramientas autorizadas.',
       'CONTRATO VISUAL DE PORCENTAJE: la PRIMERA línea de toda respuesta de proceso multi-ejecución debe ser 🧩 PROCESO <process_id> | 📈 AVANCE <anterior>%→<actual>% | <numerador>/<denominador> gates | Δ <pp>. Si no existe denominador defendible: 🧩 PROCESO <process_id> | 📈 AVANCE NO DETERMINABLE. Nunca omitas una métrica ya verificada; conserva el último valor si esta ejecución no cambia progreso.',
       'Antes de terminar repite la revisión de fronteras útiles, guarda checkpoint con objetivo, owner, receipt, bloqueo, siguiente acción exacta y condición de reanudación si procede. Reporta SIEMPRE objetivo, porcentaje anterior→actual con numerador/denominador, delta pp, pendiente, efecto realmente verificado, bloqueo y siguiente hito. Si no existe denominador defendible di NO DETERMINABLE.',
-      'MULTIPROYECTO: identifica un PROCESS_ID estable para este objetivo y NO mezcles su porcentaje con otro proceso. Otros proyectos independientes pueden avanzar en sus propios chats/tabs; conserva owner y escala del proceso actual.',
+      'MULTIPROYECTO: identifica un PROCESS_ID estable para este objetivo y NO mezcles su porcentaje con otro proceso. Si el chat contiene varias fronteras, evalúa sus objetivos y restricciones individualmente, actúa solo en las autorizadas y conserva métricas independientes. Otros proyectos pueden avanzar en sus propios chats/tabs.',
+      ...(looksLearningProcess() ? [
       'CFI/APRENDIZAJE: usa misiones cortas, feedback interactivo, colores y juego cuando ayuden, pero XP/estética jamás sustituyen dominio verificable. El porcentaje solo sube al cerrar gates de conocimiento o práctica.',
       'LEARN QUEST: si el proceso es de aprendizaje, NO entregues una pared de teoría. Presenta una micro-misión resoluble por el usuario, evalúa su respuesta, explica el error o acierto y encadena la siguiente misión sin que tenga que escribir "sigue". Usa dificultad progresiva, recuperación espaciada, variación de datos y boss/simulacro cuando proceda.',
       'PROTOCOLO VISIBLE PARA EL HUD: cuando presentes una misión termina el bloque con una línea EXACTA: 🎮 QUEST | <curso> | <mission_id> | ⭐<xp 0-500> XP | ⚔️<1-5>/5 | <título>. Si la pregunta admite opciones útiles, añade inmediatamente: 🎲 QUEST_CHOICES | <mission_id> | A=<opción> | B=<opción> | C=<opción> | D=<opción>. El HUD convertirá esas opciones en botones. Si es numérica/abierta, deja que el usuario responda desde la caja interactiva del HUD. Cuando evalúes una respuesta añade: 🏆 QUEST_RESULT | <mission_id> | PASS | +<xp> XP | 🔥<racha> o 🔁 QUEST_RESULT | <mission_id> | RETRY | +0 XP | 🔥0. Si haces PASS, presenta en esa misma respuesta la siguiente QUEST salvo boss, pausa pedagógica o gate humano real.',
+      ] : []),
       'Para el control local termina con EXACTAMENTE UNA línea JSON de metadatos, después del informe: AVANZA_CONTROL: {"status":"CONTINUE","process_id":"","objective":"","previous_pct":null,"current_pct":null,"delta_pp":null,"numerator":null,"denominator":null,"evidence":"","blocker":"","next_action":""}. Estos valores son declaraciones del asistente y NO recibos independientes. Usa VERIFIED_COMPLETE solo si el OBJETIVO PRINCIPAL está completamente verificado con fuente primaria, HUMAN_GATE_PROVEN solo si se agotaron alternativas legítimas, NO_SAFE_ACTION solo si realmente no queda acción segura positiva. Nunca afirmes resultado final por CI, cola DONE, pruebas aisladas, documentos o esta macro. Mantén el denominador del MISMO objetivo, no mezcles ámbitos.',
       `${RECEIPT} ${ticket}`,
     ];
@@ -646,12 +648,15 @@
     const id=projectKey();
     if (phase === STATES.READY || phase === STATES.WAITING) {
       if (id) setProjectMode(id,{auto:false});
+      state.autoConsented=false;
       pause('Pausada manualmente. El proyecto queda en MANUAL hasta reactivar AUTO.', false);
       return;
     }
     if (!moduleOn('engine')) { setStatus('⚡ MOTOR está OFF. Enciéndelo desde MACROS.', true); return; }
     if (!acquireLease()) { setStatus('Este chat ya está controlado por otra pestaña; no duplico acciones.', true); return; }
-    if (id) setProjectMode(id,{enabled:true});
+    if (id) setProjectMode(id,{enabled:true,auto:true});
+    state.autoConsented=true;
+    saveState();
     state.stalled=0; state.missingReceipts=0;
     phase=STATES.READY; lastAudit=0;
     setStatus('Evaluando el contexto para avanzar…'); render(); tick();
@@ -705,6 +710,7 @@
   }
   function discoverVisibleProjects() {
     const nodes=[...document.querySelectorAll('[data-message-author-role="assistant"]')].slice(-30);
+    const detected = new Set(); // Avoid binding the first of multiple unrelated objectives.
     for (const node of nodes) {
       const text=(node.innerText||node.textContent||'');
       const re=/🧩\s*PROCESO\s+([A-Za-z0-9._:-]+)[^\n]*?📈\s*(?:AVANCE\s*)?([0-9]+(?:[.,][0-9]+)?)%\s*→\s*([0-9]+(?:[.,][0-9]+)?)%[^\n]*?(\d+)\s*\/\s*(\d+)/gi;
@@ -713,9 +719,16 @@
         const id=safeId(m[1]), current=Number(m[3].replace(',','.')), previous=Number(m[2].replace(',','.')), numerator=Number(m[4]), denominator=Number(m[5]);
         if(!id||denominator<=0||numerator>denominator||Math.abs(100*numerator/denominator-current)>0.5) continue;
         const old=projects[id]||{};
-        projects[id]={...old,id,current_pct:Math.max(old.current_pct??0,current),previous_pct:previous,delta_pp:current-previous,numerator,denominator,chatKey,updated_at:new Date().toISOString(),objective:old.objective||id,status:old.status||'CONTINUE'};
-        if(!state.processId){ state.processId=id; state.lastPercent=current; state.lastDelta=current-previous; state.lastNumerator=numerator; state.lastDenominator=denominator; }
+        detected.add(id);
+        projects[id]={...old,id,current_pct:current,previous_pct:previous,delta_pp:current-previous,numerator,denominator,chatKey,updated_at:new Date().toISOString(),objective:old.objective||id,status:old.status||'CONTINUE'};
       }
+    }
+    // Bind automatically only when precisely one process is visible in this chat.
+    // Multiple processes remain visible as separate cards; the assistant recovers the correct active objective.
+    if(!state.processId && detected.size===1) {
+      const id=[...detected][0], p=projects[id];
+      state.processId=id; state.lastPercent=p.current_pct; state.lastDelta=p.delta_pp;
+      state.lastNumerator=p.numerator; state.lastDenominator=p.denominator;
     }
     if(Object.keys(projects).length){ try{localStorage.setItem(PROJECTS_KEY,JSON.stringify(projects));}catch{} renderProjects(); }
     if (Date.now() - lastPassiveProgressScan > 3500) {
@@ -724,6 +737,8 @@
     }
   }
   function shouldAutoStart() {
+    // Autonomy is scoped to an explicitly started CHAT; project-wide mode is not enough.
+    if (state.autoConsented !== true) return false;
     if(!moduleOn('engine')||!moduleOn('auto')||checkConflicts()||isGenerating()) return false;
     discoverVisibleProjects();
     const id=projectKey(); if(!id) return false;
