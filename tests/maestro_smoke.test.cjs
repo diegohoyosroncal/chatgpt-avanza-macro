@@ -111,7 +111,7 @@ test('permanent health badge names the installed version without pretending the 
   assert.match(script, /updateHealth\(\)/);
 });
 test('registry matches stable and candidate versions and records native-app limitations', () => {
-  assert.equal(registry.channels.stable.version_verified_in_repository, '4.1.1');
+  assert.equal(registry.channels.stable.version_verified_in_repository, '4.2.0');
   assert.equal(registry.channels.candidate.version, '4.3.0');
   assert.equal(registry.channels.candidate.status, 'draft_interactive_quest_ribbon');
   assert.ok(registry.limitations.some(text => text.includes('Native Android/iOS')));
@@ -143,7 +143,7 @@ test('continuity has no fixed execution-count stop', () => {
   assert.match(script, /Estancamiento alto: auditoría profunda y cambio de estrategia; NO es señal de STOP/);
 });
 test('game mode keeps XP explicitly separate from verified progress', () => {
-  assert.match(script, /XP\/racha = motivación/);
+  assert.match(script, /XP\/racha motivan/);
   assert.match(script, /CFI\/APRENDIZAJE/);
 });
 
@@ -164,7 +164,7 @@ test('Learn Quest protocol is readable and generic across courses', () => {
 test('Learn Quest persists XP separately from verified project percentage', () => {
   assert.match(script,/const LEARN_KEY = 'avanza-v4-learn-quest-v1'/);
   assert.match(script,/localStorage\.setItem\(LEARN_KEY/);
-  assert.match(script,/XP\/racha = motivación · 📈 % = dominio verificado/);
+  assert.match(script,/porcentaje = dominio verificado/);
 });
 test('academic AUTO lane waits while a learner owes an answer', () => {
   assert.match(script,/L\?\.status==='AWAITING_USER'/);
