@@ -1,21 +1,21 @@
 {
   "schema_version": 2,
-  "updated_at": "2026-10-11T00:08:00-05:00",
+  "updated_at": "2026-10-11T00:16:00-05:00",
   "purpose": "Single macro source of truth; user projects, economic state and native app execution are independent",
   "primary_repository": "diegohoyosroncal/chatgpt-avanza-macro",
   "channels": {
     "stable": {
       "path": "avanza_macro_maestro_v4.user.js",
       "branch": "main",
-      "version_verified_in_repository": "4.2.0",
+      "version_verified_in_repository": "4.3.0",
       "installed_profiles": "not_verified",
-      "ci": "offline tests PASS + Chromium Learn Quest HUD PASS before merge"
+      "ci": "27/27 offline + Chromium interactive HUD PASS before merge"
     },
     "candidate": {
       "path": "avanza_macro_maestro_v4.user.js",
       "branch": "feat/interactive-quest-progress-ribbon-20261011",
       "version": "4.3.0",
-      "status": "draft_interactive_quest_ribbon",
+      "status": "promoted_to_stable",
       "installed_profiles": "not_verified"
     }
   },
@@ -66,8 +66,8 @@
       "name": "AVANZA Interactive Quest",
       "version": "4.3.0-interactive1",
       "executor": "userscript_web",
-      "branch": "feat/interactive-quest-progress-ribbon-20261011",
-      "status": "draft"
+      "branch": "main",
+      "status": "stable"
     }
   ],
   "related_independent_systems": [
@@ -106,10 +106,10 @@
   ],
   "rollback": "Restore avanza_macro_maestro_v4.user.js from commit ad812155a070654770508cfae6f677bd8d8fdecf (v4.0.3); never delete project state.",
   "release_evidence": {
-    "pr": 6,
-    "merge_commit": "a0ddf1b3b633bdc9586781f2d80bdef46d10c0e5",
-    "offline_tests": "19/19 PASS",
-    "chromium_hud": "PASS",
+    "pr": 7,
+    "merge_commit": "ea3eede6d72397834ee6b96f79c75cc7e67105c6",
+    "offline_tests": "27/27 PASS",
+    "chromium_hud": "PASS interactive ribbon/choices/free-text/rescue",
     "authenticated_profile": "not_verified",
     "learn_quest": "PASS"
   }
