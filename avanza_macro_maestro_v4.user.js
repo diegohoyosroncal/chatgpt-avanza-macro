@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         AVANZA — Macro Maestro · Piloto Automático
 // @namespace    https://chatgpt.com/
-// @version      4.4.5
+// @version      4.4.6
 // @description  Cockpit multiproyecto + Learn Quest: módulos ON/OFF, AUTO/MANUAL, progreso serio independiente, misiones jugables y sincronización entre pestañas.
 // @updateURL    https://raw.githubusercontent.com/diegohoyosroncal/chatgpt-avanza-macro/main/avanza_macro_maestro_v4.user.js
 // @downloadURL  https://raw.githubusercontent.com/diegohoyosroncal/chatgpt-avanza-macro/main/avanza_macro_maestro_v4.user.js
@@ -22,7 +22,7 @@
   const SINGLETON = 'data-avanza-maestro-v4-runner';
   if (document.documentElement?.getAttribute(SINGLETON) === '1') return;
   document.documentElement?.setAttribute(SINGLETON, '1');
-  const INSTALLED_VERSION = '4.4.5-send-fix';
+  const INSTALLED_VERSION = '4.4.6-button-feedback';
   const LEARN_KEY = 'avanza-v4-learn-quest-v1';
   const CONTROL_KEY = 'avanza-v4-control-center-v1';
   const PROJECTS_KEY = 'avanza-v4-project-registry-v1';
@@ -508,7 +508,10 @@
     const indicator=dashboard?.querySelector('[data-value="live-indicator"]');
     if(indicator){ indicator.dataset.live=active?'true':'false';
       indicator.textContent=active?(phase===STATES.WAITING?'● ESPERANDO':'● AUTO ACTIVO'):(phase===STATES.PAUSED?'● EN PAUSA':'◇ LISTO'); }
-    button.disabled = busy || conflicts().length > 0;
+    // Do not make AVANZAR inert when a legacy panel exists: its click explains
+    // the conflict via toggle()/checkConflicts(), while sending stays blocked.
+    button.disabled = busy;
+    button.title = conflicts().length ? 'Hay otra macro activa: pulsa para ver el motivo; no se enviará nada.' : 'Avanzar o detener AUTO en este chat';
     button.setAttribute('aria-pressed', String(active));
     updateDashboard();
     updateHealth();
