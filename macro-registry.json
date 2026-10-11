@@ -1,21 +1,21 @@
 {
   "schema_version": 2,
-  "updated_at": "2026-10-11T00:45:00-05:00",
+  "updated_at": "2026-10-11T00:58:00-05:00",
   "purpose": "Single macro source of truth; user projects, economic state and native app execution are independent",
   "primary_repository": "diegohoyosroncal/chatgpt-avanza-macro",
   "channels": {
     "stable": {
       "path": "avanza_macro_maestro_v4.user.js",
       "branch": "main",
-      "version_verified_in_repository": "4.4.0",
+      "version_verified_in_repository": "4.4.2",
       "installed_profiles": "not_verified",
-      "ci": "29/29 offline + Chromium Mission Control PASS; PR #13 merged as dd0340ebbdd04ac53e5c63878390b77e1412f770"
+      "ci": "v4.4.0 visual release PASS; v4.4.2 canonical integrity validation"
     },
     "candidate": {
       "path": "avanza_macro_maestro_v4.user.js",
-      "branch": "feat/v4-4-neon-control-rebased-20261011",
-      "version": "4.4.0",
-      "status": "promoted_to_stable",
+      "branch": "main",
+      "version": "4.4.2",
+      "status": "stable_pending_integrity_ci",
       "installed_profiles": "not_verified"
     }
   },
@@ -71,7 +71,7 @@
     },
     {
       "name": "AVANZA Neon Mission Control",
-      "version": "4.4.0-neon-control",
+      "version": "4.4.2-deduped-auto",
       "executor": "userscript_web",
       "branch": "main",
       "status": "stable"
@@ -119,6 +119,7 @@
     "chromium_hud": "PASS neon Mission Control + ribbon + interactive choices/free-text + rescue + fixed/drag/theme/compact",
     "authenticated_profile": "not_verified",
     "learn_quest": "PASS",
-    "cfi_quest_bank": "verified in Google Drive"
+    "cfi_quest_bank": "verified in Google Drive",
+    "current_source_version": "4.4.2"
   }
 }
