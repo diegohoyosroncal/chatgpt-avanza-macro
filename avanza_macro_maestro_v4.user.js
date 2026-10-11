@@ -173,7 +173,7 @@
   }
   function looksLearningProcess() {
     const id=projectKey(), p=projects?.[id]||{}, hay=[id,p.objective,state.objective].join(' ');
-    return /(CFI|CURSO|ACADEM|EXAM|CLASE|ESTUDI|APREND|CONTABIL|NIC\s*\d+)/i.test(hay);
+    return /^(CFI|CURSO|ACADEM|EXAM|ESTUDIO)([-_:]|$)/i.test(id) || /(?:preparar examen|aprobar curso|estudiar para examen)/i.test([state.objective,p.objective].join(' '));
   }
   function parseQuestLine(text) {
     const m=String(text||'').match(/🎮\s*QUEST\s*\|\s*([^|\n]+)\|\s*([^|\n]+)\|\s*⭐\s*(\d{1,4})\s*XP\s*\|\s*⚔️\s*([1-5])\s*\/\s*5\s*\|\s*([^\n]+)/i);
