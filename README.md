@@ -31,3 +31,7 @@ Si no aparece la pantalla de instalación, abre Tampermonkey > Utilities > Insta
 ## Puente de continuidad v1.0.3
 
 Cuando el usuario activa **AVANZA**, la macro ahora pide comprobar, usando **solo conectores autorizados y existentes**, la cadena `COLA → ENTREGA A RESPONSABLE → ACCIÓN → EFECTO` por separado. Un recibo `DONE` de una cola no equivale a autonomía útil. El script no hace llamadas de red ni almacena secretos; el puente se ejecuta únicamente si el asistente tiene las herramientas autorizadas en ese chat. La ejecución en todos los chats nativos, la entrega a owner y el trabajo posterior al cierre **siguen sin estar acreditados**. El código v1.0.3 pasó 11/11 pruebas de interfaz aisladas y su blob Git coincide byte por byte con la versión local (`92d0b14a8953fc9a502885217d6fb28dbfd7d519`).
+
+## Botón fijo mientras haces scroll
+
+El botón web usa `position:fixed`, queda anclado cerca del extremo inferior derecho de la ventana y el `MutationObserver` lo reconstruye cuando una navegación de ChatGPT sustituye el DOM. Verificación adicional local en Chromium aislado: **2/2 PASS** con desplazamiento vertical de 2100 px en viewport escritorio 1280×800 y móvil 390×844; coordenada vertical del botón sin cambios antes y después. No significa instalación real en tu cuenta ni que se pueda fijar el botón dentro de la app Android nativa o dentro de los mensajes de ChatGPT. El instalador exige aprobación previa del navegador y no puede eludirla.
