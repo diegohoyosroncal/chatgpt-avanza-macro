@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         AVANZA — Control de continuación inteligente para ChatGPT
 // @namespace    https://chatgpt.com/
-// @version      1.0.1
+// @version      1.0.2
 // @description  Agrega un botón AVANZA a cada conversación de ChatGPT web, sin transmitir datos a terceros.
 // @updateURL    https://raw.githubusercontent.com/diegohoyosroncal/chatgpt-avanza-macro/main/avanza_macro.user.js
 // @downloadURL  https://raw.githubusercontent.com/diegohoyosroncal/chatgpt-avanza-macro/main/avanza_macro.user.js
@@ -28,6 +28,8 @@
   ].join('\n');
 
   let sending = false;
+  let lastSubmitAt = 0;
+  const SUBMIT_DEDUP_MS = 4500;
   let statusTimeout;
 
   function status(message, warning = false) {
@@ -123,8 +125,29 @@
     );
   }
 
+  // Only a visible user message is a UI-level receipt. Clicking a submit button
+  // is not evidence of delivery to a server or of an assistant response.
+  function userMessageCount() {
+    return [...document.querySelectorAll('[data-message-author-role="user"]')]
+      .filter(node => (node.textContent || '').includes('AVANZA AL OBJETIVO'))
+      .length;
+  }
+
+  async function checkVisibleSubmission(before, timeoutMs = 1700) {
+    const deadline = Date.now() + timeoutMs;
+    do {
+      if (userMessageCount() > before) return true;
+      await new Promise(resolve => setTimeout(resolve, 170));
+    } while (Date.now() < deadline);
+    return userMessageCount() > before;
+  }
+
   async function advance() {
     if (sending) return;
+    if (Date.now() - lastSubmitAt < SUBMIT_DEDUP_MS) {
+      status('Envío reciente: revisa el chat antes de repetir.', true);
+      return;
+    }
     if (generationInProgress()) {
       status('La respuesta sigue generándose. Usa AVANZA cuando termine.', true);
       return;
@@ -147,8 +170,14 @@
       await new Promise(resolve => setTimeout(resolve, 230));
       const send = findSend(composer);
       if (send && !generationInProgress()) {
+        const before = userMessageCount();
+        lastSubmitAt = Date.now();
         send.click();
-        status('Macro enviada al chat actual. Comprueba la respuesta.');
+        const visibleReceipt = await checkVisibleSubmission(before);
+        status(visibleReceipt
+          ? 'La macro aparece en el chat. El resultado aún requiere verificación.'
+          : 'Se pulsó Enviar, pero NO se confirmó el mensaje. Revísalo antes de repetir.',
+          !visibleReceipt);
       } else {
         status('Macro insertada: pulsa Enviar. No se confirmó el envío automático.', true);
       }
