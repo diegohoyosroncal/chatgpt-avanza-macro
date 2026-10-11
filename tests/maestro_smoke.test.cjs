@@ -76,7 +76,7 @@ test('dragging records position and disposes pointer event handlers', () => {
 });
 test('concurrent-script guard executes before send or auto cycle, progress not fabricated', () => {
   assert.match(script, /function toggle\(\) \{\s*syncRoute\(\);\s*if \(checkConflicts\(\)\) return;/);
-  assert.match(script, /async function deliver\(step\) \{\s*if \(checkConflicts\(\)\) return;/);
+  assert.match(script, /async function deliver\(step\) \{\s*if \(checkConflicts\(\) \|\| !moduleOn\('engine'\)\) return;/);
   assert.match(script, /Progreso aún no verificable/);
   assert.match(script, /lastDenominator/);
 });
@@ -112,8 +112,37 @@ test('permanent health badge names the installed version without pretending the 
 });
 test('registry matches stable and candidate versions and records native-app limitations', () => {
   assert.equal(registry.channels.stable.version_verified_in_repository, '4.0.3');
-  assert.equal(registry.channels.candidate.version, '4.0.4');
-  assert.equal(registry.channels.candidate.status, 'draft_not_deployed');
+  assert.equal(registry.channels.candidate.version, '4.1.0');
+  assert.equal(registry.channels.candidate.status, 'draft_multiproject');
   assert.ok(registry.limitations.some(text => text.includes('Native Android/iOS')));
   assert.ok(registry.release_gates.includes('authenticated_chatgpt_browser_smoke_pass'));
+});
+
+test('multiproject cockpit exposes six independent module switches', () => {
+  for (const name of ['engine','auto','progress','sync','game','aura']) assert.match(script, new RegExp('data-module="'+name+'"'));
+  assert.match(script, /🎛️ MACROS · ON\/OFF/);
+});
+test('project cards keep ON-OFF and AUTO-MANUAL state independently', () => {
+  assert.match(script, /function projectMode\(id\)/);
+  assert.match(script, /data-project-enabled/);
+  assert.match(script, /data-project-auto/);
+  assert.match(script, /projectModes/);
+});
+test('project state persists beyond a single tab session', () => {
+  assert.match(script, /localStorage\.setItem\(storageKey\(\),JSON\.stringify\(state\)\)/);
+  assert.match(script, /localStorage\.getItem\(storageKey\(\)\)\|\|sessionStorage\.getItem/);
+});
+test('cross-tab project registry uses BroadcastChannel without remote APIs', () => {
+  assert.match(script, /new BroadcastChannel\(CHANNEL_NAME\)/);
+  assert.match(script, /channel\.postMessage/);
+  assert.doesNotMatch(script, /fetch\(|XMLHttpRequest|WebSocket\(/);
+});
+test('continuity has no fixed execution-count stop', () => {
+  assert.doesNotMatch(script, /Límite de 12 continuaciones automáticas/);
+  assert.doesNotMatch(script, /MAX_AUTOMATIC_FOLLOWUPS/);
+  assert.match(script, /Estancamiento alto: auditoría profunda y cambio de estrategia; NO es señal de STOP/);
+});
+test('game mode keeps XP explicitly separate from verified progress', () => {
+  assert.match(script, /XP visual ≠ % verificado/);
+  assert.match(script, /CFI\/APRENDIZAJE/);
 });
