@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         AVANZA — Macro Maestro · Piloto Automático
 // @namespace    https://chatgpt.com/
-// @version      4.0.2
+// @version      4.0.3
 // @description  Un solo control inteligente para ChatGPT web: reevalúa cada respuesta, continúa de forma acotada y cambia de estrategia ante estancamiento.
 // @updateURL    https://raw.githubusercontent.com/diegohoyosroncal/chatgpt-avanza-macro/main/avanza_macro_maestro_v4.user.js
 // @downloadURL  https://raw.githubusercontent.com/diegohoyosroncal/chatgpt-avanza-macro/main/avanza_macro_maestro_v4.user.js
@@ -17,6 +17,7 @@
   // Never auto-start on page load, after reload, or when navigating to another chat.
   // The userscript never calls a remote API, reads credentials or controls ChatGPT tools.
   const APP = 'avanza-macro-maestro-v4';
+  const INSTALLED_VERSION = '4.0.3-rc1';
   const MARK = 'MACRO MAESTRO — AVANZA AL OBJETIVO';
   const RECEIPT = 'AVANZA_CICLO_ID:';
   const MAX_AUTOMATIC_FOLLOWUPS = 12; // bounded safety budget, not claimed objective completion
@@ -445,14 +446,17 @@
       <div class="next" data-value="next">El siguiente hito se decide según evidencia del chat.</div>
       <button class="go" data-action="avanzar" type="button" aria-label="Avanzar según el contexto o detener el ciclo">▶  AVANZAR</button>
       <div class="status" data-warning="false" role="status" aria-live="polite">Un botón. Decide la ruta según cada respuesta.</div>
-      <div class="foot"><span>Informe del asistente ≠ prueba independiente</span><span class="scope">POR CHAT</span></div>`;
+      <div class="foot"><span>Informe del asistente ≠ prueba independiente</span><span class="scope">v${INSTALLED_VERSION} · POR CHAT</span></div>`;
     button=panel.querySelector('[data-action="avanzar"]');
     statusNode=panel.querySelector('.status');
     button.addEventListener('click',toggle);
     dashboard=panel;
     shadow.append(css,panel);
     document.body.appendChild(root);
-    if (stopReason) setStatus(stopReason);
+    const competing = ['avanza-universal-control-v1','avanza-macro-maestro-v2','avanza-macro-maestro-v3'].filter(id => !!document.getElementById(id));
+    if (competing.length) {
+      setStatus('Precaución: se detectaron paneles anteriores (' + competing.join(', ') + '). Ocultarlos no desactiva sus scripts. Desactiva los scripts antiguos en Tampermonkey antes de ejecutar ciclos.', true);
+    } else if (stopReason) setStatus(stopReason);
     render();
   }
   function hideLegacyPanels() {
