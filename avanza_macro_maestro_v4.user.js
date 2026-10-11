@@ -823,7 +823,8 @@
     const id=projectKey();
     const mode=id?projectMode(id):{enabled:true,auto:true};
     if(!mode.enabled||!mode.auto) return false;
-    const L=id?learningFor(id):null; if(moduleOn('game')&&L?.status==='AWAITING_USER') return false;
+    // Learn Quest is display-only: its difficulty, answers and ON/OFF state never gate autonomous business work.
+    // Real HUMAN_GATE, explicit consent, draft protection and stopReason are handled separately.
     if(draft(findComposer())) return false;
     if(state.lastStatus&&EXIT.has(state.lastStatus)) return false;
     if(typeof state.lastPercent==='number'&&state.lastPercent>=100) return false;
@@ -1028,8 +1029,37 @@
   }
   function renderMissionControl() {
     if(!missionOverlay) return;
-    const id=projectKey()||'CFI-E2-2026-10-16';
-    const p=projects[id]||projects['CFI-E2-2026-10-16']||{};
+    const liveId=projectKey();
+    // Fail scoped: only accounting chats may render the accounting exam/quest interface.
+    // Unknown contexts show no cross-project data as their own progress.
+    if(!liveId || !/^CFI(?:-|$)/i.test(liveId)) {
+      const row=liveId?(projects[liveId]||{}):{};
+      const pct=liveId && Number.isFinite(row.current_pct)?row.current_pct:
+        (liveId && state.processId===liveId && Number.isFinite(state.lastPercent)?state.lastPercent:null);
+      const fraction=Number.isInteger(row.numerator)&&Number.isInteger(row.denominator)&&row.denominator>0?
+        row.numerator+'/'+row.denominator:'Denominador no verificado';
+      const next=liveId?(row.next_action||state.nextAction||'Recuperar la siguiente frontera con evidencia'):
+        'Recuperar primero el PROCESS_ID y objetivo específico de esta conversación.';
+      const block=liveId?(row.blocker||state.blocker||'Sin bloqueo confirmado'):'Contexto sin identificar';
+      missionOverlay.innerHTML=
+        '<div class="mc-shell"><div class="mc-topbar"><div class="mc-brand">🚀 AVANZA <span>MISSION CONTROL</span></div>'+
+        '<div class="mc-topchips"><span>PROYECTO <b>'+escapeHtml(liveId||'SIN OBJETIVO',70)+'</b></span></div>'+
+        '<button type="button" data-action="cinema-close">✕</button></div>'+
+        '<div class="mc-grid"><aside class="mc-left"><div class="mc-orb" style="--mc:'+(pct??0)+'"><div>'+
+        '<strong>'+formatPercent(pct)+'</strong><small>AVANCE REGISTRADO</small></div></div>'+
+        '<div class="mc-card"><h4>📊 FUENTE DEL PROYECTO</h4><p>'+escapeHtml(fraction,95)+
+        '</p><p>El porcentaje no acredita cobro ni efecto externo.</p></div></aside>'+
+        '<main class="mc-center"><section class="mc-hero"><div><small>OBJETIVO REAL</small>'+
+        '<h2>'+escapeHtml(liveId||'SIN OBJETIVO',96)+'</h2><p>'+escapeHtml(row.objective||state.objective||next,190)+
+        '</p></div></section><div class="mc-card"><h4>PRÓXIMO RESULTADO VERIFICABLE</h4><p>'+escapeHtml(next,220)+
+        '</p><h4>GATE / BLOQUEO</h4><p>'+escapeHtml(block,220)+
+        '</p><p>No hay cuestionarios ni XP como condición del trabajo real.</p>'+
+        '<p><a href="https://mundo-vivo-play-safe-demo-pdess2573.vercel.app/" target="_blank" rel="noopener noreferrer">🎮 Abrir MUNDO VIVO · CONSTRUIR</a></p>'+
+        '</div></main></div></div>';
+      return;
+    }
+    const id=liveId;
+    const p=projects[id]||{};
     const L=learningFor(id)||{};
     const pct=typeof p.current_pct==='number'?p.current_pct:(typeof state.lastPercent==='number'?state.lastPercent:null);
     const xp=L.xp||0, level=1+Math.floor(xp/500), streak=L.streak||0;
