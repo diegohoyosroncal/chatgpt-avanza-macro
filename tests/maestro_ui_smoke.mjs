@@ -21,7 +21,7 @@ try {
     await host.waitFor({timeout:7000});
     const dock = host.locator('.panel');
     const localVersion = await host.locator('[data-value="health"]').innerText();
-    assert.match(localVersion,/4\.3\.0-interactive1/);
+    assert.match(localVersion,/4\.4\.0-neon-control/);
     assert.match(localVersion,/remota NO verificada/);
     assert.equal(await host.locator('[data-module]').count(),6);
     assert.match(await host.locator('[data-module="auto"]').innerText(),/AUTO ON/);
@@ -41,7 +41,7 @@ try {
     assert.equal(await dock.locator('[data-learn-action]').count(),5);
     assert.match(await host.locator('[data-value="progress-ribbon"]').innerText(),/CFI/);
     assert.match(await host.locator('[data-value="progress-ribbon"]').innerText(),/15,8%|15\.8%/);
-    assert.equal(await host.locator('[data-quest-choice]').count(),4);
+    assert.equal(await dock.locator('[data-quest-choice]').count(),4);
     assert.equal(await dock.locator('[data-learn-answer]').count(),1);
     await host.locator('[data-quest-choice="A"]').click();
     assert.match(await page.locator('#prompt-textarea').inputValue(),/LEARN_ANSWER/);
