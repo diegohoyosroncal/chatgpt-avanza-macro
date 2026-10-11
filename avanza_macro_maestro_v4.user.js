@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         AVANZA — Macro Maestro · Piloto Automático
 // @namespace    https://chatgpt.com/
-// @version      4.3.0
+// @version      4.3.1
 // @description  Cockpit multiproyecto + Learn Quest: módulos ON/OFF, AUTO/MANUAL, progreso serio independiente, misiones jugables y sincronización entre pestañas.
 // @updateURL    https://raw.githubusercontent.com/diegohoyosroncal/chatgpt-avanza-macro/main/avanza_macro_maestro_v4.user.js
 // @downloadURL  https://raw.githubusercontent.com/diegohoyosroncal/chatgpt-avanza-macro/main/avanza_macro_maestro_v4.user.js
@@ -18,7 +18,11 @@
   // Auto-continúa solo proyectos identificados que estén explícitamente en AUTO.
   // No llama APIs remotas, no lee credenciales y no elude permisos/herramientas de ChatGPT.
   const APP = 'avanza-macro-maestro-v4';
-  const INSTALLED_VERSION = '4.3.0-interactive1';
+  // One runner per page. Prevent two injected copies from creating two timers.
+  const SINGLETON = 'data-avanza-maestro-v4-runner';
+  if (document.documentElement?.getAttribute(SINGLETON) === '1') return;
+  document.documentElement?.setAttribute(SINGLETON, '1');
+  const INSTALLED_VERSION = '4.3.1-visible-progress';
   const LEARN_KEY = 'avanza-v4-learn-quest-v1';
   const CONTROL_KEY = 'avanza-v4-control-center-v1';
   const PROJECTS_KEY = 'avanza-v4-project-registry-v1';
@@ -652,6 +656,53 @@
     phase=STATES.READY; lastAudit=0;
     setStatus('Evaluando el contexto para avanzar…'); render(); tick();
   }
+
+  // PASSIVE, READ-ONLY display recovery: no ChatGPT request, no external call.
+  // Unlike 🧩 PROCESO, many existing chats report progress in natural Spanish.
+  // Never treat a statement from the assistant as independent primary proof.
+  let lastPassiveProgressScan = 0;
+  function hydrateVisibleReportedProgress() {
+    if (!moduleOn('progress') || state.processId) return; // do not override canonical tagged project
+    if (state.lastDenominator && state.lastPercent !== null
+        && state.lastProof !== 'ASISTENTE_VISIBLE_NO_PRUEBA_PRIMARIA') return;
+    const labels = [
+      { re: /continuidad(?:\s+aut[oó]noma)?\s+entre\s+chats/gi, objective: 'Continuidad entre chats' },
+      { re: /entrega\s+(?:de\s+estado\s+)?a\s+(?:los\s+)?(?:responsables|owners)/gi, objective: 'Entrega a responsables' },
+      { re: /consumo\s+de\s+gse\s+por\s+owners/gi, objective: 'Consumo GSE por owners' },
+    ];
+    const nodes = [...document.querySelectorAll('[data-message-author-role="assistant"]')].slice(-24);
+    for (let k=nodes.length-1; k>=0; k--) {
+      const content=(nodes[k].innerText||nodes[k].textContent||'').replace(/\u00a0/g,' ');
+      for (const label of labels) {
+        for (const hit of content.matchAll(label.re)) {
+          const area=content.slice(hit.index,hit.index+240);
+          const ps=[...area.matchAll(/(\d{1,3}(?:[.,]\d{1,2})?)\s*%/g)]
+            .map(m=>({ value:Number(m[1].replace(',','.')), at:m.index }));
+          const fs=[...area.matchAll(/\b(\d{1,3})\s*(?:\/|de)\s*(\d{1,3})(?:\s+(?:hitos|responsables|owners))?/gi)]
+            .map(m=>({ n:Number(m[1]),d:Number(m[2]),at:m.index }));
+          for (const frac of fs) {
+            if (!frac.d || frac.n>frac.d) continue;
+            const pct=ps.filter(x=>Math.abs(x.value-100*frac.n/frac.d)<.31
+              && Math.abs(x.at-frac.at)<110)
+              .sort((a,b)=>Math.abs(a.at-frac.at)-Math.abs(b.at-frac.at))[0];
+            if (!pct) continue;
+            const changed=state.lastPercent!==pct.value || state.lastDenominator!==frac.d
+              || state.objective!==label.objective || state.lastNumerator!==frac.n;
+            if (!changed) return;
+            state.objective=label.objective;
+            state.lastPercent=pct.value;
+            state.lastNumerator=frac.n;
+            state.lastDenominator=frac.d;
+            state.lastDelta=null; // no reliable transition inferred from prose
+            state.lastProof='ASISTENTE_VISIBLE_NO_PRUEBA_PRIMARIA';
+            saveState();
+            updateDashboard();
+            return;
+          }
+        }
+      }
+    }
+  }
   function discoverVisibleProjects() {
     const nodes=[...document.querySelectorAll('[data-message-author-role="assistant"]')].slice(-30);
     for (const node of nodes) {
@@ -667,6 +718,10 @@
       }
     }
     if(Object.keys(projects).length){ try{localStorage.setItem(PROJECTS_KEY,JSON.stringify(projects));}catch{} renderProjects(); }
+    if (Date.now() - lastPassiveProgressScan > 3500) {
+      lastPassiveProgressScan = Date.now();
+      hydrateVisibleReportedProgress();
+    }
   }
   function shouldAutoStart() {
     if(!moduleOn('engine')||!moduleOn('auto')||checkConflicts()||isGenerating()) return false;
