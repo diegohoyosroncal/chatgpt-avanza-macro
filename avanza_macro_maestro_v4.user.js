@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         AVANZA — Macro Maestro · Piloto Automático
 // @namespace    https://chatgpt.com/
-// @version      4.3.1
+// @version      4.4.0
 // @description  Cockpit multiproyecto + Learn Quest: módulos ON/OFF, AUTO/MANUAL, progreso serio independiente, misiones jugables y sincronización entre pestañas.
 // @updateURL    https://raw.githubusercontent.com/diegohoyosroncal/chatgpt-avanza-macro/main/avanza_macro_maestro_v4.user.js
 // @downloadURL  https://raw.githubusercontent.com/diegohoyosroncal/chatgpt-avanza-macro/main/avanza_macro_maestro_v4.user.js
@@ -22,7 +22,7 @@
   const SINGLETON = 'data-avanza-maestro-v4-runner';
   if (document.documentElement?.getAttribute(SINGLETON) === '1') return;
   document.documentElement?.setAttribute(SINGLETON, '1');
-  const INSTALLED_VERSION = '4.3.1-visible-progress';
+  const INSTALLED_VERSION = '4.4.0-decision-optin';
   const LEARN_KEY = 'avanza-v4-learn-quest-v1';
   const CONTROL_KEY = 'avanza-v4-control-center-v1';
   const PROJECTS_KEY = 'avanza-v4-project-registry-v1';
@@ -107,10 +107,23 @@
   }
 
   function readControl() {
-    const defaults = { modules:{engine:true,auto:true,progress:true,sync:true,game:true,aura:true}, backgroundAuto:true, projectModes:{} };
+    const defaults = { modules:{engine:true,auto:false,background:false,progress:true,sync:true,game:true,aura:true}, backgroundAuto:false, backgroundOptIn:false, autoRunOptIn:false, projectModes:{} };
     try {
       const raw = JSON.parse(localStorage.getItem(CONTROL_KEY) || 'null');
-      return raw && typeof raw === 'object' ? { ...defaults, ...raw, modules:{...defaults.modules,...(raw.modules||{})}, projectModes:{...(raw.projectModes||{})} } : defaults;
+      if(!raw || typeof raw !== 'object' || Array.isArray(raw)) return defaults;
+      const autoRunOptIn=raw.autoRunOptIn===true;
+      const backgroundOptIn=raw.backgroundOptIn===true;
+      const modules={...defaults.modules,...(raw.modules||{})};
+      // Older builds initialized AUTO/FONDO as ON without opt-in. Their raw flags are
+      // NOT evidence of consent; the visible button must match actual permission.
+      if(!autoRunOptIn) modules.auto=false;
+      if(!backgroundOptIn) modules.background=false;
+      const projectModes={...(raw.projectModes||{})};
+      if(!autoRunOptIn) {
+        for(const key of Object.keys(projectModes)) projectModes[key]={...projectModes[key],auto:false};
+      }
+      return {...defaults,...raw,modules,projectModes,autoRunOptIn,backgroundOptIn,
+        backgroundAuto:backgroundOptIn && raw.backgroundAuto===true};
     } catch { return defaults; }
   }
   function saveControl() {
@@ -120,7 +133,7 @@
   function moduleOn(name) { return control.modules?.[name] !== false; }
   function projectMode(id) {
     const row=control.projectModes?.[id]||{};
-    return { enabled:row.enabled!==false, auto:row.auto!==false };
+    return { enabled:row.enabled!==false, auto:row.auto===true };
   }
   function setProjectMode(id,patch) {
     if(!id) return;
@@ -388,21 +401,45 @@
     }
     return null;
   }
-  function strategy() {
-    if (state.stalled >= 6) return 'AUDITORIA_PROFUNDA_CREAR_O_SUSTITUIR_CAPACIDAD';
-    if (state.stalled >= 3 || state.missingReceipts >= 2) return 'REVISAR_RUTA_Y_CAMBIAR_ESTRATEGIA';
-    if (state.lastDelta === null) return 'RECUPERAR_METRICA_Y_VERIFICAR';
-    if (state.lastDelta > 0) return 'EJECUTAR_SIGUIENTE_HITO';
-    if (state.stalled >= 1) return 'COMPARAR_ALTERNATIVAS_Y_EJECUTAR';
-    return 'AVANZAR_Y_VERIFICAR';
+  // Context-sensitive decision advice. Never treat local assistant reports as external evidence.
+  // This pure resolver only selects WHICH process to request; the assistant must test reality.
+  function chooseRoute(signals = {}) {
+    const n = v => Number.isFinite(Number(v)) && Number(v) >= 0 ? Number(v) : 0;
+    const stalled = n(signals.stalled), missing = n(signals.missingReceipts);
+    const repeated = n(signals.repeatedResponses), delta = signals.lastDelta;
+    const blocker = String(signals.blocker || '').slice(0,160);
+    if (signals.lastStatus === 'VERIFIED_COMPLETE')
+      return {mode:'VERIFICAR_CIERRE_EN_FUENTE',reason:'cierre declarado: exige recibo independiente'};
+    if (signals.lastStatus === 'HUMAN_GATE_PROVEN')
+      return {mode:'AUDITAR_GATE_Y_ALTERNATIVAS',reason:'autorización humana declarada: confirmar inevitabilidad'};
+    if (signals.lastStatus === 'NO_SAFE_ACTION')
+      return {mode:'REVISAR_VALOR_Y_CONDICION_DE_REANUDACION',reason:'punto fijo declarado: no fabricar trabajo'};
+    if (stalled >= 6 || repeated >= 3)
+      return {mode:'REPLANTEAR_ADOPTAR_FUSIONAR_SUSTITUIR_O_CREAR',reason:'bucle prolongado: challenger causal obligatorio'};
+    if (stalled >= 3)
+      return {mode:'DESTRABAR_CAMBIANDO_ESTRATEGIA',reason:'tres ciclos sin efecto verificado'};
+    if (missing >= 2)
+      return {mode:'AUDITAR_RECIBOS_Y_RECUPERAR_CONTEXTO',reason:'faltan recibos válidos; no fingir avance'};
+    if (stalled >= 1 && /(permiso|login|oauth|captcha|acceso|cuota|error|fallo|blocked|gate)/i.test(blocker))
+      return {mode:'DESBLOQUEAR_E_INVESTIGAR_ALTERNATIVAS',reason:'bloqueo concreto; comparar proveedor, canal o capacidad'};
+    if (stalled >= 1)
+      return {mode:'COMPARAR_ALTERNATIVAS_Y_EJECUTAR',reason:'sin avance en el último ciclo'};
+    if (delta === null || delta === undefined)
+      return {mode:'VERIFICAR_METRICA_Y_ACTUAR',reason:'sin denominador o variación validada'};
+    if (Number(delta) > 0)
+      return {mode:'EJECUTAR_SIGUIENTE_HITO_Y_VERIFICAR',reason:'avance declarado: verificar antes de acreditarlo'};
+    return {mode:'EJECUTAR_Y_VERIFICAR',reason:'continuar la mejor ruta autorizada'};
   }
+  function strategy() { return chooseRoute(state).mode; }
   function buildMessage(ticket, step) {
-    const chosen = strategy();
+    const decision = chooseRoute(state);
+    const chosen = decision.mode;
     const core = [
       `${MARK} — CONTROL ADAPTATIVO ${ticket}. Esta señal AGREGA capacidades; NO reemplaza objetivo, autorizaciones, decisiones, instrucciones ni checkpoints de este chat.`,
-      `Decisión interna de interfaz: ${chosen}. PROCESS_ID actual: ${state.processId || 'POR RECUPERAR'}. Ciclo local ${step}. Anterior conocido (NO prueba externa): progreso ${state.lastPercent ?? 'NO DETERMINABLE'}%, denominador ${state.lastDenominator ?? 'NO DETERMINABLE'}, delta ${state.lastDelta ?? 'NO DETERMINABLE'} pp, ciclos sin progreso ${state.stalled}.`,
+      `Decisión interna de interfaz: ${chosen}. Motivo: ${decision.reason}. PROCESS_ID actual: ${state.processId || 'POR RECUPERAR'}. Ciclo local ${step}. Anterior conocido (NO prueba externa): progreso ${state.lastPercent ?? 'NO DETERMINABLE'}%, denominador ${state.lastDenominator ?? 'NO DETERMINABLE'}, delta ${state.lastDelta ?? 'NO DETERMINABLE'} pp, ciclos sin progreso ${state.stalled}.`,
       'RECUPERA estado actual desde este chat y fuentes canónicas disponibles. Evalúa primero cuál es el verdadero objetivo pendiente, su dueño y qué cambió desde la respuesta anterior. No dependas de una cifra inferida de la interfaz para afirmar efectos.',
       'DECIDE TÚ la mejor acción: ejecutar, verificar, conciliar, corregir, investigar globalmente, adoptar/reutilizar/integrar/fusionar/delegar legítimamente/sustituir/adaptar/construir una capacidad faltante, detener una estrategia de valor negativo o cambiar de rumbo. No conviertas AVANZAR en ejecutar por ejecutar, ni le pidas al usuario escoger entre alternativas.',
+      'DECISOR: primero verifica cuál de las rutas resuelve realmente el próximo hito. Contrasta estrategia vigente contra ALTERNATIVA A ADOPTAR/INTEGRAR y ALTERNATIVA B SUSTITUIR/CREAR UNA CAPACIDAD, incluye opciones globales. Evalúa beneficio marginal, coste total, tiempo, seguridad, permisos, reversibilidad, diferenciación causal y evidencia primaria. Descarta rutas peores; elige tú; ejecuta la mejor ya autorizada. Nunca crees solo por crear. Tras 3 ciclos equivalentes sin evidencia, una salida que repita la misma acción NO cuenta como nueva estrategia.',
       'EJECUTA dentro de este turno las acciones seguras y autorizadas con valor positivo, verifica cada una en una fuente independiente, distingue COLA→ENTREGA→ACCIÓN→EFECTO y sigue con las demás. Si llevamos 3 intentos sin DELTA verificable, identifica causa raíz y realiza una intervención MATERIALMENTE diferente antes de repetir.',
       'Puedes evaluar alternativas mundiales y crear componentes faltantes cuando sea legítimo, pero NUNCA saltar permisos, MFA, consentimiento, términos, límites de herramienta o costos. No generar gastos, pagos, contratos, cambios irreversibles o despliegues riesgosos sin autorización precisa. Preserva single-owner, deduplicación, idempotencia y protección de secretos.',
       'La continuidad fuera del chat requiere el ejecutor externo existente AUTORIZADO y sus recibos; no basta enviar mensajes con la macro ni crear más cron/tareas. No simules persistencia o cumplimiento universal en otros chats. Esta macro puede proponer una continuación del hilo web abierto, pero la ejecución real debe comprobarse en herramientas autorizadas.',
@@ -465,6 +502,7 @@
     set('fraction', state.lastNumerator !== null && state.lastDenominator ? `${state.lastNumerator}/${state.lastDenominator} hitos` : state.lastDenominator ? `Base ${state.lastDenominator} hitos` : 'Base no validada');
     set('pending',known ? `${formatPercent(100-pct)} pendiente` : 'Pendiente —');
     set('objective', escapeText(state.objective || 'Objetivo del chat · por recuperar',88));
+    set('decision', '🧭 ' + chooseRoute(state).mode + ' · ' + chooseRoute(state).reason);
     set('stage', phase === STATES.WAITING ? 'ESPERANDO RESPUESTA' : phase === STATES.READY ? 'DECIDIENDO RUTA' : phase === STATES.PAUSED ? 'PAUSADA' : 'DISPONIBLE');
     set('loops', `${state.cycles || 0} ciclos · ${state.stalled || 0} sin avance`);
     set('next', escapeText(state.nextAction || 'El siguiente hito se decide según evidencia del chat.',112));
@@ -516,7 +554,7 @@
       syncRoute();
       if (phase !== STATES.READY) return;
       if (!renewLease()) { pause('Otro panel tiene el control de este chat; no duplico envíos.', true); return; }
-      if (document.hidden && !control.backgroundAuto) { setStatus('Pestaña en segundo plano: AUTO-background está OFF.'); return; }
+      if (document.hidden && !(control.backgroundAuto===true && control.backgroundOptIn===true)) { setStatus('Pestaña en segundo plano: AUTO-background está OFF.'); return; }
       if (isGenerating()) { setStatus('Respuesta en curso; no duplico mensajes.'); return; }
       const c = findComposer();
       if (!c) { pause('No encuentro el cuadro de mensaje; no se envió nada.', true); return; }
@@ -550,7 +588,7 @@
     syncRoute();
     if (phase !== STATES.READY && phase !== STATES.WAITING) return;
     if (!renewLease()) { pause('El control de este chat está activo en otra pestaña; no duplico mensajes.', true); return; }
-    if (document.hidden && !control.backgroundAuto) return;
+    if (document.hidden && !(control.backgroundAuto===true && control.backgroundOptIn===true)) return;
     if (phase === STATES.READY) {
       if (now() - lastAudit < MIN_SEND_GAP_MS) return;
       lastAudit = now();
@@ -652,7 +690,7 @@
     if (!moduleOn('engine')) { setStatus('⚡ MOTOR está OFF. Enciéndelo desde MACROS.', true); return; }
     if (!acquireLease()) { setStatus('Este chat ya está controlado por otra pestaña; no duplico acciones.', true); return; }
     if (id) setProjectMode(id,{enabled:true});
-    state.stalled=0; state.missingReceipts=0;
+    // Manual reactivation must NOT erase the evidence of a stalled strategy.
     phase=STATES.READY; lastAudit=0;
     setStatus('Evaluando el contexto para avanzar…'); render(); tick();
   }
@@ -724,7 +762,7 @@
     }
   }
   function shouldAutoStart() {
-    if(!moduleOn('engine')||!moduleOn('auto')||checkConflicts()||isGenerating()) return false;
+    if(!moduleOn('engine')||!moduleOn('auto')||control.autoRunOptIn!==true||checkConflicts()||isGenerating()) return false;
     discoverVisibleProjects();
     const id=projectKey(); if(!id) return false;
     const mode=projectMode(id); if(!mode.enabled||!mode.auto) return false;
@@ -823,7 +861,7 @@
   }
   function renderModules() {
     if(!dashboard) return;
-    const labels={engine:'⚡ MOTOR',auto:'♾️ AUTO',progress:'📈 %',sync:'🌐 SYNC',game:'🎮 QUEST',aura:'🎨 AURA'};
+    const labels={engine:'⚡ MOTOR',auto:'♾️ AUTOENVÍOS',background:'🪟 FONDO',progress:'📈 %',sync:'🌐 SYNC',game:'🎮 QUEST',aura:'🎨 AURA'};
     for(const b of dashboard.querySelectorAll('[data-module]')){
       const name=b.dataset.module,on=moduleOn(name); b.dataset.on=on?'true':'false'; b.textContent=(labels[name]||name)+' '+(on?'ON':'OFF');
     }
@@ -944,7 +982,7 @@
       .top{display:flex;align-items:center;gap:9px}.logo{display:grid;place-items:center;width:34px;height:34px;flex:0 0 auto;border-radius:11px;background:linear-gradient(130deg,#ffe28d,#f59e0b);color:#201508;font-size:21px;font-weight:900;box-shadow:0 0 24px #fbbf2440}.topname{flex:1;min-width:0}.brand{font-weight:850;letter-spacing:.09em;font-size:12px}.sub{font-size:10px;color:var(--muted);letter-spacing:.05em}.pill{font-size:8.5px;letter-spacing:.05em;font-weight:850;border:1px solid #4c5b73;border-radius:20px;padding:5px 6px;background:#172335;white-space:nowrap}
       .title{font-size:10.5px;letter-spacing:.02em;color:#cbd5e1;margin:14px 0 7px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.metrics{display:flex;gap:13px;align-items:center}.ring{--fill:0;--angle:calc(var(--fill) * 3.6deg);width:100px;height:100px;flex:0 0 100px;border-radius:50%;background:conic-gradient(var(--accent-light) 0deg,var(--accent) var(--angle),#334155 var(--angle),#334155 360deg);display:grid;place-items:center;box-shadow:0 0 20px #f59e0b22;}.center{display:flex;flex-direction:column;align-items:center;justify-content:center;border-radius:50%;width:79px;height:79px;background:#111c2d;border:2px solid #182841;text-align:center}.pct{font-size:22px;line-height:1.1;font-weight:820;font-variant-numeric:tabular-nums;letter-spacing:-.06em}.caption{color:#a7b5c7;font-size:9px;margin-top:4px}
       .stat{flex:1;min-width:0}.transition{font-weight:800;font-size:14px;font-variant-numeric:tabular-nums;white-space:nowrap}.delta{font-size:11px;font-weight:800;color:#facc15;margin:7px 0}.frac,.pending{font-size:10px;color:#bac9d9}.bar{margin:13px 0 0;height:6px;background:#334155;border-radius:99px;overflow:hidden}.bar-fill{height:100%;background:linear-gradient(90deg,var(--accent),var(--accent-light));border-radius:99px;transition:width .35s ease}
-      .tinyrow{display:flex;align-items:center;justify-content:space-between;gap:6px;margin:12px 0 8px;color:#9eacc1;font-size:9px}.tone:before{content:'';display:inline-block;width:6px;height:6px;background:#94a3b8;border-radius:100%;margin-right:5px}.tone[data-level=live]:before{background:#34d399;box-shadow:0 0 9px #34d399aa}.tone[data-level=risk]:before{background:#fb923c}.next{color:#cbd5e1;font-size:10px;line-height:1.35;min-height:14px;max-height:42px;overflow:hidden;margin-bottom:12px}
+      .tinyrow{display:flex;align-items:center;justify-content:space-between;gap:6px;margin:12px 0 8px;color:#9eacc1;font-size:9px}.tone:before{content:'';display:inline-block;width:6px;height:6px;background:#94a3b8;border-radius:100%;margin-right:5px}.tone[data-level=live]:before{background:#34d399;box-shadow:0 0 9px #34d399aa}.tone[data-level=risk]:before{background:#fb923c}.decision{color:#fcd34d;font-weight:800;font-size:9px;line-height:1.35;padding:6px 7px;border-radius:8px;background:#1c2538;margin:6px 0 5px;overflow-wrap:anywhere}.next{color:#cbd5e1;font-size:10px;line-height:1.35;min-height:14px;max-height:42px;overflow:hidden;margin-bottom:12px}
       .go{position:relative;width:100%;border:0;border-radius:12px;min-height:47px;cursor:pointer;background:linear-gradient(120deg,var(--accent-light),var(--accent) 56%,var(--accent));color:#281b07;font:900 14px/1.2 ui-sans-serif,system-ui,sans-serif;letter-spacing:.08em;box-shadow:0 5px 19px #fbbf2440;transition:transform .15s,filter .15s}.go:hover{filter:brightness(1.06);transform:translateY(-1px)}.go.active{background:linear-gradient(120deg,#64748b,#475569);color:white;box-shadow:none}.go:focus-visible{outline:3px solid #38bdf8;outline-offset:3px}.go:disabled{opacity:.7;cursor:wait;transform:none}
       .status{font-size:9.5px;color:#cbd5e1;margin-top:10px;min-height:25px;max-height:56px;overflow:hidden}.status[data-warning=true]{color:#fdba74}.foot{font-size:9px;color:#8799ae;border-top:1px solid var(--stroke);padding-top:8px;margin-top:4px;display:flex;justify-content:space-between;gap:5px}.scope{font-weight:700;color:#9fc3d8}
       .health{font-size:9px;line-height:1.3;margin:7px 0 0;padding:5px 7px;color:#a6cee7;border:1px solid var(--stroke);border-radius:8px;background:#0a1b2c}
@@ -973,14 +1011,14 @@
     panel.innerHTML=`<div class="top"><span class="logo" aria-hidden="true">↗</span><div class="topname"><div class="brand">AVANZA</div><div class="sub">MACRO MAESTRO · v4</div></div><button type="button" data-action="theme" title="Cambiar color">◐</button><button type="button" data-action="collapse" title="Compactar / ampliar">▁</button><span class="pill">CON CONTROL</span></div>
       <div class="health" data-value="health" data-warning="false">Versión remota sin verificar</div>
       <div class="progress-ribbon" data-value="progress-ribbon" aria-label="Porcentajes verificados de proyectos"></div>
-      <div class="section"><div class="section-title">🎛️ MACROS · ON/OFF</div><div class="modules"><button data-module="engine"></button><button data-module="auto"></button><button data-module="progress"></button><button data-module="sync"></button><button data-module="game"></button><button data-module="aura"></button></div></div>
+      <div class="section"><div class="section-title">🎛️ MACROS · ON/OFF</div><div class="modules"><button data-module="engine"></button><button data-module="auto"></button><button data-module="background"></button><button data-module="progress"></button><button data-module="sync"></button><button data-module="game"></button><button data-module="aura"></button></div></div>
       <div class="section"><div class="section-title">🗺️ PROYECTOS · PARALELO</div><div class="projects" data-value="projects"></div></div>
       <div class="game" data-value="game"></div>
       <div class="title" data-value="objective">Objetivo del chat · por recuperar</div>
       <div class="metrics"><div class="ring"><div class="center"><span class="pct" data-value="percent" aria-label="Porcentaje actual">—</span><span class="caption">AVANCE</span></div></div><div class="stat"><div class="transition" data-value="transition">— → —</div><div class="delta" data-value="delta">Δ — pp</div><div class="frac" data-value="fraction">Base no validada</div><div class="pending" data-value="pending">Pendiente —</div></div></div>
       <div class="bar" role="progressbar" aria-label="Progreso reportado del objetivo del chat"><div class="bar-fill"></div></div>
       <div class="tinyrow"><span class="tone" data-level="idle" data-value="stage">DISPONIBLE</span><span data-value="loops">0 ciclos · 0 sin avance</span></div>
-      <div class="next" data-value="next">El siguiente hito se decide según evidencia del chat.</div>
+      <div class="decision" data-value="decision">🧭 DECISOR · verificando situación</div><div class="next" data-value="next">El siguiente hito se decide según evidencia del chat.</div>
       <button class="go" data-action="avanzar" type="button" aria-label="Avanzar según el contexto o detener el ciclo">▶  AVANZAR</button>
       <div class="status" data-warning="false" role="status" aria-live="polite">Un botón. Decide la ruta según cada respuesta.</div>
       <div class="foot"><span>Informe del asistente ≠ prueba independiente</span><span class="scope">v${INSTALLED_VERSION} · POR CHAT</span></div>`;
@@ -991,6 +1029,25 @@
       const mod=event.target.closest('[data-module]');
       if(mod){
         const name=mod.dataset.module; control.modules[name]=!moduleOn(name);
+        if(name==='auto'){
+          // Persist consent per browser; never infer consent from historic default=true.
+          control.autoRunOptIn=moduleOn('auto');
+          if(control.autoRunOptIn){
+            const id=projectKey();
+            if(id) control.projectModes[id]={...projectMode(id),enabled:true,auto:true};
+            setStatus('♾️ AUTO ON, activado explícitamente. Solo proyectos autorizados.');
+          } else {
+            if(phase===STATES.READY||phase===STATES.WAITING) pause('AUTO OFF: envíos detenidos; progreso conservado.');
+            else setStatus('AUTO OFF: el panel sigue visible; envíos solo al pulsar AVANZAR.');
+          }
+        }
+        if(name==='background'){
+          control.backgroundOptIn=moduleOn('background');
+          control.backgroundAuto=control.backgroundOptIn;
+          setStatus(control.backgroundOptIn
+            ? 'AUTO FONDO ON: solo mientras la pestaña siga abierta; no ejecuta un navegador cerrado.'
+            : 'AUTO FONDO OFF: pausado al ocultar la pestaña.');
+        }
         if(name==='sync') initChannel();
         if(name==='engine'&&!moduleOn('engine')&&(phase===STATES.READY||phase===STATES.WAITING)) pause('⚡ MOTOR OFF desde el cockpit.');
         saveControl(); render(); return;
@@ -998,7 +1055,14 @@
       const en=event.target.closest('[data-project-enabled]');
       if(en){ const id=en.dataset.projectEnabled; setProjectMode(id,{enabled:!projectMode(id).enabled}); return; }
       const au=event.target.closest('[data-project-auto]');
-      if(au){ const id=au.dataset.projectAuto; setProjectMode(id,{auto:!projectMode(id).auto,enabled:true}); return; }
+      if(au){
+        const id=au.dataset.projectAuto,next=!projectMode(id).auto;
+        if(next){ control.modules.auto=true; control.autoRunOptIn=true; }
+        setProjectMode(id,{auto:next,enabled:true});
+        if(!next&&id===projectKey()&&(phase===STATES.READY||phase===STATES.WAITING))
+          pause('AUTO OFF para este proceso. Progreso conservado.');
+        saveControl(); render(); return;
+      }
       const learn=event.target.closest('[data-learn-action]');
       if(learn){ sendLearningAction(learn.dataset.learnAction); return; }
       const choice=event.target.closest('[data-quest-choice]');
