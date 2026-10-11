@@ -487,6 +487,7 @@
   }
   function pause(reason, warn = false) {
     phase = STATES.PAUSED;
+    state.autoConsented=false; // A paused chat never silently restarts on tab reload.
     releaseLease();
     pending = null;
     replyCandidate = { fingerprint: '', firstSeen: 0 };
@@ -574,7 +575,7 @@
       return;
     }
     const reply = assistantAfter(pending.ticket);
-    if (reply === '<<USER_INTERRUPTED>>') { pending=null; phase=STATES.IDLE; replyCandidate={fingerprint:'',firstSeen:0}; state.lastUpdated=new Date().toISOString(); saveState(); setStatus('Intervención humana detectada: conservo el proyecto y re-evalúo tras la respuesta.'); return; }
+    if (reply === '<<USER_INTERRUPTED>>') { pending=null; phase=STATES.IDLE; state.autoConsented=false; replyCandidate={fingerprint:'',firstSeen:0}; state.lastUpdated=new Date().toISOString(); saveState(); setStatus('Intervención humana detectada: conservo el proyecto y re-evalúo tras la respuesta.'); return; }
     if (!reply || isGenerating()) return;
     const key = fingerprint(reply);
     if (key !== replyCandidate.fingerprint) {
