@@ -106,7 +106,20 @@
     const defaults = { modules:{engine:true,auto:false,background:false,progress:true,sync:true,game:true,aura:true}, backgroundAuto:false, backgroundOptIn:false, autoRunOptIn:false, projectModes:{} };
     try {
       const raw = JSON.parse(localStorage.getItem(CONTROL_KEY) || 'null');
-      return raw && typeof raw === 'object' ? { ...defaults, ...raw, modules:{...defaults.modules,...(raw.modules||{})}, projectModes:{...(raw.projectModes||{})} } : defaults;
+      if(!raw || typeof raw !== 'object' || Array.isArray(raw)) return defaults;
+      const autoRunOptIn=raw.autoRunOptIn===true;
+      const backgroundOptIn=raw.backgroundOptIn===true;
+      const modules={...defaults.modules,...(raw.modules||{})};
+      // Older builds initialized AUTO/FONDO as ON without opt-in. Their raw flags are
+      // NOT evidence of consent; the visible button must match actual permission.
+      if(!autoRunOptIn) modules.auto=false;
+      if(!backgroundOptIn) modules.background=false;
+      const projectModes={...(raw.projectModes||{})};
+      if(!autoRunOptIn) {
+        for(const key of Object.keys(projectModes)) projectModes[key]={...projectModes[key],auto:false};
+      }
+      return {...defaults,...raw,modules,projectModes,autoRunOptIn,backgroundOptIn,
+        backgroundAuto:backgroundOptIn && raw.backgroundAuto===true};
     } catch { return defaults; }
   }
   function saveControl() {
