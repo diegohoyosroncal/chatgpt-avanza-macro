@@ -1044,6 +1044,15 @@
   }
   function renderMissionControl() {
     if(!missionOverlay) return;
+    if(!looksLearningProcess()) {
+      const id=projectKey(), p=id?(projects[id]||{}):{};
+      const objective=state.objective||p.objective||'Objetivo del chat: recuperar del historial';
+      const next=state.nextAction||p.next_action||'Recuperar siguiente frontera de este chat';
+      const blocked=state.blocker||p.blocker||'Bloqueo no determinado';
+      const pct=state.lastPercent??p.current_pct??null;
+      missionOverlay.innerHTML='<div class="mc-shell"><div class="mc-topbar"><div class="mc-brand">AVANZA · OBJETIVO DEL CHAT</div><button data-action="cinema-close">Cerrar</button></div><div class="mc-grid"><main class="mc-center"><section class="mc-hero"><h2>'+escapeHtml(objective,180)+'</h2><p>Avance reportado: '+formatPercent(pct)+'</p></section><section class="mc-quest"><h3>Próxima frontera</h3><p>'+escapeHtml(next,300)+'</p></section></main><aside class="mc-right"><div class="mc-card"><h4>Gate actual</h4><p>'+escapeHtml(blocked,220)+'</p></div></aside></div></div>';
+      return;
+    }
     const id=projectKey()||'CFI-E2-2026-10-16';
     const p=projects[id]||projects['CFI-E2-2026-10-16']||{};
     const L=learningFor(id)||{};
