@@ -98,3 +98,22 @@ test('all browser AUTO send paths honor explicit consent',()=>{
   assert.match(source,/data-module="background"/);
   assert.match(source,/if\(looksLearningProcess\(\)&&L\?\.status==='AWAITING_USER'\)/);
 });
+
+test('reload disarms AUTO but does not erase owner, goal, progress or inflight receipt',()=>{
+  const begin=source.indexOf('  function recoverState() {');
+  const end=source.indexOf('  function saveState() {',begin);
+  assert.ok(begin>=0&&end>begin);
+  const original={autoConsented:true,processId:'OWNER-1',objective:'ORIGINAL GOAL',
+    lastPercent:40,lastDenominator:5,lastNumerator:2,inFlightTicket:'AVZ-999',
+    inFlightSentAt:1234,parkFingerprint:'xyz',nextAction:'Recover existing task'};
+  const recover=new Function('localStorage','sessionStorage','storageKey','freshState',
+    source.slice(begin,end)+'return recoverState;')(
+      {getItem:()=>JSON.stringify(original)},{getItem:()=>null},()=>'/c/owner-1',
+      ()=>({autoConsented:false,processId:'',objective:'',inFlightTicket:''})
+    );
+  const state=recover();
+  assert.equal(state.autoConsented,false,'AUTO requires new click in a reloaded page');
+  for(const key of ['processId','objective','lastPercent','lastDenominator','lastNumerator',
+      'inFlightTicket','inFlightSentAt','parkFingerprint','nextAction'])
+    assert.equal(state[key],original[key],'preserved '+key);
+});

@@ -283,7 +283,11 @@
     try {
       const raw=localStorage.getItem(storageKey())||sessionStorage.getItem(storageKey());
       const parsed=raw&&JSON.parse(raw);
-      return parsed&&typeof parsed==='object'?{...freshState(),...parsed}:freshState();
+      // Reloading a browser tab never grants a fresh per-chat AUTO consent.
+      // Preserve objectives, percentages, drafts and in-flight tickets for safe recovery.
+      return parsed&&typeof parsed==='object'&&!Array.isArray(parsed)
+        ? {...freshState(),...parsed,autoConsented:false}
+        : freshState();
     } catch { return freshState(); }
   }
   function saveState() {
