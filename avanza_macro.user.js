@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         AVANZA — Control de continuación inteligente para ChatGPT
 // @namespace    https://chatgpt.com/
-// @version      1.0.2
+// @version      1.0.3
 // @description  Agrega un botón AVANZA a cada conversación de ChatGPT web, sin transmitir datos a terceros.
 // @updateURL    https://raw.githubusercontent.com/diegohoyosroncal/chatgpt-avanza-macro/main/avanza_macro.user.js
 // @downloadURL  https://raw.githubusercontent.com/diegohoyosroncal/chatgpt-avanza-macro/main/avanza_macro.user.js
@@ -24,6 +24,7 @@
     '4) Ante tres intentos o ciclos sin progreso VERIFICABLE, deja de repetir la misma ruta, diagnostica causa raíz, elige un challenger materialmente diferente, ejecútalo y vuelve a comprobar. Nunca cuentes planes, CI, alertas, código ni tráfico como ingresos o cumplimiento final.',
     '5) Antes de cerrar, vuelve a evaluar si queda una acción autorizada de valor positivo. Persiste RECEIPT, OBJETIVO, OWNER, bloqueo, NEXT_EXACT_ACTION y RESUME_CONDITION para el ejecutor externo ya existente; no crees otro cron o runtime duplicado para fingir continuidad.',
     '6) Responde SIEMPRE con OBJETIVO; porcentaje ANTERIOR → ACTUAL (numerador/denominador), DELTA en puntos porcentuales; EFECTO VERIFICADO; BLOQUEO comprobado y SIGUIENTE HITO. Si el denominador no está validado di NO DETERMINABLE y no inventes porcentajes.',
+    '7) Si una continuación debe sobrevivir a este turno, usa únicamente el puente seguro y previamente autorizado al ejecutor persistente que ya existe, cuando esté disponible. Registra un evento mínimo idempotente sin transcripciones, credenciales ni datos privados y verifica por separado COLA→ENTREGA→ACCIÓN→EFECTO. DONE/ACK de cola NO prueba ejecución útil: si no hubo nueva acción distinta y verificada, declara el bloqueo, compara alternativas y no subas el porcentaje. No inventes conectores ni uses eventos de prueba repetitivos.',
     'No pagues, cambies contratos, manejes secretos, suprimas controles de acceso ni hagas irreversibles sin autorización específica. Mi intervención humana rutinaria debe tender a cero. No afirmes control de otros chats ni ejecución después del turno sin evidencia independiente.'
   ].join('\n');
 
