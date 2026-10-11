@@ -3,6 +3,8 @@ import {readFileSync} from 'node:fs';
 import {chromium} from 'playwright-core';
 
 const script = readFileSync(new URL('../avanza_macro_maestro_v4.user.js', import.meta.url), 'utf8');
+const installedVersion=script.match(/const INSTALLED_VERSION = '([^']+)'/)?.[1];
+assert.ok(installedVersion, 'version should exist in evaluated source');
 const browserPath = process.env.CHROME_PATH;
 assert.ok(browserPath, 'CHROME_PATH must point to a locally installed Chrome/Chromium');
 const browser = await chromium.launch({executablePath: browserPath, headless:true,
@@ -21,10 +23,19 @@ try {
     await host.waitFor({timeout:7000});
     const dock = host.locator('.panel');
     const localVersion = await host.locator('[data-value="health"]').innerText();
-    assert.match(localVersion,/4\.3\.0-interactive1/);
+    assert.ok(localVersion.includes(installedVersion), 'HUD reports actual installed candidate version');
     assert.match(localVersion,/remota NO verificada/);
-    assert.equal(await host.locator('[data-module]').count(),6);
-    assert.match(await host.locator('[data-module="auto"]').innerText(),/AUTO ON/);
+    assert.equal(await host.locator('[data-module]').count(),7);
+    assert.match(await host.locator('[data-module="auto"]').innerText(),/AUTOENVÍOS OFF/);
+    assert.match(await host.locator('[data-module="background"]').innerText(),/FONDO OFF/);
+    await host.locator('[data-module="auto"]').click();
+    assert.match(await host.locator('[data-module="auto"]').innerText(),/AUTOENVÍOS ON/);
+    await host.locator('[data-module="auto"]').click();
+    assert.match(await host.locator('[data-module="auto"]').innerText(),/AUTOENVÍOS OFF/);
+    await host.locator('[data-module="background"]').click();
+    assert.match(await host.locator('[data-module="background"]').innerText(),/FONDO ON/);
+    await host.locator('[data-module="background"]').click();
+    assert.match(await host.locator('[data-module="background"]').innerText(),/FONDO OFF/);
     assert.match(await host.locator('[data-module="game"]').innerText(),/QUEST ON/);
     assert.match(await host.locator('[data-module="aura"]').innerText(),/AURA ON/);
     await page.evaluate(() => {
