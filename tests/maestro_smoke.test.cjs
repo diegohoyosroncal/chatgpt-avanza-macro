@@ -267,7 +267,7 @@ test('cross-process receipts cannot affect current objective or terminal status'
 test('reported progress remains visibly unverified and input controls are normalized',()=>{
   assert.match(script,/AVANCE REPORTADO/);
   assert.match(script,/reportado; fuente externa pendiente/);
-  assert.match(script,/control=normalizeControl\(/);
+  assert.match(script,/control=mergeIncomingCosmeticControl\(/);
 });
 test('AVANZA is the last panel element after status and footer',()=>{
   const start=script.indexOf('    panel.innerHTML=`<div class="top">');
