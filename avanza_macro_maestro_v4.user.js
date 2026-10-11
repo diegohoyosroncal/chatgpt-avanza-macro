@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         AVANZA — Macro Maestro · Piloto Automático
 // @namespace    https://chatgpt.com/
-// @version      4.2.0
+// @version      4.3.0
 // @description  Cockpit multiproyecto + Learn Quest: módulos ON/OFF, AUTO/MANUAL, progreso serio independiente, misiones jugables y sincronización entre pestañas.
 // @updateURL    https://raw.githubusercontent.com/diegohoyosroncal/chatgpt-avanza-macro/main/avanza_macro_maestro_v4.user.js
 // @downloadURL  https://raw.githubusercontent.com/diegohoyosroncal/chatgpt-avanza-macro/main/avanza_macro_maestro_v4.user.js
@@ -18,7 +18,7 @@
   // Auto-continúa solo proyectos identificados que estén explícitamente en AUTO.
   // No llama APIs remotas, no lee credenciales y no elude permisos/herramientas de ChatGPT.
   const APP = 'avanza-macro-maestro-v4';
-  const INSTALLED_VERSION = '4.2.0-learn1';
+  const INSTALLED_VERSION = '4.3.0-interactive1';
   const LEARN_KEY = 'avanza-v4-learn-quest-v1';
   const CONTROL_KEY = 'avanza-v4-control-center-v1';
   const PROJECTS_KEY = 'avanza-v4-project-registry-v1';
@@ -146,7 +146,7 @@
     if(!id) return null;
     const p=projects?.[id]||{};
     const baseXp=Number.isInteger(p.numerator)?p.numerator*100:0;
-    return learning[id]||{processId:id,course:'',missionId:'',title:'',difficulty:1,reward:100,xp:baseXp,streak:0,status:'IDLE',boss:false,lastResult:'',completed:{},updatedAt:''};
+    return learning[id]||{processId:id,course:'',missionId:'',title:'',difficulty:1,reward:100,xp:baseXp,streak:0,status:'IDLE',boss:false,lastResult:'',choices:[],completed:{},updatedAt:''};
   }
   function setLearning(id,patch) {
     if(!id) return;
@@ -168,12 +168,49 @@
     if(!m) return null;
     return {missionId:safeId(m[1].trim()),result:m[2].toUpperCase(),claimedXp:Number(m[3]),claimedStreak:m[4]?Number(m[4]):null};
   }
+  function parseQuestChoices(text) {
+    const line=(String(text||'').match(/🎲\s*QUEST_CHOICES\s*\|[^\n]+/i)||[])[0];
+    if(!line) return null;
+    const parts=line.split('|').map(x=>x.trim());
+    if(parts.length<4) return null;
+    const missionId=safeId(parts[1].replace(/^QUEST_CHOICES\s*/i,''));
+    const choices=parts.slice(2).map(part=>{
+      const m=part.match(/^([A-F1-6])\s*[=:]\s*(.+)$/i);
+      return m?{key:m[1].toUpperCase(),label:m[2].trim().slice(0,120)}:null;
+    }).filter(Boolean).slice(0,6);
+    return missionId&&choices.length>=2?{missionId,choices}:null;
+  }
+  function findLearningProjectId(course) {
+    const needle=String(course||'').trim().toLocaleUpperCase();
+    if(!needle) return '';
+    const rows=Object.values(projects||{});
+    const hit=rows.find(p=>[p.id,p.objective].join(' ').toLocaleUpperCase().includes(needle));
+    return hit?.id||'';
+  }
   function discoverLearning() {
     if(!moduleOn('game')) return;
-    const id=projectKey(); if(!id) return;
-    const nodes=[...document.querySelectorAll('[data-message-author-role="assistant"]')].slice(-18);
-    let active=null,result=null;
-    for(const node of nodes){ const text=node.innerText||node.textContent||''; active=parseQuestLine(text)||active; result=parseQuestResult(text)||result; }
+    const nodes=[...document.querySelectorAll('[data-message-author-role="assistant"]')].slice(-24);
+    let active=null,result=null,choicePack=null;
+    for(const node of nodes){
+      const text=node.innerText||node.textContent||'';
+      active=parseQuestLine(text)||active;
+      result=parseQuestResult(text)||result;
+      choicePack=parseQuestChoices(text)||choicePack;
+    }
+    let id=projectKey();
+    if(active){
+      const mapped=findLearningProjectId(active.course);
+      if(mapped) id=mapped;
+      if(id && state.processId!==id){
+        state.processId=id;
+        const p=projects[id]||{};
+        if(typeof p.current_pct==='number') state.lastPercent=p.current_pct;
+        if(Number.isInteger(p.numerator)) state.lastNumerator=p.numerator;
+        if(Number.isInteger(p.denominator)) state.lastDenominator=p.denominator;
+        if(typeof p.delta_pp==='number') state.lastDelta=p.delta_pp;
+      }
+    }
+    if(!id) return;
     let L=learningFor(id); if(!L) return;
     if(result && result.missionId){
       const done=L.completed||{};
@@ -186,10 +223,12 @@
     }
     if(active){
       const same=active.missionId===L.missionId;
-      L={...L,...active,status:'AWAITING_USER',lastResult:same?L.lastResult:'',processId:id};
+      L={...L,...active,status:'AWAITING_USER',lastResult:same?L.lastResult:'',processId:id,choices:choicePack?.missionId===active.missionId?choicePack.choices:[]};
+    } else if(choicePack && choicePack.missionId===L.missionId) {
+      L={...L,choices:choicePack.choices};
     }
     learning[id]=L; try{localStorage.setItem(LEARN_KEY,JSON.stringify(learning));}catch{}
-    renderGame();
+    saveState(); renderGame(); renderProgressRibbon();
   }
   function readProjects() {
     const seeds=seedProjects();
@@ -363,11 +402,12 @@
       'EJECUTA dentro de este turno las acciones seguras y autorizadas con valor positivo, verifica cada una en una fuente independiente, distingue COLA→ENTREGA→ACCIÓN→EFECTO y sigue con las demás. Si llevamos 3 intentos sin DELTA verificable, identifica causa raíz y realiza una intervención MATERIALMENTE diferente antes de repetir.',
       'Puedes evaluar alternativas mundiales y crear componentes faltantes cuando sea legítimo, pero NUNCA saltar permisos, MFA, consentimiento, términos, límites de herramienta o costos. No generar gastos, pagos, contratos, cambios irreversibles o despliegues riesgosos sin autorización precisa. Preserva single-owner, deduplicación, idempotencia y protección de secretos.',
       'La continuidad fuera del chat requiere el ejecutor externo existente AUTORIZADO y sus recibos; no basta enviar mensajes con la macro ni crear más cron/tareas. No simules persistencia o cumplimiento universal en otros chats. Esta macro puede proponer una continuación del hilo web abierto, pero la ejecución real debe comprobarse en herramientas autorizadas.',
+      'CONTRATO VISUAL DE PORCENTAJE: la PRIMERA línea de toda respuesta de proceso multi-ejecución debe ser 🧩 PROCESO <process_id> | 📈 AVANCE <anterior>%→<actual>% | <numerador>/<denominador> gates | Δ <pp>. Si no existe denominador defendible: 🧩 PROCESO <process_id> | 📈 AVANCE NO DETERMINABLE. Nunca omitas una métrica ya verificada; conserva el último valor si esta ejecución no cambia progreso.',
       'Antes de terminar repite la revisión de fronteras útiles, guarda checkpoint con objetivo, owner, receipt, bloqueo, siguiente acción exacta y condición de reanudación si procede. Reporta SIEMPRE objetivo, porcentaje anterior→actual con numerador/denominador, delta pp, pendiente, efecto realmente verificado, bloqueo y siguiente hito. Si no existe denominador defendible di NO DETERMINABLE.',
       'MULTIPROYECTO: identifica un PROCESS_ID estable para este objetivo y NO mezcles su porcentaje con otro proceso. Otros proyectos independientes pueden avanzar en sus propios chats/tabs; conserva owner y escala del proceso actual.',
       'CFI/APRENDIZAJE: usa misiones cortas, feedback interactivo, colores y juego cuando ayuden, pero XP/estética jamás sustituyen dominio verificable. El porcentaje solo sube al cerrar gates de conocimiento o práctica.',
       'LEARN QUEST: si el proceso es de aprendizaje, NO entregues una pared de teoría. Presenta una micro-misión resoluble por el usuario, evalúa su respuesta, explica el error o acierto y encadena la siguiente misión sin que tenga que escribir "sigue". Usa dificultad progresiva, recuperación espaciada, variación de datos y boss/simulacro cuando proceda.',
-      'PROTOCOLO VISIBLE PARA EL HUD: cuando presentes una misión termina el bloque con una línea legible EXACTA del formato: 🎮 QUEST | <curso> | <mission_id> | ⭐<xp 0-500> XP | ⚔️<1-5>/5 | <título>. Cuando evalúes una respuesta, añade una línea: 🏆 QUEST_RESULT | <mission_id> | PASS | +<xp> XP | 🔥<racha> o 🔁 QUEST_RESULT | <mission_id> | RETRY | +0 XP | 🔥0. Si haces PASS, presenta en esa misma respuesta la siguiente QUEST salvo que corresponda boss, pausa pedagógica o gate humano real.',
+      'PROTOCOLO VISIBLE PARA EL HUD: cuando presentes una misión termina el bloque con una línea EXACTA: 🎮 QUEST | <curso> | <mission_id> | ⭐<xp 0-500> XP | ⚔️<1-5>/5 | <título>. Si la pregunta admite opciones útiles, añade inmediatamente: 🎲 QUEST_CHOICES | <mission_id> | A=<opción> | B=<opción> | C=<opción> | D=<opción>. El HUD convertirá esas opciones en botones. Si es numérica/abierta, deja que el usuario responda desde la caja interactiva del HUD. Cuando evalúes una respuesta añade: 🏆 QUEST_RESULT | <mission_id> | PASS | +<xp> XP | 🔥<racha> o 🔁 QUEST_RESULT | <mission_id> | RETRY | +0 XP | 🔥0. Si haces PASS, presenta en esa misma respuesta la siguiente QUEST salvo boss, pausa pedagógica o gate humano real.',
       'Para el control local termina con EXACTAMENTE UNA línea JSON de metadatos, después del informe: AVANZA_CONTROL: {"status":"CONTINUE","process_id":"","objective":"","previous_pct":null,"current_pct":null,"delta_pp":null,"numerator":null,"denominator":null,"evidence":"","blocker":"","next_action":""}. Estos valores son declaraciones del asistente y NO recibos independientes. Usa VERIFIED_COMPLETE solo si el OBJETIVO PRINCIPAL está completamente verificado con fuente primaria, HUMAN_GATE_PROVEN solo si se agotaron alternativas legítimas, NO_SAFE_ACTION solo si realmente no queda acción segura positiva. Nunca afirmes resultado final por CI, cola DONE, pruebas aisladas, documentos o esta macro. Mantén el denominador del MISMO objetivo, no mezcles ámbitos.',
       `${RECEIPT} ${ticket}`,
     ];
@@ -385,6 +425,28 @@
     return typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= 100 ? (Math.round(value * 100) / 100).toLocaleString('es-PE', {maximumFractionDigits: 2}) + '%' : '—';
   }
   function escapeText(value, max=100) { return String(value || '').replace(/[\u0000-\u001f]/g, ' ').slice(0,max); }
+  function escapeHtml(value,max=160) {
+    return escapeText(value,max).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+  }
+  function shortProjectLabel(id) {
+    if(/^CFI-/i.test(id)) return '🎓 CFI';
+    if(/^COCKPIT/i.test(id)) return '🧩 COCKPIT';
+    if(/VELVET/i.test(id)) return '🎬 VELVET';
+    if(/BTS/i.test(id)) return '💜 BTS';
+    if(/KASA/i.test(id)) return '🏠 KASA';
+    if(/YERABELL/i.test(id)) return '🎞️ YERABELL';
+    return '🚀 '+String(id||'').replace(/-v\d+$/i,'').slice(0,12);
+  }
+  function renderProgressRibbon() {
+    const box=dashboard?.querySelector('[data-value="progress-ribbon"]'); if(!box) return;
+    if(!moduleOn('progress')) { box.hidden=true; return; }
+    const rows=Object.values(projects||{}).filter(p=>typeof p.current_pct==='number'&&Number.isFinite(p.current_pct)).sort((a,b)=>{
+      if(a.id===projectKey()) return -1; if(b.id===projectKey()) return 1;
+      return String(b.updated_at||'').localeCompare(String(a.updated_at||''));
+    }).slice(0,6);
+    box.hidden=false;
+    box.innerHTML=rows.length?rows.map(p=>'<span class="progress-chip" data-active="'+(p.id===projectKey()?'true':'false')+'"><b>'+escapeHtml(shortProjectLabel(p.id),22)+'</b> '+escapeHtml(formatPercent(p.current_pct),8)+'</span>').join(''):'<span class="progress-chip">📈 sin % verificable aún</span>';
+  }
   function updateDashboard() {
     if (!dashboard) return;
     const pct = moduleOn('progress') ? state.lastPercent : null;
@@ -405,7 +467,7 @@
     const bar = dashboard.querySelector('.bar-fill'); if (bar) { bar.style.width = known ? `${pct}%` : '0%'; if (known) { bar.parentElement.setAttribute('aria-valuemin','0'); bar.parentElement.setAttribute('aria-valuemax','100'); bar.parentElement.setAttribute('aria-valuenow',String(pct)); bar.parentElement.removeAttribute('aria-valuetext'); } else { bar.parentElement.removeAttribute('aria-valuenow'); bar.parentElement.setAttribute('aria-valuetext','Progreso aún no verificable'); } }
     const tone = dashboard.querySelector('.tone');
     if (tone) tone.dataset.level=state.stalled>=3?'risk':phase===STATES.WAITING||phase===STATES.READY?'live':'idle';
-    renderGame(); renderModules(); renderProjects();
+    renderGame(); renderModules(); renderProjects(); renderProgressRibbon();
   }
   function render() {
     if (!button) return;
@@ -662,6 +724,19 @@
       root.style.top = Math.max(0, Math.min(presentation.y, window.innerHeight - h)) + 'px';
     }
   }
+  function ensurePanelVisible() {
+    if(!root || !root.isConnected) return;
+    root.style.display='block'; root.style.visibility='visible'; root.style.opacity='1';
+    const r=root.getBoundingClientRect();
+    const bad=!Number.isFinite(r.left)||r.width<30||r.height<30||r.right<30||r.bottom<30||r.left>window.innerWidth-30||r.top>window.innerHeight-30;
+    if(bad){
+      presentation.x=null; presentation.y=null; savePresentation();
+      root.style.left='auto'; root.style.top='auto';
+      root.style.right='max(12px, env(safe-area-inset-right))';
+      root.style.bottom='max(94px, calc(75px + env(safe-area-inset-bottom)))';
+      setStatus('🛟 HUD rescatado a una posición visible.');
+    }
+  }
   function dragMove(event) {
     if (!drag || event.pointerId !== drag.pointerId || !root) return;
     const x = Math.max(0, Math.min(drag.x + event.clientX - drag.startX, window.innerWidth - root.offsetWidth));
@@ -702,12 +777,18 @@
     const m=String(id||'').match(/(20\d{2})-(\d{2})-(\d{2})/);
     return m?new Date(Number(m[1]),Number(m[2])-1,Number(m[3]),23,59,59):null;
   }
+  function sendLearningPayload(message,label) {
+    if(isGenerating()){ setStatus('La respuesta sigue en curso; no interrumpo.',true); return false; }
+    const composer=findComposer(); if(!composer){ setStatus('No encuentro el cuadro de mensaje.',true); return false; }
+    if(draft(composer)){ setStatus('Tu borrador sigue intacto. Envíalo o bórralo antes de usar QUEST.',true); return false; }
+    if(!fillComposer(composer,message)){ setStatus('No pude preparar la acción QUEST sin tocar tu borrador.',true); return false; }
+    const send=findSend(); if(!send){ setStatus('Acción QUEST preparada; botón Enviar no disponible todavía.',true); return false; }
+    send.click(); setStatus('🎮 '+label+' enviada');
+    return true;
+  }
   function sendLearningAction(kind) {
     const id=projectKey(), L=learningFor(id);
     if(!id){ setStatus('No hay PROCESS_ID académico activo todavía.',true); return; }
-    if(isGenerating()){ setStatus('La respuesta sigue en curso; no interrumpo.',true); return; }
-    const composer=findComposer(); if(!composer){ setStatus('No encuentro el cuadro de mensaje.',true); return; }
-    if(draft(composer)){ setStatus('Tu borrador sigue intacto. Termínalo o envíalo antes de usar un botón QUEST.',true); return; }
     const mission=L?.missionId||'SIGUIENTE';
     const actions={
       start:'🎮 LEARN_ACTION | START | PROCESS '+id+' | Activa la siguiente micro-misión del curso. Hazla interactiva y no reveles la solución antes de mi intento.',
@@ -716,17 +797,23 @@
       boss:'👾 LEARN_ACTION | BOSS | PROCESS '+id+' | Lanza un boss/simulacro acumulativo apropiado a mi nivel actual; puntúa por gates, no por estilo.',
       map:'🗺️ LEARN_ACTION | MAP | PROCESS '+id+' | Muéstrame el mapa de misiones: completadas, actual, siguientes y boss. No cambies el % sin evidencia.'
     };
-    const message=actions[kind]||actions.start;
-    if(!fillComposer(composer,message)){ setStatus('No pude preparar la acción QUEST sin tocar tu borrador.',true); return; }
-    const send=findSend(); if(!send){ setStatus('Acción QUEST preparada; botón Enviar no disponible todavía.',true); return; }
-    send.click(); setStatus('🎮 Acción QUEST enviada: '+kind.toUpperCase());
+    sendLearningPayload(actions[kind]||actions.start,'acción '+kind.toUpperCase());
+  }
+  function sendLearningAnswer(answer) {
+    const id=projectKey(), L=learningFor(id), clean=String(answer||'').trim();
+    if(!id||!L?.missionId){ setStatus('Primero activa una misión.',true); return; }
+    if(!clean){ setStatus('Escribe o elige una respuesta primero.',true); return; }
+    const message='🎮 LEARN_ANSWER | PROCESS '+id+' | MISSION '+L.missionId+' | ANSWER '+clean.slice(0,1200)+' | Evalúa mi razonamiento; no me premies por estilo. Si PASS, acredita solo el gate demostrado y lanza la siguiente QUEST en esta misma respuesta.';
+    if(sendLearningPayload(message,'respuesta')){
+      const input=dashboard?.querySelector('[data-learn-answer]'); if(input) input.value='';
+    }
   }
   function renderGame() {
     const box=dashboard?.querySelector('[data-value="game"]'); if(!box) return;
     box.hidden=!moduleOn('game'); if(box.hidden) return;
     const id=projectKey(), L=learningFor(id);
     if(!id || !looksLearningProcess()){
-      box.innerHTML='<div class="quest-head"><b>🎮 LEARN QUEST</b><span>modo universal</span></div><div class="quest-empty">Se activa automáticamente en procesos de aprendizaje.</div>';
+      box.innerHTML='<div class="quest-head"><b>🎮 LEARN QUEST</b><span>modo universal</span></div><div class="quest-empty">Se activa automáticamente en procesos de aprendizaje.</div><div class="quest-actions single"><button type="button" data-learn-action="start">🎯 crear misión</button></div>';
       return;
     }
     const xp=L?.xp||0, level=1+Math.floor(xp/500), reward=L?.reward||100, streak=L?.streak||0;
@@ -736,12 +823,15 @@
     const boss=deadline?'👾 '+deadline.toLocaleDateString('es-PE',{day:'2-digit',month:'2-digit'})+' · '+Math.ceil(left/86400000)+'d':'👾 boss dinámico';
     const mission=L?.missionId||'SIGUIENTE', title=L?.title||'Listo para generar la siguiente misión';
     const status=L?.status==='AWAITING_USER'?'🎯 TU TURNO':L?.lastResult==='PASS'?'✅ GATE CERRADO':'🛰️ LISTO';
+    const choices=(L?.choices||[]).map(c=>'<button type="button" class="quest-choice" data-quest-choice="'+escapeHtml(c.key,4)+'"><b>'+escapeHtml(c.key,4)+'</b> '+escapeHtml(c.label,90)+'</button>').join('');
     box.innerHTML='<div class="quest-head"><b>🎮 LEARN QUEST</b><span>🔥 '+streak+'</span></div>'+
-      '<div class="quest-title">'+escapeText(mission,26)+' · '+escapeText(title,70)+'</div>'+
+      '<div class="quest-title">'+escapeHtml(mission,26)+' · '+escapeHtml(title,70)+'</div>'+
       '<div class="quest-meta"><span>LVL '+level+'</span><span>✨ '+xp+' XP</span><span>'+stars+'</span></div>'+
       '<div class="quest-state">'+status+' · recompensa '+reward+' XP · '+boss+'</div>'+
+      (choices?'<div class="quest-choices">'+choices+'</div>':'')+
+      '<div class="quest-answer"><textarea data-learn-answer rows="2" placeholder="✍️ responde aquí… (Enter envía · Shift+Enter salto)"></textarea><button type="button" data-learn-submit>🚀</button></div>'+
       '<div class="quest-actions"><button type="button" data-learn-action="start">🎯 misión</button><button type="button" data-learn-action="hint">💡 pista</button><button type="button" data-learn-action="retry">🔁 retry</button><button type="button" data-learn-action="boss">👾 boss</button><button type="button" data-learn-action="map">🗺️ mapa</button></div>'+
-      '<div class="quest-rule">XP/racha = motivación · 📈 % = dominio verificado</div>';
+      '<div class="quest-rule">✨ XP/racha motivan · 📈 porcentaje = dominio verificado · otros proyectos AUTO siguen aparte</div>';
   }
   function renderProjects() {
     const box=dashboard?.querySelector('[data-value="projects"]'); if(!box) return;
@@ -804,10 +894,11 @@
       .status{font-size:9.5px;color:#cbd5e1;margin-top:10px;min-height:25px;max-height:56px;overflow:hidden}.status[data-warning=true]{color:#fdba74}.foot{font-size:9px;color:#8799ae;border-top:1px solid var(--stroke);padding-top:8px;margin-top:4px;display:flex;justify-content:space-between;gap:5px}.scope{font-weight:700;color:#9fc3d8}
       .health{font-size:9px;line-height:1.3;margin:7px 0 0;padding:5px 7px;color:#a6cee7;border:1px solid var(--stroke);border-radius:8px;background:#0a1b2c}
       .health[data-warning=true]{color:#fdba74;border-color:#c2410c}
+      .progress-ribbon{display:flex;gap:5px;overflow:auto;padding:7px 1px 2px;scrollbar-width:thin}.progress-chip{flex:0 0 auto;border:1px solid #40536d;background:#0e1d32;border-radius:999px;padding:4px 7px;font-size:8.5px;color:#dbeafe;white-space:nowrap}.progress-chip[data-active=true]{border-color:var(--accent);color:var(--accent-light);box-shadow:0 0 12px var(--accent-halo)}
       .section{margin-top:10px;padding-top:9px;border-top:1px solid var(--stroke)}.section-title{font-size:9px;color:#94a3b8;font-weight:800;letter-spacing:.08em;margin-bottom:6px}
       .modules{display:grid;grid-template-columns:repeat(3,1fr);gap:5px}.modules button,.project-actions button{border:1px solid #40536d;background:#17263c;color:#e5eef8;border-radius:8px;padding:5px 4px;font-size:8.5px;font-weight:800;cursor:pointer}.modules button[data-on=true]{border-color:var(--accent);box-shadow:0 0 10px var(--accent-halo);color:var(--accent-light)}
       .projects{display:grid;gap:5px;max-height:180px;overflow:auto}.project-card{border:1px solid #31445e;background:#0d1b2d;border-radius:10px;padding:6px}.project-card[data-current=true]{border-color:var(--accent);box-shadow:0 0 14px var(--accent-halo)}.project-main{display:flex;justify-content:space-between;gap:5px;font-size:9px}.project-main b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.project-main span{color:#cbd5e1;white-space:nowrap}.project-actions{display:flex;gap:5px;margin-top:5px}.project-actions button{flex:1}.empty{font-size:9px;color:#8495aa;line-height:1.35}
-      .game{margin-top:8px;border:1px solid #6d4aff;background:radial-gradient(circle at 8% 20%,rgba(236,72,153,.17),transparent 34%),linear-gradient(120deg,#2e1065d9,#164e63d9);border-radius:13px;padding:9px;font-size:9px;color:#f3e8ff;font-weight:750;box-shadow:0 0 22px rgba(124,58,237,.12)}.quest-head{display:flex;justify-content:space-between;align-items:center;gap:7px}.quest-head span{color:#f9a8d4}.quest-title{font-size:10px;margin-top:6px;color:#fff;font-weight:850;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.quest-meta{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}.quest-meta span{background:#111c32aa;border:1px solid #596a86;border-radius:999px;padding:3px 6px}.quest-state{margin-top:7px;color:#c4f1ff}.quest-actions{display:grid;grid-template-columns:repeat(5,1fr);gap:4px;margin-top:7px}.quest-actions button{border:1px solid #596a86;background:#13233d;color:#eef7ff;border-radius:8px;padding:5px 2px;font-size:8px;font-weight:800;cursor:pointer}.quest-actions button:hover{border-color:#c4b5fd;box-shadow:0 0 10px #a78bfa33}.quest-rule,.quest-empty{margin-top:6px;color:#cbd5e1;font-size:8px;line-height:1.3}
+      .game{margin-top:8px;border:1px solid #6d4aff;background:radial-gradient(circle at 8% 20%,rgba(236,72,153,.17),transparent 34%),linear-gradient(120deg,#2e1065d9,#164e63d9);border-radius:13px;padding:9px;font-size:9px;color:#f3e8ff;font-weight:750;box-shadow:0 0 22px rgba(124,58,237,.12)}.quest-head{display:flex;justify-content:space-between;align-items:center;gap:7px}.quest-head span{color:#f9a8d4}.quest-title{font-size:10px;margin-top:6px;color:#fff;font-weight:850;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.quest-meta{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}.quest-meta span{background:#111c32aa;border:1px solid #596a86;border-radius:999px;padding:3px 6px}.quest-state{margin-top:7px;color:#c4f1ff}.quest-choices{display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-top:7px}.quest-choice{border:1px solid #6d5bd0;background:#201a43;color:#f8f7ff;border-radius:9px;padding:7px 6px;font-size:8.5px;text-align:left;cursor:pointer}.quest-choice:hover{transform:translateY(-1px);box-shadow:0 0 12px #a78bfa44}.quest-answer{display:flex;gap:5px;margin-top:7px}.quest-answer textarea{flex:1;resize:vertical;min-height:48px;max-height:120px;border:1px solid #52637d;border-radius:9px;background:#0c1728;color:#f8fafc;padding:7px;font:9px/1.35 ui-sans-serif,system-ui,sans-serif;outline:none}.quest-answer textarea:focus{border-color:#c4b5fd;box-shadow:0 0 0 2px #a78bfa22}.quest-answer button{width:40px;border:0;border-radius:9px;background:linear-gradient(135deg,#f59e0b,#ec4899,#7c3aed);color:#fff;font-size:17px;cursor:pointer}.quest-actions{display:grid;grid-template-columns:repeat(5,1fr);gap:4px;margin-top:7px}.quest-actions.single{grid-template-columns:1fr}.quest-actions button{border:1px solid #596a86;background:#13233d;color:#eef7ff;border-radius:8px;padding:5px 2px;font-size:8px;font-weight:800;cursor:pointer}.quest-actions button:hover{border-color:#c4b5fd;box-shadow:0 0 10px #a78bfa33}.quest-rule,.quest-empty{margin-top:6px;color:#cbd5e1;font-size:8px;line-height:1.3}
       .top{cursor:move;touch-action:none;user-select:none}
       .top button{cursor:pointer;touch-action:manipulation;border:1px solid #41536c;border-radius:8px;color:#e2e8f0;background:#1a2a43;padding:4px 7px;font-size:12px}
       .top button:focus-visible{outline:2px solid var(--accent)}
@@ -826,6 +917,7 @@
     const panel=document.createElement('div');panel.className='panel';
     panel.innerHTML=`<div class="top"><span class="logo" aria-hidden="true">↗</span><div class="topname"><div class="brand">AVANZA</div><div class="sub">MACRO MAESTRO · v4</div></div><button type="button" data-action="theme" title="Cambiar color">◐</button><button type="button" data-action="collapse" title="Compactar / ampliar">▁</button><span class="pill">CON CONTROL</span></div>
       <div class="health" data-value="health" data-warning="false">Versión remota sin verificar</div>
+      <div class="progress-ribbon" data-value="progress-ribbon" aria-label="Porcentajes verificados de proyectos"></div>
       <div class="section"><div class="section-title">🎛️ MACROS · ON/OFF</div><div class="modules"><button data-module="engine"></button><button data-module="auto"></button><button data-module="progress"></button><button data-module="sync"></button><button data-module="game"></button><button data-module="aura"></button></div></div>
       <div class="section"><div class="section-title">🗺️ PROYECTOS · PARALELO</div><div class="projects" data-value="projects"></div></div>
       <div class="game" data-value="game"></div>
@@ -854,6 +946,14 @@
       if(au){ const id=au.dataset.projectAuto; setProjectMode(id,{auto:!projectMode(id).auto,enabled:true}); return; }
       const learn=event.target.closest('[data-learn-action]');
       if(learn){ sendLearningAction(learn.dataset.learnAction); return; }
+      const choice=event.target.closest('[data-quest-choice]');
+      if(choice){
+        const L=learningFor(projectKey()), key=choice.dataset.questChoice;
+        const item=(L?.choices||[]).find(c=>c.key===key);
+        sendLearningAnswer(item?key+' — '+item.label:key); return;
+      }
+      const submit=event.target.closest('[data-learn-submit]');
+      if(submit){ const input=panel.querySelector('[data-learn-answer]'); sendLearningAnswer(input?.value||''); return; }
     });
     panel.querySelector('[data-action="theme"]').addEventListener('click', () => {
       const themes = ['amber','ocean','violet'];
@@ -864,6 +964,12 @@
       presentation.compact = !presentation.compact;
       savePresentation(); applyPresentation();
     });
+    panel.addEventListener('keydown', event => {
+      const input=event.target.closest?.('[data-learn-answer]');
+      if(input && event.key==='Enter' && !event.shiftKey){
+        event.preventDefault(); sendLearningAnswer(input.value||'');
+      }
+    });
     panel.querySelector('.top').addEventListener('pointerdown',dragStart);
     dashboard=panel;
     shadow.append(css,panel);
@@ -871,7 +977,7 @@
     applyPresentation();
     applyAura();
     discoverVisibleProjects();
-    renderModules(); renderProjects(); renderGame();
+    renderModules(); renderProjects(); renderGame(); renderProgressRibbon();
     updateHealth();
     if (stopReason) setStatus(stopReason);
     checkConflicts();
@@ -888,7 +994,7 @@
     observer.observe(document.documentElement, { childList: true, subtree: true });
     timer = setInterval(() => {
       if (!document.getElementById(APP)) scheduleMount();
-      checkConflicts(); discoverVisibleProjects(); discoverLearning(); maybeAutoStart(); tick();
+      checkConflicts(); discoverVisibleProjects(); discoverLearning(); ensurePanelVisible(); maybeAutoStart(); tick();
     }, CHECK_EVERY_MS);
     window.addEventListener('pagehide', () => { releaseLease(); saveState(); });
     document.addEventListener('keydown', e => {
