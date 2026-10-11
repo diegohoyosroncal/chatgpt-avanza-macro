@@ -21,7 +21,7 @@ try {
     await host.waitFor({timeout:7000});
     const dock = host.locator('.panel');
     const localVersion = await host.locator('[data-value="health"]').innerText();
-    assert.match(localVersion,/4\.3\.0-interactive1/);
+    assert.match(localVersion,/4\.4\.0-neon-control/);
     assert.match(localVersion,/remota NO verificada/);
     assert.equal(await host.locator('[data-module]').count(),6);
     assert.match(await host.locator('[data-module="auto"]').innerText(),/AUTO ON/);
@@ -46,6 +46,16 @@ try {
     await host.locator('[data-quest-choice="A"]').click();
     assert.match(await page.locator('#prompt-textarea').inputValue(),/LEARN_ANSWER/);
     await page.locator('#prompt-textarea').fill('');
+    await host.locator('[data-action="cinema"]').click();
+    const missionControl=host.locator('.mc-overlay');
+    await missionControl.waitFor({state:'visible',timeout:3000});
+    assert.match(await missionControl.innerText(),/MISSION CONTROL/);
+    assert.match(await missionControl.innerText(),/COCKPIT/);
+    assert.match(await missionControl.innerText(),/CFI/);
+    assert.match(await missionControl.innerText(),/BOSS BATTLE/);
+    assert.equal(await missionControl.locator('[data-quest-choice]').count(),4);
+    await missionControl.locator('[data-action="cinema-close"]').click();
+    assert.equal(await missionControl.isHidden(),true);
     await host.locator('[data-module="aura"]').click();
     assert.match(await host.locator('[data-module="aura"]').innerText(),/AURA OFF/);
     await host.locator('[data-module="aura"]').click();
@@ -85,7 +95,7 @@ try {
       return h?.querySelector('[data-value="health"]')?.dataset.warning === 'false';
     },{timeout:5000});
     assert.equal(await host.locator('[data-action="avanzar"]').isEnabled(),true);
-    results.push(size.width+'x'+size.height+': ribbon/interactive/rescue/fixed/drag/theme/compact/version/conflict PASS');
+    results.push(size.width+'x'+size.height+': mission-control/ribbon/interactive/rescue/fixed/drag/theme/compact/version/conflict PASS');
     await page.close();
   }
   console.log(results.join('\n'));
