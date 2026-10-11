@@ -1,143 +1,198 @@
 // ==UserScript==
-// @name         ChatGPT Avanza Macro
-// @namespace    http://tampermonkey.net/
+// @name         AVANZA — Control de continuación inteligente para ChatGPT
+// @namespace    https://chatgpt.com/
 // @version      1.0.0
-// @description  Adds a macro button to ChatGPT to quickly continue conversations.
-// @author       Diego Hoyos Roncal
+// @description  Agrega un botón AVANZA a cada conversación de ChatGPT web, sin transmitir datos a terceros.
+// @match        https://chatgpt.com/*
 // @match        https://chat.openai.com/*
+// @run-at       document-idle
 // @grant        none
 // ==/UserScript==
 
-(function() {
-    'use strict';
+(() => {
+  'use strict';
+  const ROOT_ID = 'avanza-universal-control-v1';
+  const STATUS_ID = 'avanza-universal-status-v1';
+  const MACRO = [
+    'AVANZA AL OBJETIVO — CONTINUACIÓN INTELIGENTE. Este mensaje no cambia mis objetivos previos ni autoriza gastos.',
+    '1) Recupera el contexto de ESTA conversación y los checkpoints canónicos pertinentes; confirma cuál es el objetivo real y el hito medible aún abierto.',
+    '2) Identifica el cuello de botella. Antes de ejecutar, contrasta alternativas viables, globales y verificables: ADOPTAR, REUTILIZAR, INTEGRAR, FUSIONAR, DELEGAR legítimamente, SUSTITUIR, ADAPTAR o CONSTRUIR solo una capacidad faltante. Compara valor esperado, coste marginal, seguridad, tiempo y reversibilidad.',
+    '3) EJECUTA AHORA las acciones seguras y ya autorizadas de mayor impacto, comprueba cada efecto mediante evidencia primaria y sigue con las otras ramas útiles en esta misma ejecución; no termines en recomendaciones o documentos si existe una acción realizable.',
+    '4) Ante tres intentos o ciclos sin progreso VERIFICABLE, deja de repetir la misma ruta, diagnostica causa raíz, elige un challenger materialmente diferente, ejecútalo y vuelve a comprobar. Nunca cuentes planes, CI, alertas, código ni tráfico como ingresos o cumplimiento final.',
+    '5) Antes de cerrar, vuelve a evaluar si queda una acción autorizada de valor positivo. Persiste RECEIPT, OBJETIVO, OWNER, bloqueo, NEXT_EXACT_ACTION y RESUME_CONDITION para el ejecutor externo ya existente; no crees otro cron o runtime duplicado para fingir continuidad.',
+    '6) Responde SIEMPRE con OBJETIVO; porcentaje ANTERIOR → ACTUAL (numerador/denominador), DELTA en puntos porcentuales; EFECTO VERIFICADO; BLOQUEO comprobado y SIGUIENTE HITO. Si el denominador no está validado di NO DETERMINABLE y no inventes porcentajes.',
+    'No pagues, cambies contratos, manejes secretos, suprimas controles de acceso ni hagas irreversibles sin autorización específica. Mi intervención humana rutinaria debe tender a cero. No afirmes control de otros chats ni ejecución después del turno sin evidencia independiente.'
+  ].join('\n');
 
-    // Function to create and append the button
-    function createMacroButton() {
-        const buttonText = 'Avanza Macro'; // Button text
-        const buttonId = 'avanza-macro-button'; // Unique ID for the button
-        const buttonClasses = 'btn relative btn-neutral'; // Classes for styling
+  let sending = false;
+  let statusTimeout;
 
-        // Check if the button already exists to prevent duplicates
-        if (document.getElementById(buttonId)) {
-            console.log('Avanza Macro button already exists.');
-            return;
-        }
+  function status(message, warning = false) {
+    const node = document.getElementById(STATUS_ID);
+    if (!node) return;
+    node.textContent = message;
+    node.style.color = warning ? '#fed7aa' : '#bbf7d0';
+    node.style.opacity = '1';
+    clearTimeout(statusTimeout);
+    statusTimeout = setTimeout(() => { node.style.opacity = '0'; }, 5200);
+  }
 
-        // Find the target container for appending the button
-        // This selector might need adjustment if ChatGPT's UI changes
-        const targetContainer = document.querySelector('.flex.flex-col.w-full.py-2.flex-grow.md\:py-3.md\:pl-4.relative.border.border-black\/10.bg-white.dark\:border-gray-900\/50.dark\:text-white.dark\:bg-gray-700.rounded-md.shadow-\[0_0_10px_rgba\(0\,0\,0\,0.10\)\]');
+  function visible(el) {
+    if (!el || !el.isConnected) return false;
+    if (el.getAttribute('aria-hidden') === 'true') return false;
+    const style = window.getComputedStyle(el);
+    return style.visibility !== 'hidden' && style.display !== 'none';
+  }
 
-        if (!targetContainer) {
-            console.error('Target container for Avanza Macro button not found.');
-            return;
-        }
-
-        // Create the button element
-        const macroButton = document.createElement('button');
-        macroButton.id = buttonId;
-        macroButton.className = buttonClasses;
-        macroButton.innerHTML = `
-            <div class="flex w-full items-center justify-center gap-2">
-                <svg stroke="currentColor" fill="none" stroke-width="1.5" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4" height="1em" width="1em" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M12 5v14M5 12h14"></path>
-                </svg>
-                ${buttonText}
-            </div>
-        `;
-
-        // Add event listener for button click
-        macroButton.addEventListener('click', () => {
-            console.log('Avanza Macro button clicked!');
-            simulateEnterPress();
-        });
-
-        // Append the button to the target container
-        targetContainer.appendChild(macroButton);
-        console.log('Avanza Macro button created and appended.');
+  function findComposer() {
+    const selectors = [
+      '#prompt-textarea[contenteditable="true"]',
+      '#prompt-textarea',
+      'form [contenteditable="true"][role="textbox"]',
+      '[data-testid="composer-input"] [contenteditable="true"]',
+      'form .ProseMirror[contenteditable="true"]',
+      'main [contenteditable="true"][role="textbox"]',
+      'form textarea',
+      'main textarea'
+    ];
+    for (const selector of selectors) {
+      const nodes = [...document.querySelectorAll(selector)].filter(visible);
+      const node = nodes.at(-1);
+      if (node) return node;
     }
+    return null;
+  }
 
-    // Function to simulate an Enter key press in the textarea
-    function simulateEnterPress() {
-        const textarea = document.querySelector('textarea.m-0.w-full.resize-none.border-0.bg-transparent.p-0.pr-7.focus\:ring-0.focus-visible\:ring-0.dark\:bg-transparent.pl-2.md\:pl-0');
+  function existingDraft(el) {
+    const draft = el.isContentEditable ? el.innerText : el.value;
+    return String(draft ?? '').trim();
+  }
 
-        if (textarea) {
-            console.log('Textarea found. Simulating Enter press.');
-
-            // Create and dispatch a keyboard event for 'Enter'
-            const enterEvent = new KeyboardEvent('keydown', {
-                key: 'Enter',
-                code: 'Enter',
-                keyCode: 13,
-                which: 13,
-                bubbles: true,
-                cancelable: true
-            });
-            textarea.dispatchEvent(enterEvent);
-
-            // If the chat sends on enter, this might be enough.
-            // If not, we might need to simulate a click on the send button.
-            // Let's try to find and click the send button as a fallback or additional action.
-            const sendButton = textarea.nextElementSibling; // Assuming send button is the next sibling
-
-            if (sendButton && sendButton.tagName === 'BUTTON') {
-                console.log('Send button found. Clicking it.');
-                sendButton.click();
-            } else {
-                console.log('Send button not found or is not a button.');
-                // More robust way to find send button
-                const sendButtonBySelector = document.querySelector('button.absolute.p-1.rounded-md.text-gray-500.bottom-1\.5.right-1.md\:right-2.dark\:hover\:text-gray-400.dark\:hover\:bg-gray-900.dark\:disabled\:hover\:bg-transparent');
-                if (sendButtonBySelector) {
-                    console.log('Send button found via selector. Clicking it.');
-                    sendButtonBySelector.click();
-                } else {
-                    console.error('Could not find send button using any method.');
-                }
-            }
-        } else {
-            console.error('ChatGPT textarea not found.');
-        }
+  function updateComposer(el, message) {
+    el.focus();
+    if (el.isContentEditable || el.getAttribute('contenteditable') === 'true') {
+      // User-gesture-only DOM edit: no clipboard permissions and no network calls.
+      const selection = window.getSelection();
+      const range = document.createRange();
+      range.selectNodeContents(el);
+      selection.removeAllRanges();
+      selection.addRange(range);
+      const inserted = document.execCommand('insertText', false, message);
+      if (!inserted || !existingDraft(el)) {
+        // A direct edit may not register in all React versions; leave a draft,
+        // never claim it was submitted if no enabled send button appears.
+        el.textContent = message;
+        el.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertText', data: message }));
+      }
+      return existingDraft(el).includes('AVANZA AL OBJETIVO');
     }
+    const proto = el instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
+    const setter = Object.getOwnPropertyDescriptor(proto, 'value')?.set;
+    if (setter) setter.call(el, message);
+    else el.value = message;
+    el.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertText', data: message }));
+    return String(el.value).includes('AVANZA AL OBJETIVO');
+  }
 
-    // Observe changes in the DOM to dynamically add the button
-    // This is useful when navigating between chats or refreshing the page
-    const observer = new MutationObserver((mutations) => {
-        mutations.forEach((mutation) => {
-            if (mutation.addedNodes.length || mutation.removedNodes.length) {
-                // Check if the chat input area is visible/reloaded
-                const targetContainer = document.querySelector('.flex.flex-col.w-full.py-2.flex-grow.md\:py-3.md\:pl-4.relative.border.border-black\/10.bg-white.dark\:border-gray-900\/50.dark\:text-white.dark\:bg-gray-700.rounded-md.shadow-\[0_0_10px_rgba\(0\,0\,0\,0.10\)\]');
-                if (targetContainer && !document.getElementById('avanza-macro-button')) {
-                    console.log('DOM changed and target container is present. Attempting to create button.');
-                    createMacroButton();
-                }
-                // If the button exists but the target container is gone, it might mean navigating away
-                if (!targetContainer && document.getElementById('avanza-macro-button')) {
-                    console.log('Target container removed. Removing Avanza Macro button.');
-                    document.getElementById('avanza-macro-button').remove();
-                }
-            }
-        });
-    });
+  function findSend(composer) {
+    const parent = composer.closest('form') || composer.closest('[data-testid="composer"]') || document;
+    const selectors = [
+      'button[data-testid="send-button"]',
+      'button[data-testid="fruitjuice-send-button"]',
+      'button[aria-label="Send prompt"]',
+      'button[aria-label="Send message"]',
+      'button[aria-label="Enviar mensaje"]',
+      'button[aria-label="Enviar"]',
+      'button[type="submit"]'
+    ];
+    for (const selector of selectors) {
+      const n = parent.querySelector(selector);
+      if (n && visible(n) && !n.disabled && n.getAttribute('aria-disabled') !== 'true') return n;
+    }
+    return null;
+  }
 
-    // Start observing the document body for changes
-    observer.observe(document.body, { childList: true, subtree: true });
+  function generationInProgress() {
+    const ids = ['stop-button', 'composer-stop-button'];
+    if (ids.some(id => document.querySelector(`button[data-testid="${id}"]`))) return true;
+    return [...document.querySelectorAll('button[aria-label]')].some(b =>
+      visible(b) && /^(stop generating|detener generación|detener la generación|stop streaming)$/i.test(b.getAttribute('aria-label') || '')
+    );
+  }
 
-    // Initial call to create the button in case it's already loaded
-    createMacroButton();
+  async function advance() {
+    if (sending) return;
+    if (generationInProgress()) {
+      status('La respuesta sigue generándose. Usa AVANZA cuando termine.', true);
+      return;
+    }
+    const composer = findComposer();
+    if (!composer) {
+      status('No encuentro el cuadro de mensaje. Abre una conversación.', true);
+      return;
+    }
+    if (existingDraft(composer)) {
+      status('Hay un borrador: no lo sobrescribí ni lo envié.', true);
+      return;
+    }
+    sending = true;
+    try {
+      if (!updateComposer(composer, MACRO)) {
+        status('No pude insertar la macro; no envié nada.', true);
+        return;
+      }
+      await new Promise(resolve => setTimeout(resolve, 230));
+      const send = findSend(composer);
+      if (send && !generationInProgress()) {
+        send.click();
+        status('Macro enviada al chat actual. Comprueba la respuesta.');
+      } else {
+        status('Macro insertada: pulsa Enviar. No se confirmó el envío automático.', true);
+      }
+    } catch {
+      status('No se completó la acción; revisa el cuadro antes de reenviar.', true);
+    } finally {
+      sending = false;
+    }
+  }
 
-    // Re-check and create button if URL changes without full page reload
-    let lastUrl = location.href;
-    new MutationObserver(() => {
-        const url = location.href;
-        if (url !== lastUrl) {
-            lastUrl = url;
-            console.log('URL changed. Re-checking for button.');
-            // Give a short delay for the new page elements to render
-            setTimeout(() => {
-                if (!document.getElementById('avanza-macro-button')) {
-                    createMacroButton();
-                }
-            }, 500);
-        }
-    }).observe(document, { subtree: true, childList: true });
+  function mount() {
+    if (document.getElementById(ROOT_ID)) return;
+    if (!document.body) return;
+    const host = document.createElement('div');
+    host.id = ROOT_ID;
+    host.setAttribute('role', 'group');
+    host.setAttribute('aria-label', 'Control AVANZA de ChatGPT');
+    host.style.cssText = 'position:fixed;bottom:calc(env(safe-area-inset-bottom, 0px) + 92px);right:12px;z-index:2147483646;display:flex;flex-direction:column;align-items:flex-end;gap:7px;max-width:min(85vw,340px);font-family:system-ui,-apple-system,sans-serif;';
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.id = 'avanza-one-tap-button';
+    btn.textContent = '▶ AVANZAR AL OBJETIVO';
+    btn.title = 'Recuperar contexto, evaluar opciones, ejecutar lo autorizado, verificar y reportar porcentaje';
+    btn.setAttribute('aria-label', 'Avanzar al objetivo en esta conversación');
+    btn.style.cssText = 'background:#facc15;color:#1f2937;border:2px solid #202020;border-radius:999px;padding:12px 16px;min-height:46px;box-shadow:0 4px 18px #0007;font-size:13px;font-weight:800;cursor:pointer;line-height:1.3;touch-action:manipulation;';
+    btn.addEventListener('click', advance);
+    const notice = document.createElement('div');
+    notice.id = STATUS_ID;
+    notice.setAttribute('role','status');
+    notice.setAttribute('aria-live', 'polite');
+    notice.style.cssText = 'font-size:11px;background:#111827;color:#bbf7d0;padding:5px 10px;border-radius:10px;opacity:0;transition:opacity .2s;pointer-events:none;max-width:300px;text-align:right;';
+    host.append(btn, notice);
+    document.body.append(host);
+  }
 
+  mount();
+  // Some ChatGPT page transitions replace portions of the DOM without a full reload.
+  let scheduled = false;
+  const observer = new MutationObserver(() => {
+    if (scheduled || document.getElementById(ROOT_ID)) return;
+    scheduled = true;
+    requestAnimationFrame(() => { scheduled = false; mount(); });
+  });
+  observer.observe(document.documentElement, { childList: true, subtree: true });
+  document.addEventListener('keydown', (event) => {
+    if (event.repeat || !event.altKey || !event.shiftKey || event.key.toLowerCase() !== 'a') return;
+    event.preventDefault();
+    advance();
+  });
 })();
