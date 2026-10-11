@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         AVANZA — Macro Maestro · Piloto Automático
 // @namespace    https://chatgpt.com/
-// @version      4.4.4
+// @version      4.4.5
 // @description  Cockpit multiproyecto + Learn Quest: módulos ON/OFF, AUTO/MANUAL, progreso serio independiente, misiones jugables y sincronización entre pestañas.
 // @updateURL    https://raw.githubusercontent.com/diegohoyosroncal/chatgpt-avanza-macro/main/avanza_macro_maestro_v4.user.js
 // @downloadURL  https://raw.githubusercontent.com/diegohoyosroncal/chatgpt-avanza-macro/main/avanza_macro_maestro_v4.user.js
@@ -22,7 +22,7 @@
   const SINGLETON = 'data-avanza-maestro-v4-runner';
   if (document.documentElement?.getAttribute(SINGLETON) === '1') return;
   document.documentElement?.setAttribute(SINGLETON, '1');
-  const INSTALLED_VERSION = '4.4.4-focus-default';
+  const INSTALLED_VERSION = '4.4.5-send-fix';
   const LEARN_KEY = 'avanza-v4-learn-quest-v1';
   const CONTROL_KEY = 'avanza-v4-control-center-v1';
   const PROJECTS_KEY = 'avanza-v4-project-registry-v1';
@@ -347,6 +347,28 @@
     }
     return draft(e).includes(message.slice(0, 60));
   }
+  function clearOwnUnsentDraft(el, message) {
+    if (!el || draft(el) !== String(message).trim()) return false;
+    try {
+      if (el.isContentEditable) {
+        el.focus();
+        const range = document.createRange();
+        range.selectNodeContents(el);
+        const sel = window.getSelection();
+        sel?.removeAllRanges(); sel?.addRange(range);
+        if (!document.execCommand('delete', false, null)) {
+          el.textContent = '';
+          el.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'deleteContentBackward' }));
+        }
+      } else {
+        const proto = el instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
+        const setter = Object.getOwnPropertyDescriptor(proto, 'value')?.set;
+        if (setter) setter.call(el, ''); else el.value = '';
+        el.dispatchEvent(new InputEvent('input', { bubbles:true, inputType:'deleteContentBackward' }));
+      }
+      return true;
+    } catch { return false; }
+  }
   function allMessages() {
     return [...document.querySelectorAll('[data-message-author-role]')].filter(x =>
       x.getAttribute('data-message-author-role') === 'user' || x.getAttribute('data-message-author-role') === 'assistant');
@@ -551,15 +573,33 @@
       const c = findComposer();
       if (!c) { pause('No encuentro el cuadro de mensaje; no se envió nada.', true); return; }
       if (draft(c)) { pause('Hay un borrador escrito. Se conservó intacto.', true); return; }
-      const send = findSend();
-      if (!send) { pause('No hay botón Enviar habilitado. No se envió nada.', true); return; }
+      // ChatGPT normally disables Enviar when the composer is empty.
+      // Never demand an enabled send control BEFORE filling it.
       const ticket = `AVZ4-${String(now())}-${state.totalSent + 1}`;
       const message = buildMessage(ticket, step);
       if (!fillComposer(c, message)) { pause('El editor no aceptó el mensaje; no se envió nada.', true); return; }
-      await new Promise(resolve => setTimeout(resolve, 120));
-      if (!renewLease() || phase !== STATES.READY || isGenerating() || currentChatKey() !== chatKey) { pause('El estado cambió antes de enviar. Se detuvo por seguridad.', true); return; }
-      const liveSend = findSend();
-      if (!liveSend) { pause('El botón Enviar dejó de estar disponible.', true); return; }
+      // Wait briefly for React/ProseMirror to enable Send after input/change.
+      let liveSend = null;
+      for (let attempt = 0; attempt < 8; attempt += 1) {
+        await new Promise(resolve => setTimeout(resolve, 150));
+        if (phase !== STATES.READY || currentChatKey() !== chatKey || isGenerating() || !renewLease()) break;
+        if (draft(c) !== message.trim()) break; // user edit wins; never send altered text
+        liveSend = findSend();
+        if (liveSend) break;
+      }
+      if (!renewLease() || phase !== STATES.READY || isGenerating() || currentChatKey() !== chatKey) {
+        pause('El chat cambió antes del envío. No pulsé Enviar.', true); return;
+      }
+      if (draft(c) !== message.trim()) {
+        pause('El contenido del editor cambió; conservé el borrador y no envié nada.',true); return;
+      }
+      if (!liveSend) {
+        // We injected this draft ourselves; clear only if completely untouched.
+        // No outgoing message or write-ahead ticket has occurred.
+        clearOwnUnsentDraft(c, message);
+        pause('No se habilitó Enviar después de escribir; no envié nada. Puedes pulsar AVANZAR nuevamente.', true);
+        return;
+      }
       const delivered = await claimAndSend(liveSend,ticket);
       if (!delivered) { pause('Otro panel o un mensaje pendiente tiene prioridad. No duplico el envío.',true); return; }
       // Click is not proof of delivery. Wait for the unique user-message receipt in the DOM.
