@@ -1,0 +1,28 @@
+name: AVANZA explicit AUTO opt-in
+on:
+  pull_request:
+    paths:
+      - avanza_macro_maestro_v4.user.js
+      - tests/auto_optin.test.cjs
+      - .github/workflows/auto-optin.yml
+  push:
+    branches: [main]
+    paths:
+      - avanza_macro_maestro_v4.user.js
+      - tests/auto_optin.test.cjs
+      - .github/workflows/auto-optin.yml
+permissions:
+  contents: read
+concurrency:
+  group: avanza-auto-safety-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  safe-auto:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+      - name: JavaScript source syntax
+        run: node --check avanza_macro_maestro_v4.user.js
+      - name: In-memory isolated AUTO and background tests
+        run: node --test tests/auto_optin.test.cjs

@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         AVANZA — Macro Maestro · Piloto Automático
 // @namespace    https://chatgpt.com/
-// @version      4.3.0
+// @version      4.3.1
 // @description  Cockpit multiproyecto + Learn Quest: módulos ON/OFF, AUTO/MANUAL, progreso serio independiente, misiones jugables y sincronización entre pestañas.
 // @updateURL    https://raw.githubusercontent.com/diegohoyosroncal/chatgpt-avanza-macro/main/avanza_macro_maestro_v4.user.js
 // @downloadURL  https://raw.githubusercontent.com/diegohoyosroncal/chatgpt-avanza-macro/main/avanza_macro_maestro_v4.user.js
@@ -18,7 +18,7 @@
   // Auto-continúa solo proyectos identificados que estén explícitamente en AUTO.
   // No llama APIs remotas, no lee credenciales y no elude permisos/herramientas de ChatGPT.
   const APP = 'avanza-macro-maestro-v4';
-  const INSTALLED_VERSION = '4.3.0-interactive1';
+  const INSTALLED_VERSION = '4.3.1-explicit-auto';
   const LEARN_KEY = 'avanza-v4-learn-quest-v1';
   const CONTROL_KEY = 'avanza-v4-control-center-v1';
   const PROJECTS_KEY = 'avanza-v4-project-registry-v1';
@@ -103,10 +103,23 @@
   }
 
   function readControl() {
-    const defaults = { modules:{engine:true,auto:true,progress:true,sync:true,game:true,aura:true}, backgroundAuto:true, projectModes:{} };
+    const defaults = { modules:{engine:true,auto:false,background:false,progress:true,sync:true,game:true,aura:true}, backgroundAuto:false, backgroundOptIn:false, autoRunOptIn:false, projectModes:{} };
     try {
       const raw = JSON.parse(localStorage.getItem(CONTROL_KEY) || 'null');
-      return raw && typeof raw === 'object' ? { ...defaults, ...raw, modules:{...defaults.modules,...(raw.modules||{})}, projectModes:{...(raw.projectModes||{})} } : defaults;
+      if(!raw || typeof raw !== 'object' || Array.isArray(raw)) return defaults;
+      const autoRunOptIn=raw.autoRunOptIn===true;
+      const backgroundOptIn=raw.backgroundOptIn===true;
+      const modules={...defaults.modules,...(raw.modules||{})};
+      // Older builds initialized AUTO/FONDO as ON without opt-in. Their raw flags are
+      // NOT evidence of consent; the visible button must match actual permission.
+      if(!autoRunOptIn) modules.auto=false;
+      if(!backgroundOptIn) modules.background=false;
+      const projectModes={...(raw.projectModes||{})};
+      if(!autoRunOptIn) {
+        for(const key of Object.keys(projectModes)) projectModes[key]={...projectModes[key],auto:false};
+      }
+      return {...defaults,...raw,modules,projectModes,autoRunOptIn,backgroundOptIn,
+        backgroundAuto:backgroundOptIn && raw.backgroundAuto===true};
     } catch { return defaults; }
   }
   function saveControl() {
@@ -116,7 +129,7 @@
   function moduleOn(name) { return control.modules?.[name] !== false; }
   function projectMode(id) {
     const row=control.projectModes?.[id]||{};
-    return { enabled:row.enabled!==false, auto:row.auto!==false };
+    return { enabled:row.enabled!==false, auto:row.auto===true };
   }
   function setProjectMode(id,patch) {
     if(!id) return;
@@ -512,7 +525,7 @@
       syncRoute();
       if (phase !== STATES.READY) return;
       if (!renewLease()) { pause('Otro panel tiene el control de este chat; no duplico envíos.', true); return; }
-      if (document.hidden && !control.backgroundAuto) { setStatus('Pestaña en segundo plano: AUTO-background está OFF.'); return; }
+      if (document.hidden && !(control.backgroundAuto===true && control.backgroundOptIn===true)) { setStatus('Pestaña oculta: FONDO OFF. El autoenvío se reanuda al mostrarla.'); return; }
       if (isGenerating()) { setStatus('Respuesta en curso; no duplico mensajes.'); return; }
       const c = findComposer();
       if (!c) { pause('No encuentro el cuadro de mensaje; no se envió nada.', true); return; }
@@ -546,7 +559,7 @@
     syncRoute();
     if (phase !== STATES.READY && phase !== STATES.WAITING) return;
     if (!renewLease()) { pause('El control de este chat está activo en otra pestaña; no duplico mensajes.', true); return; }
-    if (document.hidden && !control.backgroundAuto) return;
+    if (document.hidden && !(control.backgroundAuto===true && control.backgroundOptIn===true)) return;
     if (phase === STATES.READY) {
       if (now() - lastAudit < MIN_SEND_GAP_MS) return;
       lastAudit = now();
@@ -669,7 +682,7 @@
     if(Object.keys(projects).length){ try{localStorage.setItem(PROJECTS_KEY,JSON.stringify(projects));}catch{} renderProjects(); }
   }
   function shouldAutoStart() {
-    if(!moduleOn('engine')||!moduleOn('auto')||checkConflicts()||isGenerating()) return false;
+    if(!moduleOn('engine')||!moduleOn('auto')||control.autoRunOptIn!==true||checkConflicts()||isGenerating()) return false;
     discoverVisibleProjects();
     const id=projectKey(); if(!id) return false;
     const mode=projectMode(id); if(!mode.enabled||!mode.auto) return false;
@@ -768,7 +781,7 @@
   }
   function renderModules() {
     if(!dashboard) return;
-    const labels={engine:'⚡ MOTOR',auto:'♾️ AUTO',progress:'📈 %',sync:'🌐 SYNC',game:'🎮 QUEST',aura:'🎨 AURA'};
+    const labels={engine:'⚡ MOTOR',auto:'♾️ AUTOENVÍOS',background:'🪟 FONDO',progress:'📈 %',sync:'🌐 SYNC',game:'🎮 QUEST',aura:'🎨 AURA'};
     for(const b of dashboard.querySelectorAll('[data-module]')){
       const name=b.dataset.module,on=moduleOn(name); b.dataset.on=on?'true':'false'; b.textContent=(labels[name]||name)+' '+(on?'ON':'OFF');
     }
@@ -918,7 +931,7 @@
     panel.innerHTML=`<div class="top"><span class="logo" aria-hidden="true">↗</span><div class="topname"><div class="brand">AVANZA</div><div class="sub">MACRO MAESTRO · v4</div></div><button type="button" data-action="theme" title="Cambiar color">◐</button><button type="button" data-action="collapse" title="Compactar / ampliar">▁</button><span class="pill">CON CONTROL</span></div>
       <div class="health" data-value="health" data-warning="false">Versión remota sin verificar</div>
       <div class="progress-ribbon" data-value="progress-ribbon" aria-label="Porcentajes verificados de proyectos"></div>
-      <div class="section"><div class="section-title">🎛️ MACROS · ON/OFF</div><div class="modules"><button data-module="engine"></button><button data-module="auto"></button><button data-module="progress"></button><button data-module="sync"></button><button data-module="game"></button><button data-module="aura"></button></div></div>
+      <div class="section"><div class="section-title">🎛️ MACROS · ON/OFF</div><div class="modules"><button data-module="engine"></button><button data-module="auto"></button><button data-module="background"></button><button data-module="progress"></button><button data-module="sync"></button><button data-module="game"></button><button data-module="aura"></button></div></div>
       <div class="section"><div class="section-title">🗺️ PROYECTOS · PARALELO</div><div class="projects" data-value="projects"></div></div>
       <div class="game" data-value="game"></div>
       <div class="title" data-value="objective">Objetivo del chat · por recuperar</div>
@@ -936,6 +949,25 @@
       const mod=event.target.closest('[data-module]');
       if(mod){
         const name=mod.dataset.module; control.modules[name]=!moduleOn(name);
+        if(name==='auto'){
+          // Persist consent per browser; never infer consent from historic default=true.
+          control.autoRunOptIn=moduleOn('auto');
+          if(control.autoRunOptIn){
+            const id=projectKey();
+            if(id) control.projectModes[id]={...projectMode(id),enabled:true,auto:true};
+            setStatus('♾️ AUTO ON, activado explícitamente. Solo proyectos autorizados.');
+          } else {
+            if(phase===STATES.READY||phase===STATES.WAITING) pause('AUTO OFF: envíos detenidos; progreso conservado.');
+            else setStatus('AUTO OFF: el panel sigue visible; envíos solo al pulsar AVANZAR.');
+          }
+        }
+        if(name==='background'){
+          control.backgroundOptIn=moduleOn('background');
+          control.backgroundAuto=control.backgroundOptIn;
+          setStatus(control.backgroundOptIn
+            ? 'AUTO FONDO ON: solo mientras la pestaña siga abierta; no ejecuta un navegador cerrado.'
+            : 'AUTO FONDO OFF: pausado al ocultar la pestaña.');
+        }
         if(name==='sync') initChannel();
         if(name==='engine'&&!moduleOn('engine')&&(phase===STATES.READY||phase===STATES.WAITING)) pause('⚡ MOTOR OFF desde el cockpit.');
         saveControl(); render(); return;
@@ -943,7 +975,14 @@
       const en=event.target.closest('[data-project-enabled]');
       if(en){ const id=en.dataset.projectEnabled; setProjectMode(id,{enabled:!projectMode(id).enabled}); return; }
       const au=event.target.closest('[data-project-auto]');
-      if(au){ const id=au.dataset.projectAuto; setProjectMode(id,{auto:!projectMode(id).auto,enabled:true}); return; }
+      if(au){
+        const id=au.dataset.projectAuto,next=!projectMode(id).auto;
+        if(next){ control.modules.auto=true; control.autoRunOptIn=true; }
+        setProjectMode(id,{auto:next,enabled:true});
+        if(!next&&id===projectKey()&&(phase===STATES.READY||phase===STATES.WAITING))
+          pause('AUTO OFF para este proceso. Progreso conservado.');
+        saveControl(); render(); return;
+      }
       const learn=event.target.closest('[data-learn-action]');
       if(learn){ sendLearningAction(learn.dataset.learnAction); return; }
       const choice=event.target.closest('[data-quest-choice]');
