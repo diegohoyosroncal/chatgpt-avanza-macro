@@ -694,6 +694,10 @@
       .status{font-size:9.5px;color:#cbd5e1;margin-top:10px;min-height:25px;max-height:56px;overflow:hidden}.status[data-warning=true]{color:#fdba74}.foot{font-size:9px;color:#8799ae;border-top:1px solid var(--stroke);padding-top:8px;margin-top:4px;display:flex;justify-content:space-between;gap:5px}.scope{font-weight:700;color:#9fc3d8}
       .health{font-size:9px;line-height:1.3;margin:7px 0 0;padding:5px 7px;color:#a6cee7;border:1px solid var(--stroke);border-radius:8px;background:#0a1b2c}
       .health[data-warning=true]{color:#fdba74;border-color:#c2410c}
+      .section{margin-top:10px;padding-top:9px;border-top:1px solid var(--stroke)}.section-title{font-size:9px;color:#94a3b8;font-weight:800;letter-spacing:.08em;margin-bottom:6px}
+      .modules{display:grid;grid-template-columns:repeat(3,1fr);gap:5px}.modules button,.project-actions button{border:1px solid #40536d;background:#17263c;color:#e5eef8;border-radius:8px;padding:5px 4px;font-size:8.5px;font-weight:800;cursor:pointer}.modules button[data-on=true]{border-color:var(--accent);box-shadow:0 0 10px var(--accent-halo);color:var(--accent-light)}
+      .projects{display:grid;gap:5px;max-height:180px;overflow:auto}.project-card{border:1px solid #31445e;background:#0d1b2d;border-radius:10px;padding:6px}.project-card[data-current=true]{border-color:var(--accent);box-shadow:0 0 14px var(--accent-halo)}.project-main{display:flex;justify-content:space-between;gap:5px;font-size:9px}.project-main b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.project-main span{color:#cbd5e1;white-space:nowrap}.project-actions{display:flex;gap:5px;margin-top:5px}.project-actions button{flex:1}.empty{font-size:9px;color:#8495aa;line-height:1.35}
+      .game{margin-top:8px;border:1px solid #4c3a6b;background:linear-gradient(90deg,#2e1065aa,#164e63aa);border-radius:9px;padding:7px;font-size:9px;color:#f3e8ff;font-weight:750}
       .top{cursor:move;touch-action:none;user-select:none}
       .top button{cursor:pointer;touch-action:manipulation;border:1px solid #41536c;border-radius:8px;color:#e2e8f0;background:#1a2a43;padding:4px 7px;font-size:12px}
       .top button:focus-visible{outline:2px solid var(--accent)}
@@ -712,6 +716,9 @@
     const panel=document.createElement('div');panel.className='panel';
     panel.innerHTML=`<div class="top"><span class="logo" aria-hidden="true">↗</span><div class="topname"><div class="brand">AVANZA</div><div class="sub">MACRO MAESTRO · v4</div></div><button type="button" data-action="theme" title="Cambiar color">◐</button><button type="button" data-action="collapse" title="Compactar / ampliar">▁</button><span class="pill">CON CONTROL</span></div>
       <div class="health" data-value="health" data-warning="false">Versión remota sin verificar</div>
+      <div class="section"><div class="section-title">🎛️ MACROS · ON/OFF</div><div class="modules"><button data-module="engine"></button><button data-module="auto"></button><button data-module="progress"></button><button data-module="sync"></button><button data-module="game"></button><button data-module="aura"></button></div></div>
+      <div class="section"><div class="section-title">🗺️ PROYECTOS · PARALELO</div><div class="projects" data-value="projects"></div></div>
+      <div class="game" data-value="game"></div>
       <div class="title" data-value="objective">Objetivo del chat · por recuperar</div>
       <div class="metrics"><div class="ring"><div class="center"><span class="pct" data-value="percent" aria-label="Porcentaje actual">—</span><span class="caption">AVANCE</span></div></div><div class="stat"><div class="transition" data-value="transition">— → —</div><div class="delta" data-value="delta">Δ — pp</div><div class="frac" data-value="fraction">Base no validada</div><div class="pending" data-value="pending">Pendiente —</div></div></div>
       <div class="bar" role="progressbar" aria-label="Progreso reportado del objetivo del chat"><div class="bar-fill"></div></div>
@@ -723,6 +730,19 @@
     button=panel.querySelector('[data-action="avanzar"]');
     statusNode=panel.querySelector('.status');
     button.addEventListener('click',toggle);
+    panel.addEventListener('click', event => {
+      const mod=event.target.closest('[data-module]');
+      if(mod){
+        const name=mod.dataset.module; control.modules[name]=!moduleOn(name);
+        if(name==='sync') initChannel();
+        if(name==='engine'&&!moduleOn('engine')&&(phase===STATES.READY||phase===STATES.WAITING)) pause('⚡ MOTOR OFF desde el cockpit.');
+        saveControl(); render(); return;
+      }
+      const en=event.target.closest('[data-project-enabled]');
+      if(en){ const id=en.dataset.projectEnabled; setProjectMode(id,{enabled:!projectMode(id).enabled}); return; }
+      const au=event.target.closest('[data-project-auto]');
+      if(au){ const id=au.dataset.projectAuto; setProjectMode(id,{auto:!projectMode(id).auto,enabled:true}); return; }
+    });
     panel.querySelector('[data-action="theme"]').addEventListener('click', () => {
       const themes = ['amber','ocean','violet'];
       presentation.theme = themes[(themes.indexOf(presentation.theme) + 1) % themes.length];
@@ -737,6 +757,9 @@
     shadow.append(css,panel);
     document.body.appendChild(root);
     applyPresentation();
+    applyAura();
+    discoverVisibleProjects();
+    renderModules(); renderProjects(); renderGame();
     updateHealth();
     if (stopReason) setStatus(stopReason);
     checkConflicts();
