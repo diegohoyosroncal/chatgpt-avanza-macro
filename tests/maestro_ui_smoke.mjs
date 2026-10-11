@@ -93,7 +93,11 @@ try {
       const h=document.getElementById('avanza-macro-maestro-v4')?.shadowRoot;
       return h?.querySelector('[data-value="health"]')?.dataset.warning === 'true';
     },{timeout:5000});
-    assert.equal(await host.locator('[data-action="avanzar"]').isDisabled(),true);
+    assert.equal(await host.locator('[data-action="avanzar"]').isEnabled(),true);
+    const composerBeforeConflict = await page.locator('#prompt-textarea').inputValue();
+    await host.locator('[data-action="avanzar"]').click();
+    assert.match(await host.locator('[role="status"]').innerText(),/macro|conflicto|desactiva/i);
+    assert.equal(await page.locator('#prompt-textarea').inputValue(),composerBeforeConflict);
     await page.evaluate(() => document.getElementById('diego-mision-autonomia-v1').remove());
     await page.waitForFunction(() => {
       const h=document.getElementById('avanza-macro-maestro-v4')?.shadowRoot;
