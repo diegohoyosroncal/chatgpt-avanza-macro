@@ -16,8 +16,8 @@ test('complete user script parses without side effects',()=>{
 function makeAuto(input={}){
   const state={autoConsented:false,inFlightTicket:'',parkFingerprint:'',parkSince:0,stalled:4,missingReceipts:2,lastPercent:40,lastStatus:'',...input};
   let saves=0;
-  const fn=new Function('state','moduleOn','checkConflicts','isGenerating','discoverVisibleProjects','projectKey','projectMode','learningFor','draft','findComposer','EXIT','lastVisibleAssistantFingerprint','saveState',section('  function shouldAutoStart() {','  function maybeAutoStart() {')+'return shouldAutoStart;')(
-    state,()=>true,()=>false,()=>false,()=>{},()=>state.projectId||'',()=>({enabled:true,auto:true}),
+  const fn=new Function('state','control','moduleOn','checkConflicts','isGenerating','discoverVisibleProjects','projectKey','projectMode','learningFor','draft','findComposer','EXIT','lastVisibleAssistantFingerprint','saveState',section('  function shouldAutoStart() {','  function maybeAutoStart() {')+'return shouldAutoStart;')(
+    state,{autoRunOptIn:true},()=>true,()=>false,()=>false,()=>{},()=>state.projectId||'',()=>({enabled:true,auto:true}),
     ()=>null,()=>'',()=>null,new Set(['VERIFIED_COMPLETE','NO_SAFE_ACTION','HUMAN_GATE_PROVEN']),()=>state.newFingerprint||'old',()=>{saves++;});
   return {start:fn(),state,saves};
 }
@@ -25,6 +25,7 @@ test('AUTO requires per-chat activation; no global unsolicited sending',()=>{
   assert.equal(makeAuto().start,false);
   assert.equal(makeAuto({autoConsented:true}).start,true);
   assert.equal(makeAuto({autoConsented:true,projectId:'BUSINESS'}).start,true);
+  assert.equal(makeAuto({autoConsented:false,projectId:'BUSINESS'}).start,false);
 });
 test('pending unique ticket blocks duplicate action on reload',()=>{
   assert.equal(makeAuto({autoConsented:true,inFlightTicket:'AVZ4-unique'}).start,false);
