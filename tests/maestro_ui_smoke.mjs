@@ -1,0 +1,62 @@
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+import {chromium} from 'playwright-core';
+
+const script = readFileSync(new URL('../avanza_macro_maestro_v4.user.js', import.meta.url), 'utf8');
+const browserPath = process.env.CHROME_PATH;
+assert.ok(browserPath, 'CHROME_PATH must point to a locally installed Chrome/Chromium');
+const browser = await chromium.launch({executablePath: browserPath, headless:true,
+  args:['--no-sandbox','--disable-dev-shm-usage','--no-first-run']});
+const hostId = 'avanza-macro-maestro-v4';
+const getHost = () => document.getElementById('avanza-macro-maestro-v4');
+const results = [];
+try {
+  for (const size of [{width:1280,height:800},{width:390,height:844}]) {
+    const page = await browser.newPage({viewport:size});
+    await page.setContent(`<!doctype html><html><body style="min-height:4000px;background:#141b2b">
+      <form style="position:fixed;bottom:0"><textarea id="prompt-textarea"></textarea>
+      <button data-testid="send-button">Enviar</button></form></body></html>`);
+    await page.addScriptTag({content:script});
+    const host = page.locator('#'+hostId);
+    await host.waitFor({timeout:7000});
+    const dock = host.locator('.panel');
+    const localVersion = await host.locator('[data-value="health"]').innerText();
+    assert.match(localVersion,/4\.0\.4-rc1/);
+    assert.match(localVersion,/remota NO verificada/);
+    const before = await host.boundingBox();
+    await page.evaluate(() => scrollTo(0,2100));
+    await page.waitForTimeout(950);
+    const after = await host.boundingBox();
+    assert.ok(Math.abs(before.y-after.y)<2, 'dock must remain fixed after scroll');
+    await host.locator('[data-action="theme"]').click();
+    assert.equal(await host.getAttribute('data-theme'),'ocean');
+    await host.locator('[data-action="collapse"]').click();
+    assert.match(await dock.getAttribute('class'),/compact/);
+    await host.locator('[data-action="collapse"]').click();
+    assert.doesNotMatch(await dock.getAttribute('class'),/compact/);
+    const top = host.locator('.brand');
+    const start = await host.boundingBox();
+    const rect = await top.boundingBox();
+    await page.mouse.move(rect.x+Math.min(20,rect.width/2),rect.y+rect.height/2);
+    await page.mouse.down();
+    await page.mouse.move(rect.x+65,rect.y+60,{steps:5});
+    await page.mouse.up();
+    const moved = await host.boundingBox();
+    assert.ok(Math.abs(moved.x-start.x)>8 || Math.abs(moved.y-start.y)>8,'HUD must be draggable');
+    await page.evaluate(() => {const e=document.createElement('aside');e.id='diego-mision-autonomia-v1';e.style.display='none';document.body.append(e);});
+    await page.waitForFunction(() => {
+      const h=document.getElementById('avanza-macro-maestro-v4')?.shadowRoot;
+      return h?.querySelector('[data-value="health"]')?.dataset.warning === 'true';
+    },{timeout:5000});
+    assert.equal(await host.locator('[data-action="avanzar"]').isDisabled(),true);
+    await page.evaluate(() => document.getElementById('diego-mision-autonomia-v1').remove());
+    await page.waitForFunction(() => {
+      const h=document.getElementById('avanza-macro-maestro-v4')?.shadowRoot;
+      return h?.querySelector('[data-value="health"]')?.dataset.warning === 'false';
+    },{timeout:5000});
+    assert.equal(await host.locator('[data-action="avanzar"]').isEnabled(),true);
+    results.push(size.width+'x'+size.height+': fixed/drag/theme/compact/version/conflict PASS');
+    await page.close();
+  }
+  console.log(results.join('\n'));
+} finally { await browser.close(); }
