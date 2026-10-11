@@ -723,6 +723,19 @@
       root.style.top = Math.max(0, Math.min(presentation.y, window.innerHeight - h)) + 'px';
     }
   }
+  function ensurePanelVisible() {
+    if(!root || !root.isConnected) return;
+    root.style.display='block'; root.style.visibility='visible'; root.style.opacity='1';
+    const r=root.getBoundingClientRect();
+    const bad=!Number.isFinite(r.left)||r.width<30||r.height<30||r.right<30||r.bottom<30||r.left>window.innerWidth-30||r.top>window.innerHeight-30;
+    if(bad){
+      presentation.x=null; presentation.y=null; savePresentation();
+      root.style.left='auto'; root.style.top='auto';
+      root.style.right='max(12px, env(safe-area-inset-right))';
+      root.style.bottom='max(94px, calc(75px + env(safe-area-inset-bottom)))';
+      setStatus('🛟 HUD rescatado a una posición visible.');
+    }
+  }
   function dragMove(event) {
     if (!drag || event.pointerId !== drag.pointerId || !root) return;
     const x = Math.max(0, Math.min(drag.x + event.clientX - drag.startX, window.innerWidth - root.offsetWidth));
@@ -880,10 +893,11 @@
       .status{font-size:9.5px;color:#cbd5e1;margin-top:10px;min-height:25px;max-height:56px;overflow:hidden}.status[data-warning=true]{color:#fdba74}.foot{font-size:9px;color:#8799ae;border-top:1px solid var(--stroke);padding-top:8px;margin-top:4px;display:flex;justify-content:space-between;gap:5px}.scope{font-weight:700;color:#9fc3d8}
       .health{font-size:9px;line-height:1.3;margin:7px 0 0;padding:5px 7px;color:#a6cee7;border:1px solid var(--stroke);border-radius:8px;background:#0a1b2c}
       .health[data-warning=true]{color:#fdba74;border-color:#c2410c}
+      .progress-ribbon{display:flex;gap:5px;overflow:auto;padding:7px 1px 2px;scrollbar-width:thin}.progress-chip{flex:0 0 auto;border:1px solid #40536d;background:#0e1d32;border-radius:999px;padding:4px 7px;font-size:8.5px;color:#dbeafe;white-space:nowrap}.progress-chip[data-active=true]{border-color:var(--accent);color:var(--accent-light);box-shadow:0 0 12px var(--accent-halo)}
       .section{margin-top:10px;padding-top:9px;border-top:1px solid var(--stroke)}.section-title{font-size:9px;color:#94a3b8;font-weight:800;letter-spacing:.08em;margin-bottom:6px}
       .modules{display:grid;grid-template-columns:repeat(3,1fr);gap:5px}.modules button,.project-actions button{border:1px solid #40536d;background:#17263c;color:#e5eef8;border-radius:8px;padding:5px 4px;font-size:8.5px;font-weight:800;cursor:pointer}.modules button[data-on=true]{border-color:var(--accent);box-shadow:0 0 10px var(--accent-halo);color:var(--accent-light)}
       .projects{display:grid;gap:5px;max-height:180px;overflow:auto}.project-card{border:1px solid #31445e;background:#0d1b2d;border-radius:10px;padding:6px}.project-card[data-current=true]{border-color:var(--accent);box-shadow:0 0 14px var(--accent-halo)}.project-main{display:flex;justify-content:space-between;gap:5px;font-size:9px}.project-main b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.project-main span{color:#cbd5e1;white-space:nowrap}.project-actions{display:flex;gap:5px;margin-top:5px}.project-actions button{flex:1}.empty{font-size:9px;color:#8495aa;line-height:1.35}
-      .game{margin-top:8px;border:1px solid #6d4aff;background:radial-gradient(circle at 8% 20%,rgba(236,72,153,.17),transparent 34%),linear-gradient(120deg,#2e1065d9,#164e63d9);border-radius:13px;padding:9px;font-size:9px;color:#f3e8ff;font-weight:750;box-shadow:0 0 22px rgba(124,58,237,.12)}.quest-head{display:flex;justify-content:space-between;align-items:center;gap:7px}.quest-head span{color:#f9a8d4}.quest-title{font-size:10px;margin-top:6px;color:#fff;font-weight:850;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.quest-meta{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}.quest-meta span{background:#111c32aa;border:1px solid #596a86;border-radius:999px;padding:3px 6px}.quest-state{margin-top:7px;color:#c4f1ff}.quest-actions{display:grid;grid-template-columns:repeat(5,1fr);gap:4px;margin-top:7px}.quest-actions button{border:1px solid #596a86;background:#13233d;color:#eef7ff;border-radius:8px;padding:5px 2px;font-size:8px;font-weight:800;cursor:pointer}.quest-actions button:hover{border-color:#c4b5fd;box-shadow:0 0 10px #a78bfa33}.quest-rule,.quest-empty{margin-top:6px;color:#cbd5e1;font-size:8px;line-height:1.3}
+      .game{margin-top:8px;border:1px solid #6d4aff;background:radial-gradient(circle at 8% 20%,rgba(236,72,153,.17),transparent 34%),linear-gradient(120deg,#2e1065d9,#164e63d9);border-radius:13px;padding:9px;font-size:9px;color:#f3e8ff;font-weight:750;box-shadow:0 0 22px rgba(124,58,237,.12)}.quest-head{display:flex;justify-content:space-between;align-items:center;gap:7px}.quest-head span{color:#f9a8d4}.quest-title{font-size:10px;margin-top:6px;color:#fff;font-weight:850;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.quest-meta{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}.quest-meta span{background:#111c32aa;border:1px solid #596a86;border-radius:999px;padding:3px 6px}.quest-state{margin-top:7px;color:#c4f1ff}.quest-choices{display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-top:7px}.quest-choice{border:1px solid #6d5bd0;background:#201a43;color:#f8f7ff;border-radius:9px;padding:7px 6px;font-size:8.5px;text-align:left;cursor:pointer}.quest-choice:hover{transform:translateY(-1px);box-shadow:0 0 12px #a78bfa44}.quest-answer{display:flex;gap:5px;margin-top:7px}.quest-answer textarea{flex:1;resize:vertical;min-height:48px;max-height:120px;border:1px solid #52637d;border-radius:9px;background:#0c1728;color:#f8fafc;padding:7px;font:9px/1.35 ui-sans-serif,system-ui,sans-serif;outline:none}.quest-answer textarea:focus{border-color:#c4b5fd;box-shadow:0 0 0 2px #a78bfa22}.quest-answer button{width:40px;border:0;border-radius:9px;background:linear-gradient(135deg,#f59e0b,#ec4899,#7c3aed);color:#fff;font-size:17px;cursor:pointer}.quest-actions{display:grid;grid-template-columns:repeat(5,1fr);gap:4px;margin-top:7px}.quest-actions.single{grid-template-columns:1fr}.quest-actions button{border:1px solid #596a86;background:#13233d;color:#eef7ff;border-radius:8px;padding:5px 2px;font-size:8px;font-weight:800;cursor:pointer}.quest-actions button:hover{border-color:#c4b5fd;box-shadow:0 0 10px #a78bfa33}.quest-rule,.quest-empty{margin-top:6px;color:#cbd5e1;font-size:8px;line-height:1.3}
       .top{cursor:move;touch-action:none;user-select:none}
       .top button{cursor:pointer;touch-action:manipulation;border:1px solid #41536c;border-radius:8px;color:#e2e8f0;background:#1a2a43;padding:4px 7px;font-size:12px}
       .top button:focus-visible{outline:2px solid var(--accent)}
@@ -902,6 +916,7 @@
     const panel=document.createElement('div');panel.className='panel';
     panel.innerHTML=`<div class="top"><span class="logo" aria-hidden="true">↗</span><div class="topname"><div class="brand">AVANZA</div><div class="sub">MACRO MAESTRO · v4</div></div><button type="button" data-action="theme" title="Cambiar color">◐</button><button type="button" data-action="collapse" title="Compactar / ampliar">▁</button><span class="pill">CON CONTROL</span></div>
       <div class="health" data-value="health" data-warning="false">Versión remota sin verificar</div>
+      <div class="progress-ribbon" data-value="progress-ribbon" aria-label="Porcentajes verificados de proyectos"></div>
       <div class="section"><div class="section-title">🎛️ MACROS · ON/OFF</div><div class="modules"><button data-module="engine"></button><button data-module="auto"></button><button data-module="progress"></button><button data-module="sync"></button><button data-module="game"></button><button data-module="aura"></button></div></div>
       <div class="section"><div class="section-title">🗺️ PROYECTOS · PARALELO</div><div class="projects" data-value="projects"></div></div>
       <div class="game" data-value="game"></div>
@@ -930,6 +945,14 @@
       if(au){ const id=au.dataset.projectAuto; setProjectMode(id,{auto:!projectMode(id).auto,enabled:true}); return; }
       const learn=event.target.closest('[data-learn-action]');
       if(learn){ sendLearningAction(learn.dataset.learnAction); return; }
+      const choice=event.target.closest('[data-quest-choice]');
+      if(choice){
+        const L=learningFor(projectKey()), key=choice.dataset.questChoice;
+        const item=(L?.choices||[]).find(c=>c.key===key);
+        sendLearningAnswer(item?key+' — '+item.label:key); return;
+      }
+      const submit=event.target.closest('[data-learn-submit]');
+      if(submit){ const input=panel.querySelector('[data-learn-answer]'); sendLearningAnswer(input?.value||''); return; }
     });
     panel.querySelector('[data-action="theme"]').addEventListener('click', () => {
       const themes = ['amber','ocean','violet'];
@@ -940,6 +963,12 @@
       presentation.compact = !presentation.compact;
       savePresentation(); applyPresentation();
     });
+    panel.addEventListener('keydown', event => {
+      const input=event.target.closest?.('[data-learn-answer]');
+      if(input && event.key==='Enter' && !event.shiftKey){
+        event.preventDefault(); sendLearningAnswer(input.value||'');
+      }
+    });
     panel.querySelector('.top').addEventListener('pointerdown',dragStart);
     dashboard=panel;
     shadow.append(css,panel);
@@ -947,7 +976,7 @@
     applyPresentation();
     applyAura();
     discoverVisibleProjects();
-    renderModules(); renderProjects(); renderGame();
+    renderModules(); renderProjects(); renderGame(); renderProgressRibbon();
     updateHealth();
     if (stopReason) setStatus(stopReason);
     checkConflicts();
@@ -964,7 +993,7 @@
     observer.observe(document.documentElement, { childList: true, subtree: true });
     timer = setInterval(() => {
       if (!document.getElementById(APP)) scheduleMount();
-      checkConflicts(); discoverVisibleProjects(); discoverLearning(); maybeAutoStart(); tick();
+      checkConflicts(); discoverVisibleProjects(); discoverLearning(); ensurePanelVisible(); maybeAutoStart(); tick();
     }, CHECK_EVERY_MS);
     window.addEventListener('pagehide', () => { releaseLease(); saveState(); });
     document.addEventListener('keydown', e => {
