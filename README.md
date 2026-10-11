@@ -21,4 +21,9 @@ Si no aparece la pantalla de instalación, abre Tampermonkey > Utilities > Insta
 
 ## Estado de verificación
 
-Versión 1.0.2: **11/11 pruebas automatizadas en navegador aislado** (botón, un toque, protección de borrador, protección durante generación, persistencia al cambiar chat, atajo y autoreparación de DOM). GitHub readback y hash Git Blob coinciden byte a byte con la versión probada (v1.0.2, SHA-1 5bf154be88e202855d932342da56f987bcdded30).0.2, SHA-1 424eaa52c78ba62910b2826bc02238eec8426dc5). El enlace @updateURL permite buscar actualizaciones desde Tampermonkey. Un clic en Enviar NO constituye prueba de entrega: v1.0.2 intenta comprobar que el mensaje aparezca en el DOM del hilo, sin afirmar respuesta ni entrega de servidor. No se ha probado ni instalado en la sesión real del usuario, por lo que ese hito continúa pendiente. No se ha creado un cron, runtime ni servicio de pago adicional.
+- **Versión 1.0.2:** 11/11 pruebas automatizadas en Chromium aislado: control visible, envío por clic, confirmación en DOM, protección contra dobles envíos, borradores, bloqueo durante generación, envío no confirmado, ausencia de botón Enviar, montaje SPA, atajo y vista móvil. No hubo llamadas de red externas generadas por el script.
+- Archivo GitHub con SHA de contenido Git Blob `5bf154be88e202855d932342da56f987bcdded30`, leído y contrastado con el archivo probado localmente.
+- El botón sólo verifica visibilidad de mensaje en el DOM; no puede probar entrega final en servidores ni el cumplimiento de instrucciones por el modelo. Si falta recibo, lo señala expresamente.
+- **Instalación real de escritorio y Android: 0/2 verificada.** No se ha usado ni autorizado una sesión remota para instalar extensiones.
+- Un gestor de scripts como Tampermonkey puede solicitar permisos amplios de acceso a sitios, aunque este userscript declara únicamente los dominios ChatGPT y no efectúa solicitudes de red.
+- No se instaló ningún cron, servicio adicional ni se autorizó gasto.
