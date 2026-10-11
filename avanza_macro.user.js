@@ -1,9 +1,12 @@
 // ==UserScript==
 // @name         AVANZA — Control de continuación inteligente para ChatGPT
 // @namespace    https://chatgpt.com/
-// @version      1.0.0
+// @version      1.0.1
 // @description  Agrega un botón AVANZA a cada conversación de ChatGPT web, sin transmitir datos a terceros.
+// @updateURL    https://raw.githubusercontent.com/diegohoyosroncal/chatgpt-avanza-macro/main/avanza_macro.user.js
+// @downloadURL  https://raw.githubusercontent.com/diegohoyosroncal/chatgpt-avanza-macro/main/avanza_macro.user.js
 // @match        https://chatgpt.com/*
+// @match        https://www.chatgpt.com/*
 // @match        https://chat.openai.com/*
 // @run-at       document-idle
 // @grant        none
