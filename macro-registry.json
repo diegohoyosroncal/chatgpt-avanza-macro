@@ -1,20 +1,21 @@
 {
   "schema_version": 2,
-  "updated_at": "2026-10-10",
+  "updated_at": "2026-10-10T23:50:00-05:00",
   "purpose": "Single macro source of truth; user projects, economic state and native app execution are independent",
   "primary_repository": "diegohoyosroncal/chatgpt-avanza-macro",
   "channels": {
     "stable": {
       "path": "avanza_macro_maestro_v4.user.js",
       "branch": "main",
-      "version_verified_in_repository": "4.0.3",
-      "installed_profiles": "not_verified"
+      "version_verified_in_repository": "4.1.0",
+      "installed_profiles": "not_verified",
+      "ci": "18/18 offline + Chromium HUD PASS before merge"
     },
     "candidate": {
       "path": "avanza_macro_maestro_v4.user.js",
       "branch": "feat/multiproject-cockpit-20261010",
       "version": "4.1.0",
-      "status": "draft_multiproject",
+      "status": "promoted_to_stable",
       "installed_profiles": "not_verified"
     }
   },
@@ -31,7 +32,7 @@
       "version": "4.0.3",
       "executor": "userscript_web",
       "path": "avanza_macro_maestro_v4.user.js",
-      "status": "stable"
+      "status": "retained_at_commit_ad812155"
     },
     {
       "name": "MISIÓN VIVA",
@@ -51,8 +52,8 @@
       "name": "AVANZA Cockpit Multiproyecto",
       "version": "4.1.0-multi1",
       "executor": "userscript_web",
-      "branch": "feat/multiproject-cockpit-20261010",
-      "status": "draft"
+      "branch": "main",
+      "status": "stable"
     }
   ],
   "related_independent_systems": [
@@ -82,5 +83,12 @@
     "multiproject_registry_and_module_controls_pass",
     "cross_tab_sync_pass"
   ],
-  "rollback": "Disable visual candidate in Tampermonkey and reenable preserved v4.0.3 from main; never delete project state"
+  "rollback": "Restore avanza_macro_maestro_v4.user.js from commit ad812155a070654770508cfae6f677bd8d8fdecf (v4.0.3); never delete project state.",
+  "release_evidence": {
+    "pr": 4,
+    "merge_commit": "1b0d0f410d196af50d77d914c3e0363f28e52bbb",
+    "offline_tests": "18/18 PASS",
+    "chromium_hud": "PASS",
+    "authenticated_profile": "not_verified"
+  }
 }
