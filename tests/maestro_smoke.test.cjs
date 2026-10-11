@@ -11,7 +11,7 @@ assert.ok(script.includes(boot), 'known bootstrapping gate must exist for non-in
 
 function harness() {
   const source = script.slice(0, script.indexOf(boot)) +
-    "  window.__TEST = { readPresentation, conflicts, dragStart, dragMove, dragEnd, applyPresentation, checkConflicts, setRoot:(x)=>{root=x;},setDashboard:(x)=>{dashboard=x;},setPresentation:(x)=>{presentation=x;},getPresentation:()=>presentation };\n})();";
+    "  window.__TEST = { readPresentation, conflicts, dragStart, dragMove, dragEnd, applyPresentation, checkConflicts, acquireLease, renewLease, releaseLease, setRoot:(x)=>{root=x;},setDashboard:(x)=>{dashboard=x;},setPresentation:(x)=>{presentation=x;},getPresentation:()=>presentation };\n})();";
   const dom = {};
   const mem = {};
   const listeners = {};
@@ -78,4 +78,27 @@ test('concurrent-script guard executes before send or auto cycle, progress not f
   assert.match(script, /async function deliver\(step\) \{\s*if \(checkConflicts\(\)\) return;/);
   assert.match(script, /Progreso aún no verificable/);
   assert.match(script, /lastDenominator/);
+});
+
+
+test('cross-tab lease is preserved from latest stable baseline', () => {
+  assert.match(script, /const LEASE_PREFIX = 'avanza-v4-single-tab:'/);
+  assert.match(script, /if \(!acquireLease\(\)\)/);
+  assert.match(script, /if \(!renewLease\(\)\)/);
+  assert.match(script, /function pause\([\s\S]*?releaseLease\(\);/);
+  const {t,mem}=harness();
+  assert.equal(t.acquireLease(), true);
+  assert.equal(t.renewLease(), true);
+  const active = Object.keys(mem).find(key => key.startsWith('avanza-v4-single-tab:'));
+  assert.ok(active);
+  t.releaseLease();
+  assert.equal(mem[active], undefined);
+});
+
+test('another tab lease refuses duplicate control and preserves foreign owner', () => {
+  const {t,mem}=harness();
+  const key='avanza-v4-single-tab:chatgpt.com/c/test';
+  mem[key]=JSON.stringify({owner:'foreign-tab',expires:Date.now()+300000});
+  assert.equal(t.acquireLease(),false);
+  assert.equal(JSON.parse(mem[key]).owner,'foreign-tab');
 });
