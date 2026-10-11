@@ -302,7 +302,7 @@ test('cross-tab cosmetic sync never overrides AUTO FONDO engine or local project
 });
 
 test('passive progress never replaces a stored untagged original goal',()=>{
-  const body=section('  function hydrateVisibleReportedProgress() {','  function discoverVisibleProjects() {');
+  const body=sourceSection('  function hydrateVisibleReportedProgress() {','  function discoverVisibleProjects() {');
   const make=(state)=>{
     let wrote=0;
     const f=new Function('state','moduleOn','document','saveState','updateDashboard',body+'return hydrateVisibleReportedProgress;')(
@@ -322,7 +322,7 @@ test('passive progress never replaces a stored untagged original goal',()=>{
   assert.equal(blank.writes,1);
 });
 test('historical tagged progress binds only a new or identical goal',()=>{
-  const body=section('  function discoverVisibleProjects() {','  function shouldAutoStart() {');
+  const body=sourceSection('  function discoverVisibleProjects() {','  function shouldAutoStart() {');
   const sourceLine='🧩 PROCESO PROCESS-PROVEN | 📈 AVANCE 0%→50% | 2/4';
   function run(goal){
     const state={processId:'',objective:goal,lastPercent:null,lastNumerator:null,lastDenominator:null};
@@ -347,3 +347,9 @@ test('historical tagged progress binds only a new or identical goal',()=>{
   assert.equal(empty.state.processId,'PROCESS-PROVEN');
   assert.equal(empty.state.lastPercent,50);
 });
+
+function sourceSection(first,last) {
+  const a=script.indexOf(first),b=script.indexOf(last,a);
+  assert.ok(a>=0&&b>a,'cannot extract '+first);
+  return script.slice(a,b);
+}
