@@ -42,7 +42,7 @@ try {
     assert.match(await host.locator('[data-value="progress-ribbon"]').innerText(),/CFI/);
     assert.match(await host.locator('[data-value="progress-ribbon"]').innerText(),/15,8%|15\.8%/);
     assert.equal(await host.locator('[data-quest-choice]').count(),4);
-    assert.equal(await host.locator('[data-learn-answer]').count(),1);
+    assert.equal(await dock.locator('[data-learn-answer]').count(),1);
     await host.locator('[data-quest-choice="A"]').click();
     assert.match(await page.locator('#prompt-textarea').inputValue(),/LEARN_ANSWER/);
     await page.locator('#prompt-textarea').fill('');
