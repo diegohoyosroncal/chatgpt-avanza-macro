@@ -1,6 +1,6 @@
 {
   "schema_version": 2,
-  "updated_at": "2026-10-10T23:58:00-05:00",
+  "updated_at": "2026-10-10T23:59:00-05:00",
   "purpose": "Single macro source of truth; user projects, economic state and native app execution are independent",
   "primary_repository": "diegohoyosroncal/chatgpt-avanza-macro",
   "channels": {
@@ -13,9 +13,9 @@
     },
     "candidate": {
       "path": "avanza_macro_maestro_v4.user.js",
-      "branch": "feat/seed-active-projects-20261010",
-      "version": "4.1.1",
-      "status": "promoted_to_stable",
+      "branch": "feat/learn-quest-engine-20261010",
+      "version": "4.2.0",
+      "status": "draft_learn_quest",
       "installed_profiles": "not_verified"
     }
   },
@@ -54,6 +54,13 @@
       "executor": "userscript_web",
       "branch": "main",
       "status": "stable"
+    },
+    {
+      "name": "AVANZA Learn Quest",
+      "version": "4.2.0-learn1",
+      "executor": "userscript_web",
+      "branch": "feat/learn-quest-engine-20261010",
+      "status": "draft"
     }
   ],
   "related_independent_systems": [
@@ -81,7 +88,10 @@
     "update_and_rollback_tested",
     "no_economic_project_regressions",
     "multiproject_registry_and_module_controls_pass",
-    "cross_tab_sync_pass"
+    "cross_tab_sync_pass",
+    "learn_quest_parser_pass",
+    "learn_quest_hud_pass",
+    "learning_waits_for_user_pass"
   ],
   "rollback": "Restore avanza_macro_maestro_v4.user.js from commit ad812155a070654770508cfae6f677bd8d8fdecf (v4.0.3); never delete project state.",
   "release_evidence": {

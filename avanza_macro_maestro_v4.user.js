@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         AVANZA — Macro Maestro · Piloto Automático
 // @namespace    https://chatgpt.com/
-// @version      4.1.1
-// @description  Cockpit multiproyecto para ChatGPT web: módulos ON/OFF, AUTO/MANUAL, progreso independiente, misiones y sincronización segura entre pestañas.
+// @version      4.2.0
+// @description  Cockpit multiproyecto + Learn Quest: módulos ON/OFF, AUTO/MANUAL, progreso serio independiente, misiones jugables y sincronización entre pestañas.
 // @updateURL    https://raw.githubusercontent.com/diegohoyosroncal/chatgpt-avanza-macro/main/avanza_macro_maestro_v4.user.js
 // @downloadURL  https://raw.githubusercontent.com/diegohoyosroncal/chatgpt-avanza-macro/main/avanza_macro_maestro_v4.user.js
 // @match        https://chatgpt.com/*
@@ -18,7 +18,8 @@
   // Auto-continúa solo proyectos identificados que estén explícitamente en AUTO.
   // No llama APIs remotas, no lee credenciales y no elude permisos/herramientas de ChatGPT.
   const APP = 'avanza-macro-maestro-v4';
-  const INSTALLED_VERSION = '4.1.1-multi1';
+  const INSTALLED_VERSION = '4.2.0-learn1';
+  const LEARN_KEY = 'avanza-v4-learn-quest-v1';
   const CONTROL_KEY = 'avanza-v4-control-center-v1';
   const PROJECTS_KEY = 'avanza-v4-project-registry-v1';
   const CHANNEL_NAME = 'avanza-v4-project-bus-v1';
@@ -61,6 +62,7 @@
   let control = readControl();
   let projects = readProjects();
   let channel = null;
+  let learning = readLearning();
 
   function currentChatKey() {
     // Route is scoped to this web chat, not a global prompt or another chat.
@@ -133,6 +135,62 @@
       'AR-TRACKER-ETSY': {id:'AR-TRACKER-ETSY',objective:'Conseguir primera venta externa verificable del producto',current_pct:null,previous_pct:null,delta_pp:null,numerator:null,denominator:null,next_action:'Resolver autenticación de vendedor o cambiar a canal ejecutable',blocker:'Etsy seller auth bloqueada; perfiles TinyFish sin sesión',updated_at:'2026-10-10T23:53:00-05:00',status:'CONTINUE',seeded:true}
     };
   }
+  function readLearning() {
+    try { const raw=JSON.parse(localStorage.getItem(LEARN_KEY)||'{}'); return raw&&typeof raw==='object'?raw:{}; } catch { return {}; }
+  }
+  function saveLearning() {
+    try { localStorage.setItem(LEARN_KEY,JSON.stringify(learning)); } catch {}
+    renderGame(); broadcast({type:'learning',learning});
+  }
+  function learningFor(id=projectKey()) {
+    if(!id) return null;
+    const p=projects?.[id]||{};
+    const baseXp=Number.isInteger(p.numerator)?p.numerator*100:0;
+    return learning[id]||{processId:id,course:'',missionId:'',title:'',difficulty:1,reward:100,xp:baseXp,streak:0,status:'IDLE',boss:false,lastResult:'',completed:{},updatedAt:''};
+  }
+  function setLearning(id,patch) {
+    if(!id) return;
+    const prev=learningFor(id)||{};
+    learning[id]={...prev,...patch,completed:{...(prev.completed||{}),...(patch.completed||{})},updatedAt:new Date().toISOString()};
+    saveLearning();
+  }
+  function looksLearningProcess() {
+    const id=projectKey(), p=projects?.[id]||{}, hay=[id,p.objective,state.objective].join(' ');
+    return /(CFI|CURSO|ACADEM|EXAM|CLASE|ESTUDI|APREND|CONTABIL|NIC\s*\d+)/i.test(hay);
+  }
+  function parseQuestLine(text) {
+    const m=String(text||'').match(/🎮\s*QUEST\s*\|\s*([^|\n]+)\|\s*([^|\n]+)\|\s*⭐\s*(\d{1,4})\s*XP\s*\|\s*⚔️\s*([1-5])\s*\/\s*5\s*\|\s*([^\n]+)/i);
+    if(!m) return null;
+    return {course:m[1].trim().slice(0,40),missionId:safeId(m[2].trim()),reward:Math.min(500,Math.max(0,Number(m[3]))),difficulty:Number(m[4]),title:m[5].trim().slice(0,120),boss:/👾|BOSS/i.test(m[5])};
+  }
+  function parseQuestResult(text) {
+    const m=String(text||'').match(/(?:🏆|🔁)\s*QUEST_RESULT\s*\|\s*([^|\n]+)\|\s*(PASS|RETRY)\s*\|\s*\+(\d{1,4})\s*XP(?:\s*\|\s*🔥\s*(\d+))?/i);
+    if(!m) return null;
+    return {missionId:safeId(m[1].trim()),result:m[2].toUpperCase(),claimedXp:Number(m[3]),claimedStreak:m[4]?Number(m[4]):null};
+  }
+  function discoverLearning() {
+    if(!moduleOn('game')) return;
+    const id=projectKey(); if(!id) return;
+    const nodes=[...document.querySelectorAll('[data-message-author-role="assistant"]')].slice(-18);
+    let active=null,result=null;
+    for(const node of nodes){ const text=node.innerText||node.textContent||''; active=parseQuestLine(text)||active; result=parseQuestResult(text)||result; }
+    let L=learningFor(id); if(!L) return;
+    if(result && result.missionId){
+      const done=L.completed||{};
+      if(result.result==='PASS' && result.missionId===L.missionId && !done[result.missionId]){
+        const gain=Math.max(0,Math.min(500,L.reward||result.claimedXp||100));
+        L={...L,xp:(L.xp||0)+gain,streak:(L.streak||0)+1,lastResult:'PASS',completed:{...done,[result.missionId]:true},status:'RESOLVED'};
+      } else if(result.result==='RETRY' && result.missionId===L.missionId){
+        L={...L,streak:0,lastResult:'RETRY',status:'AWAITING_USER'};
+      }
+    }
+    if(active){
+      const same=active.missionId===L.missionId;
+      L={...L,...active,status:'AWAITING_USER',lastResult:same?L.lastResult:'',processId:id};
+    }
+    learning[id]=L; try{localStorage.setItem(LEARN_KEY,JSON.stringify(learning));}catch{}
+    renderGame();
+  }
   function readProjects() {
     const seeds=seedProjects();
     try {
@@ -176,6 +234,7 @@
         const msg=event.data||{}; if(msg.source===TAB_OWNER) return;
         if(msg.type==='projects'&&msg.projects&&typeof msg.projects==='object'){ projects={...projects,...msg.projects}; try{localStorage.setItem(PROJECTS_KEY,JSON.stringify(projects));}catch{} renderProjects(); }
         if(msg.type==='control'&&msg.control&&typeof msg.control==='object'){ control={...control,...msg.control,modules:{...control.modules,...(msg.control.modules||{})},projectModes:{...control.projectModes,...(msg.control.projectModes||{})}}; try{localStorage.setItem(CONTROL_KEY,JSON.stringify(control));}catch{} renderModules();renderProjects();applyAura(); }
+        if(msg.type==='learning'&&msg.learning&&typeof msg.learning==='object'){ learning={...learning,...msg.learning}; try{localStorage.setItem(LEARN_KEY,JSON.stringify(learning));}catch{} renderGame(); }
       };
     } catch { channel=null; }
   }
@@ -307,6 +366,8 @@
       'Antes de terminar repite la revisión de fronteras útiles, guarda checkpoint con objetivo, owner, receipt, bloqueo, siguiente acción exacta y condición de reanudación si procede. Reporta SIEMPRE objetivo, porcentaje anterior→actual con numerador/denominador, delta pp, pendiente, efecto realmente verificado, bloqueo y siguiente hito. Si no existe denominador defendible di NO DETERMINABLE.',
       'MULTIPROYECTO: identifica un PROCESS_ID estable para este objetivo y NO mezcles su porcentaje con otro proceso. Otros proyectos independientes pueden avanzar en sus propios chats/tabs; conserva owner y escala del proceso actual.',
       'CFI/APRENDIZAJE: usa misiones cortas, feedback interactivo, colores y juego cuando ayuden, pero XP/estética jamás sustituyen dominio verificable. El porcentaje solo sube al cerrar gates de conocimiento o práctica.',
+      'LEARN QUEST: si el proceso es de aprendizaje, NO entregues una pared de teoría. Presenta una micro-misión resoluble por el usuario, evalúa su respuesta, explica el error o acierto y encadena la siguiente misión sin que tenga que escribir "sigue". Usa dificultad progresiva, recuperación espaciada, variación de datos y boss/simulacro cuando proceda.',
+      'PROTOCOLO VISIBLE PARA EL HUD: cuando presentes una misión termina el bloque con una línea legible EXACTA del formato: 🎮 QUEST | <curso> | <mission_id> | ⭐<xp 0-500> XP | ⚔️<1-5>/5 | <título>. Cuando evalúes una respuesta, añade una línea: 🏆 QUEST_RESULT | <mission_id> | PASS | +<xp> XP | 🔥<racha> o 🔁 QUEST_RESULT | <mission_id> | RETRY | +0 XP | 🔥0. Si haces PASS, presenta en esa misma respuesta la siguiente QUEST salvo que corresponda boss, pausa pedagógica o gate humano real.',
       'Para el control local termina con EXACTAMENTE UNA línea JSON de metadatos, después del informe: AVANZA_CONTROL: {"status":"CONTINUE","process_id":"","objective":"","previous_pct":null,"current_pct":null,"delta_pp":null,"numerator":null,"denominator":null,"evidence":"","blocker":"","next_action":""}. Estos valores son declaraciones del asistente y NO recibos independientes. Usa VERIFIED_COMPLETE solo si el OBJETIVO PRINCIPAL está completamente verificado con fuente primaria, HUMAN_GATE_PROVEN solo si se agotaron alternativas legítimas, NO_SAFE_ACTION solo si realmente no queda acción segura positiva. Nunca afirmes resultado final por CI, cola DONE, pruebas aisladas, documentos o esta macro. Mantén el denominador del MISMO objetivo, no mezcles ámbitos.',
       `${RECEIPT} ${ticket}`,
     ];
@@ -550,6 +611,7 @@
     discoverVisibleProjects();
     const id=projectKey(); if(!id) return false;
     const mode=projectMode(id); if(!mode.enabled||!mode.auto) return false;
+    const L=learningFor(id); if(moduleOn('game')&&L?.status==='AWAITING_USER') return false;
     if(draft(findComposer())) return false;
     if(state.lastStatus&&EXIT.has(state.lastStatus)) return false;
     if(typeof state.lastPercent==='number'&&state.lastPercent>=100) return false;
@@ -631,7 +693,7 @@
   }
   function renderModules() {
     if(!dashboard) return;
-    const labels={engine:'⚡ MOTOR',auto:'♾️ AUTO',progress:'📈 %',sync:'🌐 SYNC',game:'🎮 JUEGO',aura:'🎨 AURA'};
+    const labels={engine:'⚡ MOTOR',auto:'♾️ AUTO',progress:'📈 %',sync:'🌐 SYNC',game:'🎮 QUEST',aura:'🎨 AURA'};
     for(const b of dashboard.querySelectorAll('[data-module]')){
       const name=b.dataset.module,on=moduleOn(name); b.dataset.on=on?'true':'false'; b.textContent=(labels[name]||name)+' '+(on?'ON':'OFF');
     }
@@ -640,14 +702,46 @@
     const m=String(id||'').match(/(20\d{2})-(\d{2})-(\d{2})/);
     return m?new Date(Number(m[1]),Number(m[2])-1,Number(m[3]),23,59,59):null;
   }
+  function sendLearningAction(kind) {
+    const id=projectKey(), L=learningFor(id);
+    if(!id){ setStatus('No hay PROCESS_ID académico activo todavía.',true); return; }
+    if(isGenerating()){ setStatus('La respuesta sigue en curso; no interrumpo.',true); return; }
+    const composer=findComposer(); if(!composer){ setStatus('No encuentro el cuadro de mensaje.',true); return; }
+    if(draft(composer)){ setStatus('Tu borrador sigue intacto. Termínalo o envíalo antes de usar un botón QUEST.',true); return; }
+    const mission=L?.missionId||'SIGUIENTE';
+    const actions={
+      start:'🎮 LEARN_ACTION | START | PROCESS '+id+' | Activa la siguiente micro-misión del curso. Hazla interactiva y no reveles la solución antes de mi intento.',
+      hint:'💡 LEARN_ACTION | HINT | PROCESS '+id+' | MISSION '+mission+' | Dame UNA pista mínima y socrática; no resuelvas el ejercicio por mí.',
+      retry:'🔁 LEARN_ACTION | RETRY | PROCESS '+id+' | MISSION '+mission+' | Repite la misma habilidad con datos/contexto distintos. Conserva gates ya ganados.',
+      boss:'👾 LEARN_ACTION | BOSS | PROCESS '+id+' | Lanza un boss/simulacro acumulativo apropiado a mi nivel actual; puntúa por gates, no por estilo.',
+      map:'🗺️ LEARN_ACTION | MAP | PROCESS '+id+' | Muéstrame el mapa de misiones: completadas, actual, siguientes y boss. No cambies el % sin evidencia.'
+    };
+    const message=actions[kind]||actions.start;
+    if(!fillComposer(composer,message)){ setStatus('No pude preparar la acción QUEST sin tocar tu borrador.',true); return; }
+    const send=findSend(); if(!send){ setStatus('Acción QUEST preparada; botón Enviar no disponible todavía.',true); return; }
+    send.click(); setStatus('🎮 Acción QUEST enviada: '+kind.toUpperCase());
+  }
   function renderGame() {
     const box=dashboard?.querySelector('[data-value="game"]'); if(!box) return;
     box.hidden=!moduleOn('game'); if(box.hidden) return;
-    const id=projectKey();
-    const xp=state.lastNumerator!==null?state.lastNumerator*100:Math.round((state.lastPercent||0)*10);
-    const level=1+Math.floor(xp/500), deadline=projectDeadline(id), left=deadline?Math.max(0,deadline-Date.now()):null;
-    const boss=deadline?' · 👾 BOSS '+deadline.toLocaleDateString('es-PE',{day:'2-digit',month:'2-digit'})+' · '+Math.ceil(left/86400000)+'d':'';
-    box.textContent='🎮 LVL '+level+' · ✨ '+xp+' XP'+boss+' · XP visual ≠ % verificado';
+    const id=projectKey(), L=learningFor(id);
+    if(!id || !looksLearningProcess()){
+      box.innerHTML='<div class="quest-head"><b>🎮 LEARN QUEST</b><span>modo universal</span></div><div class="quest-empty">Se activa automáticamente en procesos de aprendizaje.</div>';
+      return;
+    }
+    const xp=L?.xp||0, level=1+Math.floor(xp/500), reward=L?.reward||100, streak=L?.streak||0;
+    const difficulty=Math.max(1,Math.min(5,L?.difficulty||1));
+    const stars='⚔️'.repeat(difficulty)+'·'.repeat(5-difficulty);
+    const deadline=projectDeadline(id), left=deadline?Math.max(0,deadline-Date.now()):null;
+    const boss=deadline?'👾 '+deadline.toLocaleDateString('es-PE',{day:'2-digit',month:'2-digit'})+' · '+Math.ceil(left/86400000)+'d':'👾 boss dinámico';
+    const mission=L?.missionId||'SIGUIENTE', title=L?.title||'Listo para generar la siguiente misión';
+    const status=L?.status==='AWAITING_USER'?'🎯 TU TURNO':L?.lastResult==='PASS'?'✅ GATE CERRADO':'🛰️ LISTO';
+    box.innerHTML='<div class="quest-head"><b>🎮 LEARN QUEST</b><span>🔥 '+streak+'</span></div>'+
+      '<div class="quest-title">'+escapeText(mission,26)+' · '+escapeText(title,70)+'</div>'+
+      '<div class="quest-meta"><span>LVL '+level+'</span><span>✨ '+xp+' XP</span><span>'+stars+'</span></div>'+
+      '<div class="quest-state">'+status+' · recompensa '+reward+' XP · '+boss+'</div>'+
+      '<div class="quest-actions"><button type="button" data-learn-action="start">🎯 misión</button><button type="button" data-learn-action="hint">💡 pista</button><button type="button" data-learn-action="retry">🔁 retry</button><button type="button" data-learn-action="boss">👾 boss</button><button type="button" data-learn-action="map">🗺️ mapa</button></div>'+
+      '<div class="quest-rule">XP/racha = motivación · 📈 % = dominio verificado</div>';
   }
   function renderProjects() {
     const box=dashboard?.querySelector('[data-value="projects"]'); if(!box) return;
@@ -713,7 +807,7 @@
       .section{margin-top:10px;padding-top:9px;border-top:1px solid var(--stroke)}.section-title{font-size:9px;color:#94a3b8;font-weight:800;letter-spacing:.08em;margin-bottom:6px}
       .modules{display:grid;grid-template-columns:repeat(3,1fr);gap:5px}.modules button,.project-actions button{border:1px solid #40536d;background:#17263c;color:#e5eef8;border-radius:8px;padding:5px 4px;font-size:8.5px;font-weight:800;cursor:pointer}.modules button[data-on=true]{border-color:var(--accent);box-shadow:0 0 10px var(--accent-halo);color:var(--accent-light)}
       .projects{display:grid;gap:5px;max-height:180px;overflow:auto}.project-card{border:1px solid #31445e;background:#0d1b2d;border-radius:10px;padding:6px}.project-card[data-current=true]{border-color:var(--accent);box-shadow:0 0 14px var(--accent-halo)}.project-main{display:flex;justify-content:space-between;gap:5px;font-size:9px}.project-main b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.project-main span{color:#cbd5e1;white-space:nowrap}.project-actions{display:flex;gap:5px;margin-top:5px}.project-actions button{flex:1}.empty{font-size:9px;color:#8495aa;line-height:1.35}
-      .game{margin-top:8px;border:1px solid #4c3a6b;background:linear-gradient(90deg,#2e1065aa,#164e63aa);border-radius:9px;padding:7px;font-size:9px;color:#f3e8ff;font-weight:750}
+      .game{margin-top:8px;border:1px solid #6d4aff;background:radial-gradient(circle at 8% 20%,rgba(236,72,153,.17),transparent 34%),linear-gradient(120deg,#2e1065d9,#164e63d9);border-radius:13px;padding:9px;font-size:9px;color:#f3e8ff;font-weight:750;box-shadow:0 0 22px rgba(124,58,237,.12)}.quest-head{display:flex;justify-content:space-between;align-items:center;gap:7px}.quest-head span{color:#f9a8d4}.quest-title{font-size:10px;margin-top:6px;color:#fff;font-weight:850;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.quest-meta{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}.quest-meta span{background:#111c32aa;border:1px solid #596a86;border-radius:999px;padding:3px 6px}.quest-state{margin-top:7px;color:#c4f1ff}.quest-actions{display:grid;grid-template-columns:repeat(5,1fr);gap:4px;margin-top:7px}.quest-actions button{border:1px solid #596a86;background:#13233d;color:#eef7ff;border-radius:8px;padding:5px 2px;font-size:8px;font-weight:800;cursor:pointer}.quest-actions button:hover{border-color:#c4b5fd;box-shadow:0 0 10px #a78bfa33}.quest-rule,.quest-empty{margin-top:6px;color:#cbd5e1;font-size:8px;line-height:1.3}
       .top{cursor:move;touch-action:none;user-select:none}
       .top button{cursor:pointer;touch-action:manipulation;border:1px solid #41536c;border-radius:8px;color:#e2e8f0;background:#1a2a43;padding:4px 7px;font-size:12px}
       .top button:focus-visible{outline:2px solid var(--accent)}
@@ -758,6 +852,8 @@
       if(en){ const id=en.dataset.projectEnabled; setProjectMode(id,{enabled:!projectMode(id).enabled}); return; }
       const au=event.target.closest('[data-project-auto]');
       if(au){ const id=au.dataset.projectAuto; setProjectMode(id,{auto:!projectMode(id).auto,enabled:true}); return; }
+      const learn=event.target.closest('[data-learn-action]');
+      if(learn){ sendLearningAction(learn.dataset.learnAction); return; }
     });
     panel.querySelector('[data-action="theme"]').addEventListener('click', () => {
       const themes = ['amber','ocean','violet'];
@@ -792,7 +888,7 @@
     observer.observe(document.documentElement, { childList: true, subtree: true });
     timer = setInterval(() => {
       if (!document.getElementById(APP)) scheduleMount();
-      checkConflicts(); discoverVisibleProjects(); maybeAutoStart(); tick();
+      checkConflicts(); discoverVisibleProjects(); discoverLearning(); maybeAutoStart(); tick();
     }, CHECK_EVERY_MS);
     window.addEventListener('pagehide', () => { releaseLease(); saveState(); });
     document.addEventListener('keydown', e => {
@@ -804,6 +900,6 @@
     }, true);
   }
   initChannel();
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => { mount(); observe(); maybeAutoStart(); }, { once: true });
-  else { mount(); observe(); maybeAutoStart(); }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => { mount(); observe(); discoverLearning(); maybeAutoStart(); }, { once: true });
+  else { mount(); observe(); discoverLearning(); maybeAutoStart(); }
 })();

@@ -21,12 +21,24 @@ try {
     await host.waitFor({timeout:7000});
     const dock = host.locator('.panel');
     const localVersion = await host.locator('[data-value="health"]').innerText();
-    assert.match(localVersion,/4\.1\.1-multi1/);
+    assert.match(localVersion,/4\.2\.0-learn1/);
     assert.match(localVersion,/remota NO verificada/);
     assert.equal(await host.locator('[data-module]').count(),6);
     assert.match(await host.locator('[data-module="auto"]').innerText(),/AUTO ON/);
-    assert.match(await host.locator('[data-module="game"]').innerText(),/JUEGO ON/);
+    assert.match(await host.locator('[data-module="game"]').innerText(),/QUEST ON/);
     assert.match(await host.locator('[data-module="aura"]').innerText(),/AURA ON/);
+    await page.evaluate(() => {
+      const a=document.createElement('div'); a.setAttribute('data-message-author-role','assistant');
+      a.innerText='🧩 PROCESO CFI-E2-2026-10-16 | 📈 AVANCE 15.8%→15.8% | 3/19 | Δ 0 pp\n🎮 QUEST | CFI | M40-4 | ⭐100 XP | ⚔️2/5 | Modelo del costo';
+      document.body.append(a);
+    });
+    await page.waitForFunction(() => {
+      const h=document.getElementById('avanza-macro-maestro-v4')?.shadowRoot;
+      return h?.querySelector('[data-value="game"]')?.textContent?.includes('M40-4');
+    },{timeout:5000});
+    assert.match(await host.locator('[data-value="game"]').innerText(),/M40-4/);
+    assert.match(await host.locator('[data-value="game"]').innerText(),/100 XP/);
+    assert.equal(await host.locator('[data-learn-action]').count(),5);
     await host.locator('[data-module="aura"]').click();
     assert.match(await host.locator('[data-module="aura"]').innerText(),/AURA OFF/);
     await host.locator('[data-module="aura"]').click();
