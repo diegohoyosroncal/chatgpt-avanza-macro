@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         AVANZA — Macro Maestro · Piloto Automático
 // @namespace    https://chatgpt.com/
-// @version      4.4.2
+// @version      4.4.3
 // @description  Cockpit multiproyecto + Learn Quest: módulos ON/OFF, AUTO/MANUAL, progreso serio independiente, misiones jugables y sincronización entre pestañas.
 // @updateURL    https://raw.githubusercontent.com/diegohoyosroncal/chatgpt-avanza-macro/main/avanza_macro_maestro_v4.user.js
 // @downloadURL  https://raw.githubusercontent.com/diegohoyosroncal/chatgpt-avanza-macro/main/avanza_macro_maestro_v4.user.js
@@ -22,7 +22,7 @@
   const SINGLETON = 'data-avanza-maestro-v4-runner';
   if (document.documentElement?.getAttribute(SINGLETON) === '1') return;
   document.documentElement?.setAttribute(SINGLETON, '1');
-  const INSTALLED_VERSION = '4.4.2-deduped-auto';
+  const INSTALLED_VERSION = '4.4.3-aurora-focus';
   const LEARN_KEY = 'avanza-v4-learn-quest-v1';
   const CONTROL_KEY = 'avanza-v4-control-center-v1';
   const PROJECTS_KEY = 'avanza-v4-project-registry-v1';
@@ -482,6 +482,10 @@
     const active = phase === STATES.READY || phase === STATES.WAITING;
     button.textContent = active ? '■  AUTO ACTIVO · DETENER' : '▶  AVANZAR · AUTO';
     button.classList.toggle('active',active);
+    dashboard?.setAttribute('data-activity', active ? (phase===STATES.WAITING?'waiting':'running') : (phase===STATES.PAUSED?'paused':'idle'));
+    const indicator=dashboard?.querySelector('[data-value="live-indicator"]');
+    if(indicator){ indicator.dataset.live=active?'true':'false';
+      indicator.textContent=active?(phase===STATES.WAITING?'● ESPERANDO':'● AUTO ACTIVO'):(phase===STATES.PAUSED?'● EN PAUSA':'◇ LISTO'); }
     button.disabled = busy || conflicts().length > 0;
     button.setAttribute('aria-pressed', String(active));
     updateDashboard();
@@ -817,11 +821,11 @@
       const old = JSON.parse(localStorage.getItem(UI_KEY) || '{}');
       return {
         theme: ['amber','ocean','violet'].includes(old.theme) ? old.theme : 'amber',
-        compact: old.compact !== false,
+        compact: old.compact === true,
         x: Number.isFinite(old.x) ? old.x : null,
         y: Number.isFinite(old.y) ? old.y : null,
       };
-    } catch { return { theme: 'amber', compact: true, x: null, y: null }; }
+    } catch { return { theme: 'amber', compact: false, x: null, y: null }; }
   }
   function savePresentation() {
     try { localStorage.setItem(UI_KEY, JSON.stringify(presentation)); } catch {}
@@ -1108,18 +1112,63 @@
 
       .panel.compact{padding:10px}
       .panel.compact .title,.panel.compact .section,.panel.compact .game,.panel.compact .health,.panel.compact .tinyrow,.panel.compact .next,.panel.compact .foot{display:none}
-      .panel.compact .ring{width:62px;height:62px;flex:0 0 62px;margin:8px auto}
-      .panel.compact .center{width:50px;height:50px}
-      .panel.compact .pct{font-size:15px}
-      .panel.compact .go{min-height:35px;font-size:11px}
-      .panel.compact .metrics{justify-content:center}
+      .panel.compact .ring{width:88px;height:88px;flex:0 0 88px;margin:6px 0}
+      .panel.compact .center{width:70px;height:70px}
+      .panel.compact .pct{font-size:21px}
+      .panel.compact .go{min-height:46px;font-size:12px}
+      .panel.compact .metrics{justify-content:space-between;gap:12px}.panel.compact .title{display:block;margin:8px 0 7px}.panel.compact .tinyrow{display:flex;margin:8px 0}.panel.compact .next{display:block;margin-bottom:10px;font-size:9px;min-height:0}.panel.compact .status{font-size:9px}
       :host([data-theme=ocean]) .delta,:host([data-theme=violet]) .delta{color:var(--accent-light)}
       @media(max-width:460px){:host{max-width:calc(100vw - 16px)}}
       @media(max-width:460px){.panel{padding:12px;border-radius:18px}.ring{width:88px;height:88px;flex-basis:88px}.center{width:69px;height:69px}.pct{font-size:19px}}
+
+      /* Aurora Focus UI — visual overlay ONLY. Existing goals and runtime are unchanged. */
+      .panel{position:relative;isolation:isolate;background:
+        radial-gradient(ellipse 160px 120px at 90% -10%,rgba(56,189,248,.26),transparent 90%),
+        radial-gradient(ellipse 200px 140px at -10% 30%,rgba(168,85,247,.22),transparent 85%),
+        linear-gradient(145deg,#0e1630 0%,#0b182c 48%,#080d1d 100%);
+        border:1px solid rgba(125,211,252,.40);
+        box-shadow:0 18px 60px rgba(1,5,19,.54),0 0 0 1px rgba(255,255,255,.065) inset,0 0 38px rgba(99,102,241,.11);
+        transition:border-color .35s,box-shadow .45s,transform .25s;
+        scrollbar-color:rgba(148,163,184,.42) transparent}
+      .panel[data-activity=running],.panel[data-activity=waiting]{border-color:var(--accent);
+        box-shadow:0 20px 65px rgba(0,0,0,.60),0 0 0 1px var(--accent-halo) inset,0 0 38px var(--accent-halo)}
+      .top{position:relative;padding:0 0 8px;border-bottom:1px solid rgba(148,163,184,.17)}
+      .logo{background:linear-gradient(125deg,#ffdd82,#fd9f45 46%,#e879f9);color:#190d20;
+        box-shadow:0 0 22px rgba(250,204,21,.20),0 0 28px rgba(217,70,239,.15)}
+      .brand{font-size:13px;letter-spacing:.13em;background:linear-gradient(95deg,#fff4ba,#f9a8d4 52%,#67e8f9);
+        background-clip:text;-webkit-background-clip:text;color:transparent}
+      .pill{display:inline-flex;align-items:center;gap:5px;color:#cddbee;border-color:rgba(125,211,252,.30);font-variant-numeric:tabular-nums}
+      .pill[data-live=true]{color:#bbf7d0;border-color:rgba(52,211,153,.56);background:rgba(6,78,59,.32);
+        animation:avanza-breathe 2.6s ease-in-out infinite}
+      .go{overflow:hidden;background:linear-gradient(110deg,#fde68a 0%,#fbbf24 31%,#f472b6 65%,#67e8f9 100%);
+        background-size:220% 220%;color:#141827;font-size:13px;min-height:49px;
+        border:1px solid rgba(255,255,255,.39);
+        box-shadow:0 5px 25px rgba(250,204,21,.20),0 0 26px rgba(217,70,239,.12);
+        transition:filter .2s,transform .2s,box-shadow .2s,background-position .5s}
+      .go:hover{background-position:100% 50%;box-shadow:0 7px 30px rgba(244,114,182,.26);transform:translateY(-2px)}
+      .go.active{background:linear-gradient(105deg,#16a34a,#0d9488 40%,#2563eb 85%,#7c3aed);
+        background-size:240% 100%;color:#f0fdf4;border-color:#86efac;box-shadow:0 0 21px rgba(34,197,94,.25);
+        animation:avanza-flow 5s ease-in-out infinite}
+      .ring{box-shadow:0 0 25px var(--accent-halo),inset 0 0 8px rgba(255,255,255,.14)}
+      .panel[data-activity=running] .ring,.panel[data-activity=waiting] .ring{animation:avanza-breathe 2.8s ease-in-out infinite}
+      .center{background:radial-gradient(circle at 32% 16%,#172746,#091326 76%);box-shadow:inset 0 0 18px rgba(3,7,18,.45)}
+      .bar{height:7px;background:#16243b;border:1px solid rgba(148,163,184,.13)}
+      .bar-fill{box-shadow:0 0 13px var(--accent-halo);background:linear-gradient(90deg,var(--accent),#a78bfa,#67e8f9)}
+      .progress-chip{background:linear-gradient(120deg,#132642,#181f3b);border-color:#3a5574;font-variant-numeric:tabular-nums}
+      .progress-chip[data-active=true]{background:linear-gradient(110deg,#1c2d47,#382755);font-weight:850}
+      .status{background:rgba(20,36,61,.45);border-left:2px solid rgba(125,211,252,.50);border-radius:6px;padding:6px 8px}
+      .status[data-warning=true]{background:rgba(124,45,18,.2);border-left-color:#fb923c}
+      .panel.compact{padding:12px;border-radius:19px}
+      @keyframes avanza-breathe{0%,100%{filter:brightness(1);box-shadow:0 0 12px var(--accent-halo)}
+        50%{filter:brightness(1.13);box-shadow:0 0 28px var(--accent-halo)}}
+      @keyframes avanza-flow{0%,100%{background-position:0% 50%}50%{background-position:100% 50%}}
+      @media(prefers-reduced-motion:reduce){.go,.bar-fill,.panel{transition:none!important}
+        .go.active,.pill[data-live=true],.panel[data-activity=running] .ring,
+        .panel[data-activity=waiting] .ring{animation:none!important}}
       @media(prefers-reduced-motion:reduce){.go,.bar-fill{transition:none}}
     `;
     const panel=document.createElement('div');panel.className='panel';
-    panel.innerHTML=`<div class="top"><span class="logo" aria-hidden="true">↗</span><div class="topname"><div class="brand">AVANZA</div><div class="sub">MACRO MAESTRO · v4</div></div><button type="button" data-action="cinema" title="Abrir Mission Control">🌌</button><button type="button" data-action="theme" title="Cambiar color">◐</button><button type="button" data-action="collapse" title="Compactar / ampliar">▁</button><span class="pill">CON CONTROL</span></div>
+    panel.innerHTML=`<div class="top"><span class="logo" aria-hidden="true">↗</span><div class="topname"><div class="brand">AVANZA</div><div class="sub">MACRO MAESTRO · v4</div></div><button type="button" data-action="cinema" title="Abrir Mission Control">🌌</button><button type="button" data-action="theme" title="Cambiar color">◐</button><button type="button" data-action="collapse" title="Compactar / ampliar">▁</button><span class="pill" data-value="live-indicator" data-live="false">◇ LISTO</span></div>
       <div class="health" data-value="health" data-warning="false">Versión remota sin verificar</div>
       <div class="progress-ribbon" data-value="progress-ribbon" aria-label="Porcentajes verificados de proyectos"></div>
       <div class="section"><div class="section-title">🎛️ MACROS · ON/OFF</div><div class="modules"><button data-module="engine"></button><button data-module="auto"></button><button data-module="progress"></button><button data-module="sync"></button><button data-module="game"></button><button data-module="aura"></button></div></div>
