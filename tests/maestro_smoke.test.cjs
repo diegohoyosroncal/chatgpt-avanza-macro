@@ -277,3 +277,26 @@ test('AVANZA is the last panel element after status and footer',()=>{
   assert.ok(html.lastIndexOf('data-action="avanzar"')>html.lastIndexOf('class="foot"'));
   assert.ok(html.lastIndexOf('data-action="avanzar"')>html.lastIndexOf('class="status"'));
 });
+
+test('cross-tab cosmetic sync never overrides AUTO FONDO engine or local project modes',()=>{
+ const first=script.indexOf('  function normalizeControl(raw) {'),last=script.indexOf('  function readControl() {',first);
+ assert.ok(first>=0&&last>first);
+ const utils=new Function(script.slice(first,last)+'return {normalizeControl,mergeIncomingCosmeticControl};')();
+ const local=utils.normalizeControl({modules:{engine:true,auto:false,background:false,game:true},
+   projectModes:{P:{auto:false,enabled:true}}});
+ const remote={autoRunOptIn:true,backgroundOptIn:true,backgroundAuto:true,
+   modules:{auto:true,background:true,engine:false,game:false},
+   projectModes:{P:{auto:true,enabled:false},OTHER:{auto:true}}};
+ const next=utils.mergeIncomingCosmeticControl(local,remote);
+ assert.equal(next.autoRunOptIn,false); assert.equal(next.backgroundOptIn,false);
+ assert.equal(next.backgroundAuto,false); assert.equal(next.modules.auto,false);
+ assert.equal(next.modules.background,false); assert.equal(next.modules.engine,true);
+ assert.equal(next.modules.game,false); assert.equal(next.projectModes.P.auto,false);
+ assert.equal(next.projectModes.P.enabled,true); assert.equal(next.projectModes.OTHER,undefined);
+ const opting=utils.normalizeControl({autoRunOptIn:true,backgroundOptIn:true,
+   backgroundAuto:true,modules:{auto:true,background:true},projectModes:{P:{auto:true}}});
+ const kept=utils.mergeIncomingCosmeticControl(opting,{modules:{auto:false,background:false}});
+ assert.equal(kept.autoRunOptIn,true); assert.equal(kept.backgroundAuto,true);
+ assert.equal(kept.modules.auto,true); assert.equal(kept.projectModes.P.auto,true);
+ assert.match(script,/control=mergeIncomingCosmeticControl\(control,msg\.control\)/);
+});

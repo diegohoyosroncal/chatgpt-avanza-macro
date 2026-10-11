@@ -122,6 +122,17 @@
     return {...defaults,...raw,modules,projectModes,autoRunOptIn,backgroundOptIn,
       backgroundAuto:backgroundOptIn && raw.backgroundAuto===true};
   }
+  // Cosmetic preferences can sync; action permissions belong to this browser/chat.
+  function mergeIncomingCosmeticControl(local,incoming) {
+    const base=normalizeControl(local);
+    const remote=incoming&&typeof incoming==='object'&&!Array.isArray(incoming)?incoming:{};
+    const nextModules={...base.modules}, flags=remote.modules&&typeof remote.modules==='object'?remote.modules:{};
+    for(const key of ['progress','sync','game','aura'])
+      if(typeof flags[key]==='boolean') nextModules[key]=flags[key];
+    return normalizeControl({...base,modules:nextModules,projectModes:base.projectModes,
+      autoRunOptIn:base.autoRunOptIn,backgroundOptIn:base.backgroundOptIn,
+      backgroundAuto:base.backgroundAuto});
+  }
   function readControl() {
     try { return normalizeControl(JSON.parse(localStorage.getItem(CONTROL_KEY) || 'null')); }
     catch { return normalizeControl(null); }
@@ -303,7 +314,7 @@
       channel.onmessage=event=>{
         const msg=event.data||{}; if(msg.source===TAB_OWNER) return;
         if(msg.type==='projects'&&msg.projects&&typeof msg.projects==='object'){ projects={...projects,...msg.projects}; try{localStorage.setItem(PROJECTS_KEY,JSON.stringify(projects));}catch{} renderProjects(); }
-        if(msg.type==='control'&&msg.control&&typeof msg.control==='object'){ control=normalizeControl({...control,...msg.control,modules:{...control.modules,...(msg.control.modules||{})},projectModes:{...control.projectModes,...(msg.control.projectModes||{})}}); try{localStorage.setItem(CONTROL_KEY,JSON.stringify(control));}catch{} renderModules();renderProjects();applyAura(); }
+        if(msg.type==='control'&&msg.control&&typeof msg.control==='object'){ control=mergeIncomingCosmeticControl(control,msg.control); try{localStorage.setItem(CONTROL_KEY,JSON.stringify(control));}catch{} renderModules();renderProjects();applyAura(); }
         if(msg.type==='learning'&&msg.learning&&typeof msg.learning==='object'){ learning={...learning,...msg.learning}; try{localStorage.setItem(LEARN_KEY,JSON.stringify(learning));}catch{} renderGame(); }
       };
     } catch { channel=null; }
