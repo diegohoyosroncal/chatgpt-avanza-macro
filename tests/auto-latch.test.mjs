@@ -85,7 +85,7 @@ test('fresh profiles and old implicit AUTO preferences remain OFF',()=>{
   assert.equal(explicit.projectModes.ECON.auto,true);
 });
 test('study UI classifier does not reframe a business accounting goal',()=>{
-  const sourcePart=section('  function looksLearningProcess() {','  function setLearning(');
+  const sourcePart=section('  function looksLearningProcess() {','  function parseQuestLine(');
   assert.ok(source.includes('function looksLearningProcess()'));
   assert.match(source,/if\(!looksLearningProcess\(\)\)/);
   assert.match(source,/id=projectKey\(\)/);
