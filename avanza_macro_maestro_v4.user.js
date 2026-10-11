@@ -613,6 +613,42 @@
     window.addEventListener('pointerup', dragEnd);
     window.addEventListener('pointercancel', dragEnd);
   }
+  function renderModules() {
+    if(!dashboard) return;
+    const labels={engine:'⚡ MOTOR',auto:'♾️ AUTO',progress:'📈 %',sync:'🌐 SYNC',game:'🎮 JUEGO',aura:'🎨 AURA'};
+    for(const b of dashboard.querySelectorAll('[data-module]')){
+      const name=b.dataset.module,on=moduleOn(name); b.dataset.on=on?'true':'false'; b.textContent=(labels[name]||name)+' '+(on?'ON':'OFF');
+    }
+  }
+  function projectDeadline(id) {
+    const m=String(id||'').match(/(20\d{2})-(\d{2})-(\d{2})/);
+    return m?new Date(Number(m[1]),Number(m[2])-1,Number(m[3]),23,59,59):null;
+  }
+  function renderGame() {
+    const box=dashboard?.querySelector('[data-value="game"]'); if(!box) return;
+    box.hidden=!moduleOn('game'); if(box.hidden) return;
+    const id=projectKey();
+    const xp=state.lastNumerator!==null?state.lastNumerator*100:Math.round((state.lastPercent||0)*10);
+    const level=1+Math.floor(xp/500), deadline=projectDeadline(id), left=deadline?Math.max(0,deadline-Date.now()):null;
+    const boss=deadline?' · 👾 BOSS '+deadline.toLocaleDateString('es-PE',{day:'2-digit',month:'2-digit'})+' · '+Math.ceil(left/86400000)+'d':'';
+    box.textContent='🎮 LVL '+level+' · ✨ '+xp+' XP'+boss+' · XP visual ≠ % verificado';
+  }
+  function renderProjects() {
+    const box=dashboard?.querySelector('[data-value="projects"]'); if(!box) return;
+    const rows=Object.values(projects).sort((a,b)=>String(b.updated_at||'').localeCompare(String(a.updated_at||''))).slice(0,12);
+    if(!rows.length){ box.innerHTML='<div class="empty">abre/visita un chat con 🧩 PROCESO y aparecerá aquí automáticamente</div>'; return; }
+    box.innerHTML=rows.map(p=>{
+      const mode=projectMode(p.id), pct=typeof p.current_pct==='number'?formatPercent(p.current_pct):'—';
+      const frac=p.numerator!==null&&p.denominator?p.numerator+'/'+p.denominator:'—';
+      return '<div class="project-card" data-current="'+(p.id===projectKey()?'true':'false')+'"><div class="project-main"><b>'+escapeText(p.id,34)+'</b><span>'+pct+' · '+frac+'</span></div><div class="project-actions"><button type="button" data-project-enabled="'+p.id+'">'+(mode.enabled?'🟢 ON':'⚫ OFF')+'</button><button type="button" data-project-auto="'+p.id+'">'+(mode.auto?'♾️ AUTO':'✋ MANUAL')+'</button></div></div>';
+    }).join('');
+  }
+  function applyAura() {
+    const old=document.getElementById(AURA_STYLE_ID);
+    if(!moduleOn('aura')){ old?.remove(); return; }
+    let style=old; if(!style){ style=document.createElement('style'); style.id=AURA_STYLE_ID; document.head?.appendChild(style); }
+    style.textContent='html,body{background:radial-gradient(circle at 12% 10%,rgba(124,58,237,.16),transparent 28%),radial-gradient(circle at 88% 18%,rgba(6,182,212,.16),transparent 30%),radial-gradient(circle at 48% 92%,rgba(245,158,11,.12),transparent 32%),linear-gradient(145deg,#07101f,#0d1730 45%,#10253c)!important;background-attachment:fixed!important}[data-message-author-role="assistant"]>div,[data-message-author-role="user"]>div{border-radius:18px!important}';
+  }
   function updateHealth() {
     const node = dashboard?.querySelector('[data-value="health"]');
     if (!node) return;
