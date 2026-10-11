@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         AVANZA — Macro Maestro · Piloto Automático
 // @namespace    https://chatgpt.com/
-// @version      4.0.3
+// @version      4.0.4
 // @description  Un solo control inteligente para ChatGPT web: reevalúa cada respuesta, continúa de forma acotada y cambia de estrategia ante estancamiento.
 // @updateURL    https://raw.githubusercontent.com/diegohoyosroncal/chatgpt-avanza-macro/main/avanza_macro_maestro_v4.user.js
 // @downloadURL  https://raw.githubusercontent.com/diegohoyosroncal/chatgpt-avanza-macro/main/avanza_macro_maestro_v4.user.js
@@ -18,7 +18,7 @@
   // Never auto-start on page load, after reload, or when navigating to another chat.
   // The userscript never calls a remote API, reads credentials or controls ChatGPT tools.
   const APP = 'avanza-macro-maestro-v4';
-  const INSTALLED_VERSION = '4.0.3-rc2';
+  const INSTALLED_VERSION = '4.0.4-rc1';
   const UI_KEY = 'avanza-master-ui-v4';
   const LEGACY_IDS = ['avanza-universal-control-v1','avanza-macro-maestro-v2','avanza-macro-maestro-v3','diego-mision-autonomia-v1'];
   const MARK = 'MACRO MAESTRO — AVANZA AL OBJETIVO';
@@ -30,6 +30,9 @@
   const RESPONSE_STABLE_MS = 3700;
   const CHECK_EVERY_MS = 700;
   const SESSION_PREFIX = 'avanza-v4-meta:';
+  const LEASE_PREFIX = 'avanza-v4-single-tab:';
+  const LEASE_TTL_MS = 45000; // browser-profile, same-chat UI coordination; not an external runtime lock
+  const TAB_OWNER = crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`;
   const STATES = Object.freeze({ IDLE: 'IDLE', READY: 'READY', WAITING: 'WAITING', PAUSED: 'PAUSED' });
   const EXIT = new Set(['VERIFIED_COMPLETE', 'HUMAN_GATE_PROVEN', 'NO_SAFE_ACTION']);
   let phase = STATES.IDLE;
@@ -57,6 +60,39 @@
     return location.hostname + location.pathname + location.search.replace(/([?&])utm_[^&]*/g, '');
   }
   function storageKey() { return SESSION_PREFIX + chatKey; }
+  function leaseKey() { return LEASE_PREFIX + chatKey; }
+  function readLease() {
+    try { return JSON.parse(localStorage.getItem(leaseKey()) || 'null'); }
+    catch { return null; }
+  }
+  function leaseIsMine() {
+    try {
+      const lease = readLease();
+      return Boolean(lease && lease.owner === TAB_OWNER && lease.expires > now());
+    } catch { return false; }
+  }
+  function acquireLease() {
+    // Coordinate active sending tabs for the SAME ChatGPT conversation on this
+    // browser profile. Never persist prompts, messages, tokens or credentials.
+    try {
+      const old = readLease();
+      if (old && old.owner !== TAB_OWNER && old.expires > now()) return false;
+      localStorage.setItem(leaseKey(), JSON.stringify({ owner: TAB_OWNER, expires: now() + LEASE_TTL_MS }));
+      return leaseIsMine();
+    } catch { return false; } // fail closed if cross-tab coordination is unavailable
+  }
+  function renewLease() {
+    if (!leaseIsMine()) return false;
+    try {
+      localStorage.setItem(leaseKey(), JSON.stringify({ owner: TAB_OWNER, expires: now() + LEASE_TTL_MS }));
+      return leaseIsMine();
+    } catch { return false; }
+  }
+  function releaseLease() {
+    try { if (readLease()?.owner === TAB_OWNER) localStorage.removeItem(leaseKey()); }
+    catch { /* inaccessible profile storage */ }
+  }
+
   function freshState() {
     return { cycles: 0, totalSent: 0, stalled: 0, missingReceipts: 0,
       lastPercent: null, lastDenominator: null, lastDelta: null,
@@ -247,6 +283,7 @@
   }
   function pause(reason, warn = false) {
     phase = STATES.PAUSED;
+    releaseLease();
     pending = null;
     replyCandidate = { fingerprint: '', firstSeen: 0 };
     stopReason = reason;
@@ -258,6 +295,7 @@
     const current = currentChatKey();
     if (current === chatKey) return;
     const wasRunning = phase === STATES.READY || phase === STATES.WAITING;
+    releaseLease(); // release the previous chat lease BEFORE switching keys
     chatKey = current;
     state = recoverState();
     pending = null;
@@ -275,6 +313,7 @@
     try {
       syncRoute();
       if (phase !== STATES.READY) return;
+      if (!renewLease()) { pause('Otro panel tiene el control de este chat; no duplico envíos.', true); return; }
       if (document.hidden) { pause('Pausada: pestaña no visible. Evita envíos inesperados.', true); return; }
       if (isGenerating()) { setStatus('Respuesta en curso; no duplico mensajes.'); return; }
       if (state.totalSent >= MAX_AUTOMATIC_FOLLOWUPS + 1) { pause('Límite de seguridad alcanzado: revisa el resultado antes de reactivar.', true); return; }
@@ -287,7 +326,7 @@
       const message = buildMessage(ticket, step);
       if (!fillComposer(c, message)) { pause('El editor no aceptó el mensaje; no se envió nada.', true); return; }
       await new Promise(resolve => setTimeout(resolve, 120));
-      if (phase !== STATES.READY || isGenerating() || currentChatKey() !== chatKey) { pause('El estado cambió antes de enviar. Se detuvo por seguridad.', true); return; }
+      if (!renewLease() || phase !== STATES.READY || isGenerating() || currentChatKey() !== chatKey) { pause('El estado cambió antes de enviar. Se detuvo por seguridad.', true); return; }
       const liveSend = findSend();
       if (!liveSend) { pause('El botón Enviar dejó de estar disponible.', true); return; }
       liveSend.click();
@@ -309,6 +348,7 @@
     if (busy) return;
     syncRoute();
     if (phase !== STATES.READY && phase !== STATES.WAITING) return;
+    if (!renewLease()) { pause('El control de este chat está activo en otra pestaña; no duplico mensajes.', true); return; }
     if (document.hidden) return; // hidden tab cannot surprise-send
     if (phase === STATES.READY) {
       if (now() - lastAudit < MIN_SEND_GAP_MS) return;
@@ -416,6 +456,7 @@
       return;
     }
     // A fresh click resets only local circuit breakers, never canon/effects.
+    if (!acquireLease()) { setStatus('Este chat ya está controlado por otra pestaña; no duplico acciones.', true); return; }
     state.totalSent = 0;
     state.stalled = 0;
     state.missingReceipts = 0;
@@ -425,7 +466,6 @@
     render();
     tick();
   }
-
   function readPresentation() {
     try {
       const old = JSON.parse(localStorage.getItem(UI_KEY) || '{}');
