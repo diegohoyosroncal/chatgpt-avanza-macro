@@ -62,3 +62,39 @@ test('only one active chat writer and no shell/network API introduced',()=>{
   assert.doesNotMatch(source,/GM_xmlhttpRequest/);
   assert.match(source,/button\.textContent = active \? '■  AUTO ACTIVO · DETENER'/);
 });
+
+
+test('fresh profiles and old implicit AUTO preferences remain OFF',()=>{
+  const body=section('  function normalizeControl(raw) {','  function readControl() {');
+  const normalize=new Function(body+'return normalizeControl;')();
+  const first=normalize(null);
+  assert.equal(first.modules.auto,false);
+  assert.equal(first.modules.background,false);
+  assert.equal(first.backgroundAuto,false);
+  const old=normalize({modules:{auto:true,engine:true},backgroundAuto:true,
+    projectModes:{'ECON':{enabled:true,auto:true}}});
+  assert.equal(old.modules.auto,false);
+  assert.equal(old.modules.background,false);
+  assert.equal(old.projectModes.ECON.auto,false);
+  assert.equal(old.autoRunOptIn,false);
+  const explicit=normalize({autoRunOptIn:true,backgroundOptIn:true,
+    backgroundAuto:true,modules:{auto:true,background:true},
+    projectModes:{ECON:{enabled:true,auto:true}}});
+  assert.equal(explicit.modules.auto,true);
+  assert.equal(explicit.backgroundAuto,true);
+  assert.equal(explicit.projectModes.ECON.auto,true);
+});
+test('study UI classifier does not reframe a business accounting goal',()=>{
+  const sourcePart=section('  function looksLearningProcess() {','  function setLearning(');
+  assert.ok(source.includes('function looksLearningProcess()'));
+  assert.match(source,/if\(!looksLearningProcess\(\)\)/);
+  assert.match(source,/id=projectKey\(\)/);
+  assert.doesNotMatch(sourcePart,/\|CONTABIL\|NIC/);
+});
+test('all browser AUTO send paths honor explicit consent',()=>{
+  assert.match(source,/control\.autoRunOptIn!==true/);
+  assert.match(source,/state\.autoConsented!==true/);
+  assert.match(source,/control\.backgroundOptIn===true/);
+  assert.match(source,/data-module="background"/);
+  assert.match(source,/if\(looksLearningProcess\(\)&&L\?\.status==='AWAITING_USER'\)/);
+});
