@@ -6,6 +6,7 @@ const path = require('node:path');
 const vm = require('node:vm');
 
 const script = fs.readFileSync(path.join(__dirname, '..', 'avanza_macro_maestro_v4.user.js'), 'utf8');
+const registry = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'macro-registry.json'), 'utf8'));
 const boot = "  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded'";
 assert.ok(script.includes(boot), 'known bootstrapping gate must exist for non-invasive test harness');
 
@@ -101,4 +102,18 @@ test('another tab lease refuses duplicate control and preserves foreign owner', 
   mem[key]=JSON.stringify({owner:'foreign-tab',expires:Date.now()+300000});
   assert.equal(t.acquireLease(),false);
   assert.equal(JSON.parse(mem[key]).owner,'foreign-tab');
+});
+
+test('permanent health badge names the installed version without pretending the remote is checked', () => {
+  assert.match(script, /data-value="health"/);
+  assert.match(script, /versión remota NO verificada/);
+  assert.match(script, /function updateHealth\(\)/);
+  assert.match(script, /updateHealth\(\)/);
+});
+test('registry matches stable and candidate versions and records native-app limitations', () => {
+  assert.equal(registry.channels.stable.version_verified_in_repository, '4.0.3');
+  assert.equal(registry.channels.candidate.version, '4.0.4');
+  assert.equal(registry.channels.candidate.status, 'draft_not_deployed');
+  assert.ok(registry.limitations.some(text => text.includes('Native Android/iOS')));
+  assert.ok(registry.release_gates.includes('authenticated_chatgpt_browser_smoke_pass'));
 });
