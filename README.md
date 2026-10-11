@@ -21,9 +21,13 @@ Si no aparece la pantalla de instalación, abre Tampermonkey > Utilities > Insta
 
 ## Estado de verificación
 
-- **Versión 1.0.2:** 11/11 pruebas automatizadas en Chromium aislado: control visible, envío por clic, confirmación en DOM, protección contra dobles envíos, borradores, bloqueo durante generación, envío no confirmado, ausencia de botón Enviar, montaje SPA, atajo y vista móvil. No hubo llamadas de red externas generadas por el script.
-- Archivo GitHub con SHA de contenido Git Blob `5bf154be88e202855d932342da56f987bcdded30`, leído y contrastado con el archivo probado localmente.
+- **Versión 1.0.3:** 11/11 pruebas automatizadas en Chromium aislado: control visible, envío por clic, confirmación en DOM, protección contra dobles envíos, borradores, bloqueo durante generación, envío no confirmado, ausencia de botón Enviar, montaje SPA, atajo y vista móvil. No hubo llamadas de red externas generadas por el script.
+- Archivo GitHub con SHA de contenido Git Blob `92d0b14a8953fc9a502885217d6fb28dbfd7d519`, leído y contrastado con el archivo probado localmente.
 - El botón sólo verifica visibilidad de mensaje en el DOM; no puede probar entrega final en servidores ni el cumplimiento de instrucciones por el modelo. Si falta recibo, lo señala expresamente.
 - **Instalación real de escritorio y Android: 0/2 verificada.** No se ha usado ni autorizado una sesión remota para instalar extensiones.
 - Un gestor de scripts como Tampermonkey puede solicitar permisos amplios de acceso a sitios, aunque este userscript declara únicamente los dominios ChatGPT y no efectúa solicitudes de red.
 - No se instaló ningún cron, servicio adicional ni se autorizó gasto.
+
+## Puente de continuidad v1.0.3
+
+Cuando el usuario activa **AVANZA**, la macro ahora pide comprobar, usando **solo conectores autorizados y existentes**, la cadena `COLA → ENTREGA A RESPONSABLE → ACCIÓN → EFECTO` por separado. Un recibo `DONE` de una cola no equivale a autonomía útil. El script no hace llamadas de red ni almacena secretos; el puente se ejecuta únicamente si el asistente tiene las herramientas autorizadas en ese chat. La ejecución en todos los chats nativos, la entrega a owner y el trabajo posterior al cierre **siguen sin estar acreditados**. El código v1.0.3 pasó 11/11 pruebas de interfaz aisladas y su blob Git coincide byte por byte con la versión local (`92d0b14a8953fc9a502885217d6fb28dbfd7d519`).
