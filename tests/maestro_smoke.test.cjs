@@ -111,7 +111,7 @@ test('permanent health badge names the installed version without pretending the 
   assert.match(script, /updateHealth\(\)/);
 });
 test('registry matches stable and candidate versions and records native-app limitations', () => {
-  assert.equal(registry.channels.stable.version_verified_in_repository, '4.0.3');
+  assert.equal(registry.channels.stable.version_verified_in_repository, '4.1.0');
   assert.equal(registry.channels.candidate.version, '4.1.0');
   assert.equal(registry.channels.candidate.status, 'draft_multiproject');
   assert.ok(registry.limitations.some(text => text.includes('Native Android/iOS')));
