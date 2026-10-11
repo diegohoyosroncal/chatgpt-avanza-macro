@@ -21,7 +21,7 @@ function harness() {
     removeEventListener: key => { delete listeners[key]; } };
   const localStorage = { getItem: key => mem[key] || null, setItem: (key, value) => { mem[key] = value; }, removeItem: key => { delete mem[key]; } };
   vm.runInNewContext(source, {document, window, localStorage, location:{ hostname:'chatgpt.com', pathname:'/c/test', search:'' },
-    console, JSON, Math, Number, String, Date, RegExp, Set, Object}, {timeout:2000});
+    console, JSON, Math, Number, String, Date, RegExp, Set, Object, crypto: { randomUUID: () => 'test-owner' }}, {timeout:2000});
   return { t: window.__TEST, dom, mem, window, listeners };
 }
 
