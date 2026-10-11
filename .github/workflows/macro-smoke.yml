@@ -5,6 +5,7 @@ on:
     paths:
       - 'avanza_macro_maestro_v4.user.js'
       - 'tests/maestro_smoke.test.cjs'
+      - 'tests/maestro_ui_smoke.mjs'
       - 'macro-registry.json'
       - '.github/workflows/macro-smoke.yml'
   push:
@@ -12,6 +13,7 @@ on:
     paths:
       - 'avanza_macro_maestro_v4.user.js'
       - 'tests/maestro_smoke.test.cjs'
+      - 'tests/maestro_ui_smoke.mjs'
       - 'macro-registry.json'
       - '.github/workflows/macro-smoke.yml'
 
@@ -33,3 +35,11 @@ jobs:
         run: node --check avanza_macro_maestro_v4.user.js
       - name: Run offline non-network unit tests
         run: node --test tests/maestro_smoke.test.cjs
+      - name: Install small browser test harness
+        run: |
+          npm install --no-save --ignore-scripts playwright-core@1.56.1
+          CHROME_PATH="$(command -v google-chrome || command -v chromium || command -v chromium-browser)"
+          test -n "$CHROME_PATH"
+          echo "CHROME_PATH=$CHROME_PATH" >> "$GITHUB_ENV"
+      - name: Headless Chromium UI controls
+        run: node tests/maestro_ui_smoke.mjs
