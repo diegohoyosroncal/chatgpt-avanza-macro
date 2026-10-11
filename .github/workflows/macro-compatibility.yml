@@ -1,0 +1,29 @@
+name: AVANZA macro compatibility
+on:
+  pull_request:
+    paths:
+      - 'avanza_macro_maestro_v4.user.js'
+      - 'avanza_macro.user.js'
+      - 'macro-registry.json'
+      - 'tests/**'
+      - '.github/workflows/macro-compatibility.yml'
+  push:
+    branches: [main, 'feat/**']
+    paths:
+      - 'avanza_macro_maestro_v4.user.js'
+      - 'avanza_macro.user.js'
+      - 'macro-registry.json'
+      - 'tests/**'
+      - '.github/workflows/macro-compatibility.yml'
+permissions:
+  contents: read
+jobs:
+  static-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: JavaScript syntax
+        run: node --check avanza_macro_maestro_v4.user.js
+      - name: Version and collision safety regression tests
+        run: node --test tests/macro-compatibility.test.mjs
