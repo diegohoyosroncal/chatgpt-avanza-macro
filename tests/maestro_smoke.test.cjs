@@ -111,9 +111,9 @@ test('permanent health badge names the installed version without pretending the 
   assert.match(script, /updateHealth\(\)/);
 });
 test('registry matches stable and candidate versions and records native-app limitations', () => {
-  assert.equal(registry.channels.stable.version_verified_in_repository, '4.0.3');
-  assert.equal(registry.channels.candidate.version, '4.1.0');
-  assert.equal(registry.channels.candidate.status, 'draft_multiproject');
+  assert.equal(registry.channels.stable.version_verified_in_repository, '4.1.0');
+  assert.equal(registry.channels.candidate.version, '4.1.1');
+  assert.equal(registry.channels.candidate.status, 'draft_seeded_catalog');
   assert.ok(registry.limitations.some(text => text.includes('Native Android/iOS')));
   assert.ok(registry.release_gates.includes('authenticated_chatgpt_browser_smoke_pass'));
 });
@@ -145,4 +145,10 @@ test('continuity has no fixed execution-count stop', () => {
 test('game mode keeps XP explicitly separate from verified progress', () => {
   assert.match(script, /XP visual ≠ % verificado/);
   assert.match(script, /CFI\/APRENDIZAJE/);
+});
+
+test('seed catalog includes active projects and never fabricates percentages for unscored lanes', () => {
+  for (const id of ['COCKPIT-TOTAL-v1','CFI-E2-2026-10-16','GLOBAL-VALUE-OS','BTS-LIMA','VELVETBOX','KASA-VIVA','YERABELL','AR-TRACKER-ETSY']) assert.match(script,new RegExp("'"+id+"'"));
+  assert.match(script,/current_pct:null/);
+  assert.match(script,/CFI-E2-2026-10-16[\s\S]*?current_pct:15\.8/);
 });
