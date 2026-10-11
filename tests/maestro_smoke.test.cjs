@@ -111,16 +111,16 @@ test('permanent health badge names the installed version without pretending the 
   assert.match(script, /updateHealth\(\)/);
 });
 test('registry matches stable and candidate versions and records native-app limitations', () => {
-  assert.equal(registry.channels.stable.version_verified_in_repository, '4.4.0');
-  assert.equal(registry.channels.candidate.version, '4.4.0');
-  assert.equal(registry.channels.candidate.status, 'promoted_to_stable');
+  assert.equal(registry.channels.stable.version_verified_in_repository, '4.4.6');
+  assert.equal(registry.channels.candidate.version, '4.4.7');
+  assert.equal(registry.channels.candidate.status, 'draft_unreleased');
   assert.ok(registry.limitations.some(text => text.includes('Native Android/iOS')));
   assert.ok(registry.release_gates.includes('authenticated_chatgpt_browser_smoke_pass'));
   assert.ok(registry.variants.some(v => v.name === 'AVANZA Neon Mission Control' && v.status === 'stable'));
 });
 
-test('multiproject cockpit exposes six independent module switches', () => {
-  for (const name of ['engine','auto','progress','sync','game','aura']) assert.match(script, new RegExp('data-module="'+name+'"'));
+test('multiproject cockpit exposes seven independent module switches', () => {
+  for (const name of ['engine','auto','background','progress','sync','game','aura']) assert.match(script, new RegExp('data-module="'+name+'"'));
   assert.match(script, /🎛️ MACROS · ON\/OFF/);
 });
 test('project cards keep ON-OFF and AUTO-MANUAL state independently', () => {
@@ -171,7 +171,7 @@ test('Learn Quest persists XP separately from verified project percentage', () =
   assert.match(script,/porcentaje = dominio verificado/);
 });
 test('academic AUTO lane waits while a learner owes an answer', () => {
-  assert.match(script,/L\?\.status==='AWAITING_USER'/);
+  assert.match(script,/looksLearningProcess\(\)&&L\?\.status==='AWAITING_USER'/);
   assert.match(script,/return false;/);
 });
 test('Learn Quest offers mission hint retry boss and map controls', () => {
