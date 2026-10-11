@@ -21,8 +21,15 @@ try {
     await host.waitFor({timeout:7000});
     const dock = host.locator('.panel');
     const localVersion = await host.locator('[data-value="health"]').innerText();
-    assert.match(localVersion,/4\.0\.4-rc1/);
+    assert.match(localVersion,/4\.1\.0-multi1/);
     assert.match(localVersion,/remota NO verificada/);
+    assert.equal(await host.locator('[data-module]').count(),6);
+    assert.match(await host.locator('[data-module="auto"]').innerText(),/AUTO ON/);
+    assert.match(await host.locator('[data-module="game"]').innerText(),/JUEGO ON/);
+    assert.match(await host.locator('[data-module="aura"]').innerText(),/AURA ON/);
+    await host.locator('[data-module="aura"]').click();
+    assert.match(await host.locator('[data-module="aura"]').innerText(),/AURA OFF/);
+    await host.locator('[data-module="aura"]').click();
     const before = await host.boundingBox();
     await page.evaluate(() => scrollTo(0,2100));
     await page.waitForTimeout(950);
