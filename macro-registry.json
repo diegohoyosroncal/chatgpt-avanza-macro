@@ -1,0 +1,86 @@
+{
+  "schema_version": 2,
+  "updated_at": "2026-10-10",
+  "purpose": "Single macro source of truth; user projects, economic state and native app execution are independent",
+  "primary_repository": "diegohoyosroncal/chatgpt-avanza-macro",
+  "channels": {
+    "stable": {
+      "path": "avanza_macro_maestro_v4.user.js",
+      "branch": "main",
+      "version_verified_in_repository": "4.0.3",
+      "installed_profiles": "not_verified"
+    },
+    "candidate": {
+      "path": "avanza_macro_maestro_v4.user.js",
+      "branch": "feat/multiproject-cockpit-20261010",
+      "version": "4.1.0",
+      "status": "draft_multiproject",
+      "installed_profiles": "not_verified"
+    }
+  },
+  "variants": [
+    {
+      "name": "AVANZA legacy",
+      "version": "1.0.3",
+      "executor": "userscript_web",
+      "path": "avanza_macro.user.js",
+      "status": "retained"
+    },
+    {
+      "name": "AVANZA Maestro",
+      "version": "4.0.3",
+      "executor": "userscript_web",
+      "path": "avanza_macro_maestro_v4.user.js",
+      "status": "stable"
+    },
+    {
+      "name": "MISIÓN VIVA",
+      "version": "3.1.0",
+      "executor": "userscript_web",
+      "library": "MISION_VIVA_v3_1.user.js",
+      "status": "parallel_legacy_needs_one_time_disable_if_active"
+    },
+    {
+      "name": "AVANZA Maestro Visual",
+      "version": "4.0.4-rc1",
+      "executor": "userscript_web",
+      "branch": "fix/visual-hud-rebased-20261010",
+      "status": "draft"
+    },
+    {
+      "name": "AVANZA Cockpit Multiproyecto",
+      "version": "4.1.0-multi1",
+      "executor": "userscript_web",
+      "branch": "feat/multiproject-cockpit-20261010",
+      "status": "draft"
+    }
+  ],
+  "related_independent_systems": [
+    "MacroDroid Android telemetry v2/v3",
+    "Chat-specific prompts and instructions",
+    "Railway/Supabase durable runtime and owner execution",
+    "Native ChatGPT apps"
+  ],
+  "limitations": [
+    "A browser userscript cannot list all installed extensions or detect invisible userscripts.",
+    "DOM panel collision detection is partial; no universal cross-browser/runtime synchronization.",
+    "Version in source is not proof of installation; Tampermonkey updates are per browser/profile and depend on settings.",
+    "Native Android/iOS ChatGPT apps cannot be modified by the userscript.",
+    "An open ChatGPT tab is not a persistent background executor; no automatic execution after tab closure.",
+    "Parallel browser lanes require the corresponding ChatGPT project tabs to remain open; the userscript is not a cloud background runtime.",
+    "The page cannot enable or disable separate Tampermonkey scripts at extension level; v4.1 centralizes supported macro features as internal modules and blocks legacy collisions."
+  ],
+  "release_gates": [
+    "source_is_latest_main_plus_adaptive_changes",
+    "javascript_syntax_valid",
+    "offline_regression_tests_pass",
+    "isolated_browser_behavior_pass",
+    "authenticated_chatgpt_browser_smoke_pass",
+    "one_active_userscript_confirmed",
+    "update_and_rollback_tested",
+    "no_economic_project_regressions",
+    "multiproject_registry_and_module_controls_pass",
+    "cross_tab_sync_pass"
+  ],
+  "rollback": "Disable visual candidate in Tampermonkey and reenable preserved v4.0.3 from main; never delete project state"
+}
