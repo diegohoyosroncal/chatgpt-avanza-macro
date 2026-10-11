@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         AVANZA — Macro Maestro · Piloto Automático
 // @namespace    https://chatgpt.com/
-// @version      4.1.1
-// @description  Cockpit multiproyecto para ChatGPT web: módulos ON/OFF, AUTO/MANUAL, progreso independiente, misiones y sincronización segura entre pestañas.
+// @version      4.2.0
+// @description  Cockpit multiproyecto + Learn Quest: módulos ON/OFF, AUTO/MANUAL, progreso serio independiente, misiones jugables y sincronización entre pestañas.
 // @updateURL    https://raw.githubusercontent.com/diegohoyosroncal/chatgpt-avanza-macro/main/avanza_macro_maestro_v4.user.js
 // @downloadURL  https://raw.githubusercontent.com/diegohoyosroncal/chatgpt-avanza-macro/main/avanza_macro_maestro_v4.user.js
 // @match        https://chatgpt.com/*
@@ -18,7 +18,8 @@
   // Auto-continúa solo proyectos identificados que estén explícitamente en AUTO.
   // No llama APIs remotas, no lee credenciales y no elude permisos/herramientas de ChatGPT.
   const APP = 'avanza-macro-maestro-v4';
-  const INSTALLED_VERSION = '4.1.1-multi1';
+  const INSTALLED_VERSION = '4.2.0-learn1';
+  const LEARN_KEY = 'avanza-v4-learn-quest-v1';
   const CONTROL_KEY = 'avanza-v4-control-center-v1';
   const PROJECTS_KEY = 'avanza-v4-project-registry-v1';
   const CHANNEL_NAME = 'avanza-v4-project-bus-v1';
@@ -61,6 +62,7 @@
   let control = readControl();
   let projects = readProjects();
   let channel = null;
+  let learning = readLearning();
 
   function currentChatKey() {
     // Route is scoped to this web chat, not a global prompt or another chat.
@@ -132,6 +134,62 @@
       'YERABELL': {id:'YERABELL',objective:'Convertir piloto de reel IA en anticipo/cobro',current_pct:null,previous_pct:null,delta_pp:null,numerator:null,denominator:null,next_action:'Recuperar material existente y cerrar flujo hacia anticipo',blocker:'Material parcial; cash S/0',updated_at:'2026-10-10T23:53:00-05:00',status:'CONTINUE',seeded:true},
       'AR-TRACKER-ETSY': {id:'AR-TRACKER-ETSY',objective:'Conseguir primera venta externa verificable del producto',current_pct:null,previous_pct:null,delta_pp:null,numerator:null,denominator:null,next_action:'Resolver autenticación de vendedor o cambiar a canal ejecutable',blocker:'Etsy seller auth bloqueada; perfiles TinyFish sin sesión',updated_at:'2026-10-10T23:53:00-05:00',status:'CONTINUE',seeded:true}
     };
+  }
+  function readLearning() {
+    try { const raw=JSON.parse(localStorage.getItem(LEARN_KEY)||'{}'); return raw&&typeof raw==='object'?raw:{}; } catch { return {}; }
+  }
+  function saveLearning() {
+    try { localStorage.setItem(LEARN_KEY,JSON.stringify(learning)); } catch {}
+    renderGame(); broadcast({type:'learning',learning});
+  }
+  function learningFor(id=projectKey()) {
+    if(!id) return null;
+    const p=projects?.[id]||{};
+    const baseXp=Number.isInteger(p.numerator)?p.numerator*100:0;
+    return learning[id]||{processId:id,course:'',missionId:'',title:'',difficulty:1,reward:100,xp:baseXp,streak:0,status:'IDLE',boss:false,lastResult:'',completed:{},updatedAt:''};
+  }
+  function setLearning(id,patch) {
+    if(!id) return;
+    const prev=learningFor(id)||{};
+    learning[id]={...prev,...patch,completed:{...(prev.completed||{}),...(patch.completed||{})},updatedAt:new Date().toISOString()};
+    saveLearning();
+  }
+  function looksLearningProcess() {
+    const id=projectKey(), p=projects?.[id]||{}, hay=[id,p.objective,state.objective].join(' ');
+    return /(CFI|CURSO|ACADEM|EXAM|CLASE|ESTUDI|APREND|CONTABIL|NIC\s*\d+)/i.test(hay);
+  }
+  function parseQuestLine(text) {
+    const m=String(text||'').match(/🎮\s*QUEST\s*\|\s*([^|\n]+)\|\s*([^|\n]+)\|\s*⭐\s*(\d{1,4})\s*XP\s*\|\s*⚔️\s*([1-5])\s*\/\s*5\s*\|\s*([^\n]+)/i);
+    if(!m) return null;
+    return {course:m[1].trim().slice(0,40),missionId:safeId(m[2].trim()),reward:Math.min(500,Math.max(0,Number(m[3]))),difficulty:Number(m[4]),title:m[5].trim().slice(0,120),boss:/👾|BOSS/i.test(m[5])};
+  }
+  function parseQuestResult(text) {
+    const m=String(text||'').match(/(?:🏆|🔁)\s*QUEST_RESULT\s*\|\s*([^|\n]+)\|\s*(PASS|RETRY)\s*\|\s*\+(\d{1,4})\s*XP(?:\s*\|\s*🔥\s*(\d+))?/i);
+    if(!m) return null;
+    return {missionId:safeId(m[1].trim()),result:m[2].toUpperCase(),claimedXp:Number(m[3]),claimedStreak:m[4]?Number(m[4]):null};
+  }
+  function discoverLearning() {
+    if(!moduleOn('game')) return;
+    const id=projectKey(); if(!id) return;
+    const nodes=[...document.querySelectorAll('[data-message-author-role="assistant"]')].slice(-18);
+    let active=null,result=null;
+    for(const node of nodes){ const text=node.innerText||node.textContent||''; active=parseQuestLine(text)||active; result=parseQuestResult(text)||result; }
+    let L=learningFor(id); if(!L) return;
+    if(result && result.missionId){
+      const done=L.completed||{};
+      if(result.result==='PASS' && result.missionId===L.missionId && !done[result.missionId]){
+        const gain=Math.max(0,Math.min(500,L.reward||result.claimedXp||100));
+        L={...L,xp:(L.xp||0)+gain,streak:(L.streak||0)+1,lastResult:'PASS',completed:{...done,[result.missionId]:true},status:'RESOLVED'};
+      } else if(result.result==='RETRY' && result.missionId===L.missionId){
+        L={...L,streak:0,lastResult:'RETRY',status:'AWAITING_USER'};
+      }
+    }
+    if(active){
+      const same=active.missionId===L.missionId;
+      L={...L,...active,status:'AWAITING_USER',lastResult:same?L.lastResult:'',processId:id};
+    }
+    learning[id]=L; try{localStorage.setItem(LEARN_KEY,JSON.stringify(learning));}catch{}
+    renderGame();
   }
   function readProjects() {
     const seeds=seedProjects();
