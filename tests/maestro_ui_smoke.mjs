@@ -38,7 +38,7 @@ try {
     },{timeout:5000});
     assert.match(await host.locator('[data-value="game"]').innerText(),/M40-4/);
     assert.match(await host.locator('[data-value="game"]').innerText(),/100 XP/);
-    assert.equal(await host.locator('[data-learn-action]').count(),5);
+    assert.equal(await dock.locator('[data-learn-action]').count(),5);
     assert.match(await host.locator('[data-value="progress-ribbon"]').innerText(),/CFI/);
     assert.match(await host.locator('[data-value="progress-ribbon"]').innerText(),/15,8%|15\.8%/);
     assert.equal(await host.locator('[data-quest-choice]').count(),4);
