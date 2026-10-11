@@ -198,3 +198,22 @@ test('quest choices parser accepts multiple labeled options', () => {
   assert.match(script,/function parseQuestChoices\(text\)/);
   assert.match(script,/A-F1-6/);
 });
+
+
+test('v4.4 exposes a full-screen Mission Control visual mode', () => {
+  assert.match(script,/4\.4\.0-neon-control/);
+  assert.match(script,/data-action="cinema"/);
+  assert.match(script,/function renderMissionControl\(\)/);
+  assert.match(script,/function toggleMissionControl\(force\)/);
+  assert.match(script,/MISSION CONTROL/);
+  assert.match(script,/mc-orb/);
+  assert.match(script,/mc-road/);
+  assert.match(script,/BOSS BATTLE/);
+});
+test('Mission Control keeps project percentages and Learn Quest interactions wired', () => {
+  assert.match(script,/missionProjectRows\(\)/);
+  assert.match(script,/data-quest-choice/);
+  assert.match(script,/data-learn-submit/);
+  assert.match(script,/data-learn-action="boss"/);
+  assert.match(script,/formatPercent\(projects\['CFI-E2-2026-10-16'\]\?\.current_pct\)/);
+});
