@@ -693,7 +693,7 @@
   }
   function renderModules() {
     if(!dashboard) return;
-    const labels={engine:'⚡ MOTOR',auto:'♾️ AUTO',progress:'📈 %',sync:'🌐 SYNC',game:'🎮 JUEGO',aura:'🎨 AURA'};
+    const labels={engine:'⚡ MOTOR',auto:'♾️ AUTO',progress:'📈 %',sync:'🌐 SYNC',game:'🎮 QUEST',aura:'🎨 AURA'};
     for(const b of dashboard.querySelectorAll('[data-module]')){
       const name=b.dataset.module,on=moduleOn(name); b.dataset.on=on?'true':'false'; b.textContent=(labels[name]||name)+' '+(on?'ON':'OFF');
     }
@@ -702,14 +702,46 @@
     const m=String(id||'').match(/(20\d{2})-(\d{2})-(\d{2})/);
     return m?new Date(Number(m[1]),Number(m[2])-1,Number(m[3]),23,59,59):null;
   }
+  function sendLearningAction(kind) {
+    const id=projectKey(), L=learningFor(id);
+    if(!id){ setStatus('No hay PROCESS_ID académico activo todavía.',true); return; }
+    if(isGenerating()){ setStatus('La respuesta sigue en curso; no interrumpo.',true); return; }
+    const composer=findComposer(); if(!composer){ setStatus('No encuentro el cuadro de mensaje.',true); return; }
+    if(draft(composer)){ setStatus('Tu borrador sigue intacto. Termínalo o envíalo antes de usar un botón QUEST.',true); return; }
+    const mission=L?.missionId||'SIGUIENTE';
+    const actions={
+      start:'🎮 LEARN_ACTION | START | PROCESS '+id+' | Activa la siguiente micro-misión del curso. Hazla interactiva y no reveles la solución antes de mi intento.',
+      hint:'💡 LEARN_ACTION | HINT | PROCESS '+id+' | MISSION '+mission+' | Dame UNA pista mínima y socrática; no resuelvas el ejercicio por mí.',
+      retry:'🔁 LEARN_ACTION | RETRY | PROCESS '+id+' | MISSION '+mission+' | Repite la misma habilidad con datos/contexto distintos. Conserva gates ya ganados.',
+      boss:'👾 LEARN_ACTION | BOSS | PROCESS '+id+' | Lanza un boss/simulacro acumulativo apropiado a mi nivel actual; puntúa por gates, no por estilo.',
+      map:'🗺️ LEARN_ACTION | MAP | PROCESS '+id+' | Muéstrame el mapa de misiones: completadas, actual, siguientes y boss. No cambies el % sin evidencia.'
+    };
+    const message=actions[kind]||actions.start;
+    if(!fillComposer(composer,message)){ setStatus('No pude preparar la acción QUEST sin tocar tu borrador.',true); return; }
+    const send=findSend(); if(!send){ setStatus('Acción QUEST preparada; botón Enviar no disponible todavía.',true); return; }
+    send.click(); setStatus('🎮 Acción QUEST enviada: '+kind.toUpperCase());
+  }
   function renderGame() {
     const box=dashboard?.querySelector('[data-value="game"]'); if(!box) return;
     box.hidden=!moduleOn('game'); if(box.hidden) return;
-    const id=projectKey();
-    const xp=state.lastNumerator!==null?state.lastNumerator*100:Math.round((state.lastPercent||0)*10);
-    const level=1+Math.floor(xp/500), deadline=projectDeadline(id), left=deadline?Math.max(0,deadline-Date.now()):null;
-    const boss=deadline?' · 👾 BOSS '+deadline.toLocaleDateString('es-PE',{day:'2-digit',month:'2-digit'})+' · '+Math.ceil(left/86400000)+'d':'';
-    box.textContent='🎮 LVL '+level+' · ✨ '+xp+' XP'+boss+' · XP visual ≠ % verificado';
+    const id=projectKey(), L=learningFor(id);
+    if(!id || !looksLearningProcess()){
+      box.innerHTML='<div class="quest-head"><b>🎮 LEARN QUEST</b><span>modo universal</span></div><div class="quest-empty">Se activa automáticamente en procesos de aprendizaje.</div>';
+      return;
+    }
+    const xp=L?.xp||0, level=1+Math.floor(xp/500), reward=L?.reward||100, streak=L?.streak||0;
+    const difficulty=Math.max(1,Math.min(5,L?.difficulty||1));
+    const stars='⚔️'.repeat(difficulty)+'·'.repeat(5-difficulty);
+    const deadline=projectDeadline(id), left=deadline?Math.max(0,deadline-Date.now()):null;
+    const boss=deadline?'👾 '+deadline.toLocaleDateString('es-PE',{day:'2-digit',month:'2-digit'})+' · '+Math.ceil(left/86400000)+'d':'👾 boss dinámico';
+    const mission=L?.missionId||'SIGUIENTE', title=L?.title||'Listo para generar la siguiente misión';
+    const status=L?.status==='AWAITING_USER'?'🎯 TU TURNO':L?.lastResult==='PASS'?'✅ GATE CERRADO':'🛰️ LISTO';
+    box.innerHTML='<div class="quest-head"><b>🎮 LEARN QUEST</b><span>🔥 '+streak+'</span></div>'+
+      '<div class="quest-title">'+escapeText(mission,26)+' · '+escapeText(title,70)+'</div>'+
+      '<div class="quest-meta"><span>LVL '+level+'</span><span>✨ '+xp+' XP</span><span>'+stars+'</span></div>'+
+      '<div class="quest-state">'+status+' · recompensa '+reward+' XP · '+boss+'</div>'+
+      '<div class="quest-actions"><button type="button" data-learn-action="start">🎯 misión</button><button type="button" data-learn-action="hint">💡 pista</button><button type="button" data-learn-action="retry">🔁 retry</button><button type="button" data-learn-action="boss">👾 boss</button><button type="button" data-learn-action="map">🗺️ mapa</button></div>'+
+      '<div class="quest-rule">XP/racha = motivación · 📈 % = dominio verificado</div>';
   }
   function renderProjects() {
     const box=dashboard?.querySelector('[data-value="projects"]'); if(!box) return;
@@ -775,7 +807,7 @@
       .section{margin-top:10px;padding-top:9px;border-top:1px solid var(--stroke)}.section-title{font-size:9px;color:#94a3b8;font-weight:800;letter-spacing:.08em;margin-bottom:6px}
       .modules{display:grid;grid-template-columns:repeat(3,1fr);gap:5px}.modules button,.project-actions button{border:1px solid #40536d;background:#17263c;color:#e5eef8;border-radius:8px;padding:5px 4px;font-size:8.5px;font-weight:800;cursor:pointer}.modules button[data-on=true]{border-color:var(--accent);box-shadow:0 0 10px var(--accent-halo);color:var(--accent-light)}
       .projects{display:grid;gap:5px;max-height:180px;overflow:auto}.project-card{border:1px solid #31445e;background:#0d1b2d;border-radius:10px;padding:6px}.project-card[data-current=true]{border-color:var(--accent);box-shadow:0 0 14px var(--accent-halo)}.project-main{display:flex;justify-content:space-between;gap:5px;font-size:9px}.project-main b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.project-main span{color:#cbd5e1;white-space:nowrap}.project-actions{display:flex;gap:5px;margin-top:5px}.project-actions button{flex:1}.empty{font-size:9px;color:#8495aa;line-height:1.35}
-      .game{margin-top:8px;border:1px solid #4c3a6b;background:linear-gradient(90deg,#2e1065aa,#164e63aa);border-radius:9px;padding:7px;font-size:9px;color:#f3e8ff;font-weight:750}
+      .game{margin-top:8px;border:1px solid #6d4aff;background:radial-gradient(circle at 8% 20%,rgba(236,72,153,.17),transparent 34%),linear-gradient(120deg,#2e1065d9,#164e63d9);border-radius:13px;padding:9px;font-size:9px;color:#f3e8ff;font-weight:750;box-shadow:0 0 22px rgba(124,58,237,.12)}.quest-head{display:flex;justify-content:space-between;align-items:center;gap:7px}.quest-head span{color:#f9a8d4}.quest-title{font-size:10px;margin-top:6px;color:#fff;font-weight:850;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.quest-meta{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}.quest-meta span{background:#111c32aa;border:1px solid #596a86;border-radius:999px;padding:3px 6px}.quest-state{margin-top:7px;color:#c4f1ff}.quest-actions{display:grid;grid-template-columns:repeat(5,1fr);gap:4px;margin-top:7px}.quest-actions button{border:1px solid #596a86;background:#13233d;color:#eef7ff;border-radius:8px;padding:5px 2px;font-size:8px;font-weight:800;cursor:pointer}.quest-actions button:hover{border-color:#c4b5fd;box-shadow:0 0 10px #a78bfa33}.quest-rule,.quest-empty{margin-top:6px;color:#cbd5e1;font-size:8px;line-height:1.3}
       .top{cursor:move;touch-action:none;user-select:none}
       .top button{cursor:pointer;touch-action:manipulation;border:1px solid #41536c;border-radius:8px;color:#e2e8f0;background:#1a2a43;padding:4px 7px;font-size:12px}
       .top button:focus-visible{outline:2px solid var(--accent)}
@@ -820,6 +852,8 @@
       if(en){ const id=en.dataset.projectEnabled; setProjectMode(id,{enabled:!projectMode(id).enabled}); return; }
       const au=event.target.closest('[data-project-auto]');
       if(au){ const id=au.dataset.projectAuto; setProjectMode(id,{auto:!projectMode(id).auto,enabled:true}); return; }
+      const learn=event.target.closest('[data-learn-action]');
+      if(learn){ sendLearningAction(learn.dataset.learnAction); return; }
     });
     panel.querySelector('[data-action="theme"]').addEventListener('click', () => {
       const themes = ['amber','ocean','violet'];
