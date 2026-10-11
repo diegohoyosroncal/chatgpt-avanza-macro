@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         AVANZA — Macro Maestro · Piloto Automático
 // @namespace    https://chatgpt.com/
-// @version      4.3.1
+// @version      4.4.0
 // @description  Cockpit multiproyecto + Learn Quest: módulos ON/OFF, AUTO/MANUAL, progreso serio independiente, misiones jugables y sincronización entre pestañas.
 // @updateURL    https://raw.githubusercontent.com/diegohoyosroncal/chatgpt-avanza-macro/main/avanza_macro_maestro_v4.user.js
 // @downloadURL  https://raw.githubusercontent.com/diegohoyosroncal/chatgpt-avanza-macro/main/avanza_macro_maestro_v4.user.js
@@ -22,7 +22,7 @@
   const SINGLETON = 'data-avanza-maestro-v4-runner';
   if (document.documentElement?.getAttribute(SINGLETON) === '1') return;
   document.documentElement?.setAttribute(SINGLETON, '1');
-  const INSTALLED_VERSION = '4.3.1-visible-progress';
+  const INSTALLED_VERSION = '4.4.0-neon-control';
   const LEARN_KEY = 'avanza-v4-learn-quest-v1';
   const CONTROL_KEY = 'avanza-v4-control-center-v1';
   const PROJECTS_KEY = 'avanza-v4-project-registry-v1';
@@ -67,6 +67,7 @@
   let projects = readProjects();
   let channel = null;
   let learning = readLearning();
+  let missionOverlay = null;
 
   function currentChatKey() {
     // Route is scoped to this web chat, not a global prompt or another chat.
@@ -471,7 +472,7 @@
     const bar = dashboard.querySelector('.bar-fill'); if (bar) { bar.style.width = known ? `${pct}%` : '0%'; if (known) { bar.parentElement.setAttribute('aria-valuemin','0'); bar.parentElement.setAttribute('aria-valuemax','100'); bar.parentElement.setAttribute('aria-valuenow',String(pct)); bar.parentElement.removeAttribute('aria-valuetext'); } else { bar.parentElement.removeAttribute('aria-valuenow'); bar.parentElement.setAttribute('aria-valuetext','Progreso aún no verificable'); } }
     const tone = dashboard.querySelector('.tone');
     if (tone) tone.dataset.level=state.stalled>=3?'risk':phase===STATES.WAITING||phase===STATES.READY?'live':'idle';
-    renderGame(); renderModules(); renderProjects(); renderProgressRibbon();
+    renderGame(); renderModules(); renderProjects(); renderProgressRibbon(); renderMissionControl();
   }
   function render() {
     if (!button) return;
@@ -898,6 +899,75 @@
       return '<div class="project-card" data-current="'+(p.id===projectKey()?'true':'false')+'"><div class="project-main"><b>'+escapeText(p.id,34)+'</b><span>'+pct+' · '+frac+'</span></div><div class="project-actions"><button type="button" data-project-enabled="'+p.id+'">'+(mode.enabled?'🟢 ON':'⚫ OFF')+'</button><button type="button" data-project-auto="'+p.id+'">'+(mode.auto?'♾️ AUTO':'✋ MANUAL')+'</button></div></div>';
     }).join('');
   }
+
+  function missionProjectRows() {
+    return Object.values(projects||{}).sort((a,b)=>{
+      const qa=typeof a.current_pct==='number'?1:0, qb=typeof b.current_pct==='number'?1:0;
+      if(qa!==qb) return qb-qa;
+      return String(b.updated_at||'').localeCompare(String(a.updated_at||''));
+    }).slice(0,8);
+  }
+  function missionNode(label,done,active=false,locked=false) {
+    const cls=done?'done':active?'active':locked?'locked':'';
+    return '<div class="mc-node '+cls+'"><span class="mc-dot">'+(done?'✓':locked?'🔒':active?'◎':'•')+'</span><b>'+escapeHtml(label,18)+'</b></div>';
+  }
+  function renderMissionControl() {
+    if(!missionOverlay) return;
+    const id=projectKey()||'CFI-E2-2026-10-16';
+    const p=projects[id]||projects['CFI-E2-2026-10-16']||{};
+    const L=learningFor(id)||{};
+    const pct=typeof p.current_pct==='number'?p.current_pct:(typeof state.lastPercent==='number'?state.lastPercent:null);
+    const xp=L.xp||0, level=1+Math.floor(xp/500), streak=L.streak||0;
+    const frac=Number.isInteger(p.numerator)&&Number.isInteger(p.denominator)?p.numerator+'/'+p.denominator:'—';
+    const rows=missionProjectRows();
+    const projectBars=rows.map(row=>{
+      const rp=typeof row.current_pct==='number'?Math.max(0,Math.min(100,row.current_pct)):null;
+      return '<div class="mc-project"><div><b>'+escapeHtml(shortProjectLabel(row.id),22)+'</b><span>'+(rp===null?'—':formatPercent(rp))+'</span></div><div class="mc-mini"><i style="width:'+(rp===null?0:rp)+'%"></i></div></div>';
+    }).join('');
+    const choices=(L.choices||[]).map(c=>'<button type="button" class="mc-choice" data-quest-choice="'+escapeHtml(c.key,4)+'"><span>'+escapeHtml(c.key,4)+'</span>'+escapeHtml(c.label,90)+'</button>').join('');
+    const map = [
+      missionNode('NIC 40',false,true,false),
+      missionNode('NIC 23',false,false,false),
+      missionNode('NIC 36',false,false,false),
+      missionNode('NIC 38',false,false,false),
+      missionNode('SIMULACRO',false,false,true)
+    ].join('<div class="mc-link"></div>');
+    missionOverlay.innerHTML=
+      '<div class="mc-shell">'+
+        '<div class="mc-topbar"><div class="mc-brand">🚀 AVANZA <span>MISSION CONTROL</span></div><div class="mc-topchips">'+
+          '<span>🧩 COCKPIT <b>'+formatPercent(projects['COCKPIT-TOTAL-v1']?.current_pct)+'</b></span>'+
+          '<span>🎓 CFI <b>'+formatPercent(projects['CFI-E2-2026-10-16']?.current_pct)+'</b></span>'+
+          '<span>🎮 QUEST <b>'+level+'</b></span>'+
+        '</div><button type="button" data-action="cinema-close">✕</button></div>'+
+        '<div class="mc-grid">'+
+          '<aside class="mc-left">'+
+            '<div class="mc-orb" style="--mc:'+(pct??0)+'"><div><strong>'+formatPercent(pct)+'</strong><small>AVANCE</small></div></div>'+
+            '<div class="mc-stat-grid"><div>⭐<b>'+xp+'</b><span>XP</span></div><div>🔥<b>'+streak+'</b><span>RACHA</span></div><div>🚩<b>'+frac+'</b><span>GATES</span></div><div>🎚️<b>'+level+'</b><span>NIVEL</span></div></div>'+
+            '<div class="mc-card"><h4>📊 PROYECTOS</h4>'+projectBars+'</div>'+
+          '</aside>'+
+          '<main class="mc-center">'+
+            '<section class="mc-hero"><div><small>CFI 2026.2</small><h2>🎯 Misión activa — '+escapeHtml(L.missionId||'SIGUIENTE',30)+'</h2><p>'+escapeHtml(L.title||p.next_action||'Recuperar siguiente micro-misión verificable.',160)+'</p></div><div class="mc-badge">⚔️ '+Math.max(1,Math.min(5,L.difficulty||1))+'/5</div></section>'+
+            '<section class="mc-quest">'+
+              '<div class="mc-quest-head"><span>🎮 TU TURNO</span><b>+'+(L.reward||100)+' XP</b></div>'+
+              (choices?'<div class="mc-choices">'+choices+'</div>':'<div class="mc-open">✍️ Respuesta abierta: usa la caja inferior o pulsa 🎯 misión para generar opciones.</div>')+
+              '<div class="mc-answer"><textarea data-learn-answer rows="3" placeholder="Escribe tu respuesta… Enter envía · Shift+Enter salto"></textarea><button type="button" data-learn-submit>🚀</button></div>'+
+              '<div class="mc-actions"><button data-learn-action="hint">💡 PISTA</button><button data-learn-action="retry">🔁 RETRY</button><button data-learn-action="boss">👾 BOSS</button><button data-learn-action="map">🗺️ MAPA</button></div>'+
+            '</section>'+
+          '</main>'+
+          '<aside class="mc-right">'+
+            '<div class="mc-card"><h4>🗺️ MAPA DE MISIONES</h4><div class="mc-road">'+map+'</div></div>'+
+            '<div class="mc-boss"><span>👾 BOSS BATTLE</span><h3>SIMULACRO E2</h3><p>mezcla de NIC 40 · 23 · 36 · 38</p><button type="button" data-learn-action="boss">🏆 ENFRENTAR BOSS</button></div>'+
+            '<div class="mc-card"><h4>🎁 RECOMPENSAS</h4><div class="mc-rewards"><span>🏆<b>+400 XP</b></span><span>💎<b>NIC 40</b></span><span>📘<b>SIMULACRO</b></span></div></div>'+
+          '</aside>'+
+        '</div>'+
+      '</div>';
+  }
+  function toggleMissionControl(force) {
+    if(!missionOverlay) return;
+    const open=typeof force==='boolean'?force:missionOverlay.hidden;
+    missionOverlay.hidden=!open;
+    if(open){ renderMissionControl(); missionOverlay.querySelector('textarea')?.focus(); }
+  }
   function applyAura() {
     const old=document.getElementById(AURA_STYLE_ID);
     if(!moduleOn('aura')){ old?.remove(); return; }
@@ -957,6 +1027,22 @@
       .top{cursor:move;touch-action:none;user-select:none}
       .top button{cursor:pointer;touch-action:manipulation;border:1px solid #41536c;border-radius:8px;color:#e2e8f0;background:#1a2a43;padding:4px 7px;font-size:12px}
       .top button:focus-visible{outline:2px solid var(--accent)}
+      .mc-overlay[hidden]{display:none!important}.mc-overlay{position:fixed;inset:12px;z-index:2147483600;border-radius:24px;overflow:auto;background:
+        radial-gradient(circle at 15% 8%,rgba(34,211,238,.16),transparent 26%),
+        radial-gradient(circle at 80% 12%,rgba(168,85,247,.18),transparent 28%),
+        radial-gradient(circle at 80% 88%,rgba(236,72,153,.14),transparent 30%),
+        linear-gradient(150deg,#06111f 0%,#091a33 45%,#090d22 100%);
+        color:#f8fbff;border:1px solid rgba(125,211,252,.28);box-shadow:0 25px 100px rgba(0,0,0,.68),0 0 60px rgba(79,70,229,.16);backdrop-filter:blur(24px)}
+      .mc-shell{min-height:100%;padding:14px}.mc-topbar{display:flex;align-items:center;gap:12px;padding:10px 12px;border:1px solid #284268;border-radius:15px;background:#08172bbf;box-shadow:0 0 24px #0ea5e922}.mc-brand{font-weight:950;letter-spacing:.08em}.mc-brand span{color:#67e8f9;font-size:10px}.mc-topchips{display:flex;gap:7px;flex:1;justify-content:center;flex-wrap:wrap}.mc-topchips span{border:1px solid #3c5275;border-radius:999px;padding:6px 9px;background:#0c1a31;color:#cbd5e1;font-size:9px}.mc-topchips b{color:#fff;margin-left:4px}.mc-topbar>button{border:1px solid #475569;background:#111827;color:#fff;border-radius:10px;padding:6px 9px;cursor:pointer}
+      .mc-grid{display:grid;grid-template-columns:minmax(190px,240px) minmax(420px,1fr) minmax(220px,300px);gap:12px;margin-top:12px}.mc-left,.mc-right{display:grid;gap:10px;align-content:start}.mc-center{display:grid;gap:10px;align-content:start}
+      .mc-orb{--mc:0;width:155px;height:155px;margin:4px auto;border-radius:50%;display:grid;place-items:center;background:conic-gradient(#22d3ee 0 calc(var(--mc)*1%),#a855f7 calc(var(--mc)*1%) calc(var(--mc)*1% + 8%),#172554 calc(var(--mc)*1% + 8%) 100%);box-shadow:0 0 38px #22d3ee44}.mc-orb>div{width:120px;height:120px;border-radius:50%;display:grid;place-items:center;align-content:center;background:#071225;border:1px solid #25466f}.mc-orb strong{font-size:25px}.mc-orb small{color:#94a3b8}
+      .mc-stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px}.mc-stat-grid>div{padding:8px;border:1px solid #263c5e;border-radius:11px;background:#0c172a;text-align:center}.mc-stat-grid b{display:block;font-size:14px}.mc-stat-grid span{font-size:8px;color:#94a3b8}.mc-card{border:1px solid #284268;border-radius:14px;background:#0a172abf;padding:10px}.mc-card h4{margin:0 0 8px;color:#dbeafe}.mc-project{margin:7px 0}.mc-project>div:first-child{display:flex;justify-content:space-between;font-size:8.5px}.mc-mini{height:5px;border-radius:99px;background:#1e293b;overflow:hidden;margin-top:3px}.mc-mini i{display:block;height:100%;background:linear-gradient(90deg,#22d3ee,#8b5cf6,#ec4899);box-shadow:0 0 12px #8b5cf688}
+      .mc-hero{display:flex;justify-content:space-between;gap:12px;padding:16px;border:1px solid #5b3dc7;border-radius:17px;background:linear-gradient(120deg,#1b1d4a,#0d2745 56%,#151238);box-shadow:0 0 32px #8b5cf633}.mc-hero small{color:#67e8f9;font-weight:800}.mc-hero h2{margin:5px 0 4px;font-size:22px}.mc-hero p{margin:0;color:#cbd5e1}.mc-badge{align-self:start;border:1px solid #f59e0b;background:#451a03;color:#fcd34d;border-radius:999px;padding:7px 9px;font-weight:900;white-space:nowrap}
+      .mc-quest{border:1px solid #4f46e5;border-radius:17px;padding:14px;background:linear-gradient(180deg,#0b1830e8,#091326e8)}.mc-quest-head{display:flex;justify-content:space-between;color:#c4b5fd;margin-bottom:10px}.mc-choices{display:grid;grid-template-columns:1fr 1fr;gap:8px}.mc-choice{border:1px solid #35537c;background:linear-gradient(100deg,#0f2a49,#1f1c52);color:#fff;border-radius:12px;padding:11px;text-align:left;cursor:pointer;transition:.16s}.mc-choice:hover{transform:translateY(-2px);border-color:#67e8f9;box-shadow:0 0 18px #22d3ee33}.mc-choice span{display:inline-grid;place-items:center;width:27px;height:27px;border-radius:8px;background:#0ea5e9;margin-right:8px;font-weight:950}.mc-open{padding:14px;border:1px dashed #475569;border-radius:12px;color:#cbd5e1}.mc-answer{display:flex;gap:8px;margin-top:10px}.mc-answer textarea{flex:1;min-height:76px;resize:vertical;border:1px solid #365174;background:#071223;color:#fff;border-radius:12px;padding:10px;outline:none}.mc-answer textarea:focus{border-color:#c084fc;box-shadow:0 0 0 2px #a855f733}.mc-answer button{width:52px;border:0;border-radius:12px;background:linear-gradient(135deg,#06b6d4,#8b5cf6,#ec4899);color:#fff;font-size:20px;cursor:pointer}.mc-actions{display:grid;grid-template-columns:repeat(4,1fr);gap:7px;margin-top:9px}.mc-actions button{border:1px solid #354b69;background:#10223b;color:#fff;border-radius:10px;padding:8px;cursor:pointer}
+      .mc-road{display:grid;justify-items:center}.mc-node{display:flex;align-items:center;gap:7px;min-width:130px;border:1px solid #334155;background:#0e1b2f;border-radius:999px;padding:7px 10px}.mc-node.done{border-color:#10b981}.mc-node.active{border-color:#f59e0b;box-shadow:0 0 18px #f59e0b55}.mc-node.locked{opacity:.55}.mc-dot{width:24px;height:24px;border-radius:50%;display:grid;place-items:center;background:#16283f}.mc-link{width:2px;height:16px;background:linear-gradient(#22d3ee,#8b5cf6)}.mc-boss{border:1px solid #b91c1c;border-radius:15px;padding:13px;background:radial-gradient(circle at 85% 20%,#7f1d1d66,transparent 35%),linear-gradient(135deg,#2a0b18,#190b13);box-shadow:0 0 25px #ef444422}.mc-boss span{color:#fca5a5;font-weight:900}.mc-boss h3{margin:5px 0}.mc-boss p{color:#fecaca;font-size:9px}.mc-boss button{width:100%;border:0;border-radius:10px;padding:10px;background:linear-gradient(100deg,#f43f5e,#e11d48,#7c3aed);color:#fff;font-weight:900;cursor:pointer}.mc-rewards{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}.mc-rewards span{border:1px solid #384f72;border-radius:10px;padding:10px 5px;text-align:center;background:#0d1a2d;font-size:17px}.mc-rewards b{display:block;font-size:8px;margin-top:4px}
+      @media(max-width:1050px){.mc-grid{grid-template-columns:200px 1fr}.mc-right{grid-column:1/-1;grid-template-columns:1fr 1fr 1fr}.mc-choices{grid-template-columns:1fr}}
+      @media(max-width:720px){.mc-overlay{inset:4px}.mc-grid{grid-template-columns:1fr}.mc-left,.mc-right{grid-template-columns:1fr}.mc-topchips{display:none}.mc-orb{width:120px;height:120px}.mc-orb>div{width:92px;height:92px}.mc-hero h2{font-size:17px}.mc-actions{grid-template-columns:1fr 1fr}}
+
       .panel.compact{padding:10px}
       .panel.compact .title,.panel.compact .stat,.panel.compact .bar,.panel.compact .tinyrow,.panel.compact .next,.panel.compact .status,.panel.compact .foot{display:none}
       .panel.compact .ring{width:62px;height:62px;flex:0 0 62px;margin:8px auto}
@@ -970,7 +1056,7 @@
       @media(prefers-reduced-motion:reduce){.go,.bar-fill{transition:none}}
     `;
     const panel=document.createElement('div');panel.className='panel';
-    panel.innerHTML=`<div class="top"><span class="logo" aria-hidden="true">↗</span><div class="topname"><div class="brand">AVANZA</div><div class="sub">MACRO MAESTRO · v4</div></div><button type="button" data-action="theme" title="Cambiar color">◐</button><button type="button" data-action="collapse" title="Compactar / ampliar">▁</button><span class="pill">CON CONTROL</span></div>
+    panel.innerHTML=`<div class="top"><span class="logo" aria-hidden="true">↗</span><div class="topname"><div class="brand">AVANZA</div><div class="sub">MACRO MAESTRO · v4</div></div><button type="button" data-action="cinema" title="Abrir Mission Control">🌌</button><button type="button" data-action="theme" title="Cambiar color">◐</button><button type="button" data-action="collapse" title="Compactar / ampliar">▁</button><span class="pill">CON CONTROL</span></div>
       <div class="health" data-value="health" data-warning="false">Versión remota sin verificar</div>
       <div class="progress-ribbon" data-value="progress-ribbon" aria-label="Porcentajes verificados de proyectos"></div>
       <div class="section"><div class="section-title">🎛️ MACROS · ON/OFF</div><div class="modules"><button data-module="engine"></button><button data-module="auto"></button><button data-module="progress"></button><button data-module="sync"></button><button data-module="game"></button><button data-module="aura"></button></div></div>
@@ -1010,6 +1096,7 @@
       const submit=event.target.closest('[data-learn-submit]');
       if(submit){ const input=panel.querySelector('[data-learn-answer]'); sendLearningAnswer(input?.value||''); return; }
     });
+    panel.querySelector('[data-action="cinema"]').addEventListener('click', () => toggleMissionControl());
     panel.querySelector('[data-action="theme"]').addEventListener('click', () => {
       const themes = ['amber','ocean','violet'];
       presentation.theme = themes[(themes.indexOf(presentation.theme) + 1) % themes.length];
@@ -1027,7 +1114,29 @@
     });
     panel.querySelector('.top').addEventListener('pointerdown',dragStart);
     dashboard=panel;
-    shadow.append(css,panel);
+    missionOverlay=document.createElement('div');
+    missionOverlay.className='mc-overlay';
+    missionOverlay.hidden=true;
+    missionOverlay.addEventListener('click',event=>{
+      const close=event.target.closest('[data-action="cinema-close"]');
+      if(close){ toggleMissionControl(false); return; }
+      const choice=event.target.closest('[data-quest-choice]');
+      if(choice){
+        const L=learningFor(projectKey()), key=choice.dataset.questChoice;
+        const item=(L?.choices||[]).find(c=>c.key===key);
+        sendLearningAnswer(item?key+' — '+item.label:key); return;
+      }
+      const submit=event.target.closest('[data-learn-submit]');
+      if(submit){ const input=missionOverlay.querySelector('[data-learn-answer]'); sendLearningAnswer(input?.value||''); return; }
+      const action=event.target.closest('[data-learn-action]');
+      if(action){ sendLearningAction(action.dataset.learnAction); return; }
+    });
+    missionOverlay.addEventListener('keydown',event=>{
+      const input=event.target.closest?.('[data-learn-answer]');
+      if(input&&event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendLearningAnswer(input.value||'');}
+      if(event.key==='Escape'){toggleMissionControl(false);}
+    });
+    shadow.append(css,panel,missionOverlay);
     document.body.appendChild(root);
     applyPresentation();
     applyAura();
