@@ -5,12 +5,14 @@ on:
     paths:
       - 'avanza_macro_maestro_v4.user.js'
       - 'tests/maestro_smoke.test.cjs'
+      - 'macro-registry.json'
       - '.github/workflows/macro-smoke.yml'
   push:
     branches: [main]
     paths:
       - 'avanza_macro_maestro_v4.user.js'
       - 'tests/maestro_smoke.test.cjs'
+      - 'macro-registry.json'
       - '.github/workflows/macro-smoke.yml'
 
 permissions:
