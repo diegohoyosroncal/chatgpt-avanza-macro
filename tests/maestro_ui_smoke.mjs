@@ -93,7 +93,13 @@ try {
       const h=document.getElementById('avanza-macro-maestro-v4')?.shadowRoot;
       return h?.querySelector('[data-value="health"]')?.dataset.warning === 'true';
     },{timeout:5000});
-    assert.equal(await host.locator('[data-action="avanzar"]').isDisabled(),true);
+    // 4.4.6 intentionally keeps the button clickable to EXPLAIN a legacy-script conflict;
+    // checkConflicts() blocks all sends. Disabled button is an obsolete expectation.
+    assert.equal(await host.locator('[data-action="avanzar"]').isEnabled(),true);
+    assert.match(await host.locator('[data-action="avanzar"]').getAttribute('title'),/otra macro activa/i);
+    await host.locator('[data-action="avanzar"]').click();
+    assert.match(await host.locator('.status').innerText(),/Detectadas macros simultáneas|envíos bloqueados/i);
+    assert.equal(await page.locator('#prompt-textarea').inputValue(),'');
     await page.evaluate(() => document.getElementById('diego-mision-autonomia-v1').remove());
     await page.waitForFunction(() => {
       const h=document.getElementById('avanza-macro-maestro-v4')?.shadowRoot;
