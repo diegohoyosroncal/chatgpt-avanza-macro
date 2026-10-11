@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         AVANZA — Macro Maestro · Piloto Automático
 // @namespace    https://chatgpt.com/
-// @version      4.4.3
+// @version      4.4.4
 // @description  Cockpit multiproyecto + Learn Quest: módulos ON/OFF, AUTO/MANUAL, progreso serio independiente, misiones jugables y sincronización entre pestañas.
 // @updateURL    https://raw.githubusercontent.com/diegohoyosroncal/chatgpt-avanza-macro/main/avanza_macro_maestro_v4.user.js
 // @downloadURL  https://raw.githubusercontent.com/diegohoyosroncal/chatgpt-avanza-macro/main/avanza_macro_maestro_v4.user.js
@@ -22,7 +22,7 @@
   const SINGLETON = 'data-avanza-maestro-v4-runner';
   if (document.documentElement?.getAttribute(SINGLETON) === '1') return;
   document.documentElement?.setAttribute(SINGLETON, '1');
-  const INSTALLED_VERSION = '4.4.3-aurora-focus';
+  const INSTALLED_VERSION = '4.4.4-focus-default';
   const LEARN_KEY = 'avanza-v4-learn-quest-v1';
   const CONTROL_KEY = 'avanza-v4-control-center-v1';
   const PROJECTS_KEY = 'avanza-v4-project-registry-v1';
@@ -821,11 +821,11 @@
       const old = JSON.parse(localStorage.getItem(UI_KEY) || '{}');
       return {
         theme: ['amber','ocean','violet'].includes(old.theme) ? old.theme : 'amber',
-        compact: old.compact === true,
+        compact: old.compact !== false,
         x: Number.isFinite(old.x) ? old.x : null,
         y: Number.isFinite(old.y) ? old.y : null,
       };
-    } catch { return { theme: 'amber', compact: false, x: null, y: null }; }
+    } catch { return { theme: 'amber', compact: true, x: null, y: null }; }
   }
   function savePresentation() {
     try { localStorage.setItem(UI_KEY, JSON.stringify(presentation)); } catch {}
