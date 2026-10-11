@@ -146,3 +146,9 @@ test('game mode keeps XP explicitly separate from verified progress', () => {
   assert.match(script, /XP visual ≠ % verificado/);
   assert.match(script, /CFI\/APRENDIZAJE/);
 });
+
+test('seed catalog includes active projects and never fabricates percentages for unscored lanes', () => {
+  for (const id of ['COCKPIT-TOTAL-v1','CFI-E2-2026-10-16','GLOBAL-VALUE-OS','BTS-LIMA','VELVETBOX','KASA-VIVA','YERABELL','AR-TRACKER-ETSY']) assert.match(script,new RegExp("'"+id+"'"));
+  assert.match(script,/current_pct:null/);
+  assert.match(script,/CFI-E2-2026-10-16[\s\S]*?current_pct:15\.8/);
+});
