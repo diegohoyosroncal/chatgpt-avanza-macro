@@ -1,0 +1,69 @@
+{
+  "schema_version": 1,
+  "updated_at": "2026-10-10",
+  "scope": "ChatGPT web userscripts; not native Android/desktop apps",
+  "primary_repo": "diegohoyosroncal/chatgpt-avanza-macro",
+  "channels": {
+    "stable": {
+      "path": "avanza_macro_maestro_v4.user.js",
+      "branch": "main",
+      "verified_source_version": "4.0.2",
+      "real_installation": "not_verified"
+    },
+    "candidate": {
+      "path": "avanza_macro_maestro_v4.user.js",
+      "branch": "feat/macro-version-health-20261010",
+      "version": "4.0.3",
+      "release_status": "draft_review_pending",
+      "real_installation": "not_verified"
+    }
+  },
+  "known_variants": [
+    {
+      "path": "avanza_macro.user.js",
+      "source_version": "1.0.3",
+      "status": "legacy-preserved",
+      "executor": "userscript_web"
+    },
+    {
+      "path": "avanza_macro_maestro_v4.user.js",
+      "source_version": "4.0.2",
+      "status": "stable-source",
+      "executor": "userscript_web"
+    }
+  ],
+  "other_known_solutions": [
+    {
+      "name": "MacroDroid telemetría Android v2/v3",
+      "executor": "native_android_automation",
+      "in_repository": false,
+      "status": "independent-not-replaced"
+    },
+    {
+      "name": "Scripts / prompts per chat",
+      "executor": "chat_prompt_or_ui",
+      "in_repository": "unknown",
+      "status": "non-enumerable-by-userscript"
+    },
+    {
+      "name": "External runtime / owner execution",
+      "executor": "backend_or_connector",
+      "in_repository": false,
+      "status": "not-replaced"
+    }
+  ],
+  "limitations": [
+    "Inventory is not exhaustive: browser extensions, installed userscripts and other remote files cannot be enumerated with @grant none.",
+    "DOM detection covers only known legacy panel IDs, not invisible background scripts.",
+    "Version installed and version published are separate facts; Tampermonkey update metadata does not prove installation.",
+    "No ChatGPT native app coverage and no automatic cross-chat memory or backend execution."
+  ],
+  "release_conditions": [
+    "static_code_checks_pass",
+    "isolated_ui_regression_tests_pass",
+    "authenticated_browser_smoke_test_pass",
+    "duplicate_scripts_reviewed",
+    "explicit_stable_promotion"
+  ],
+  "rollback": "Disable candidate or switch back to preserved v4.0.2 after browser test; never delete legacy source or mission checkpoints."
+}
