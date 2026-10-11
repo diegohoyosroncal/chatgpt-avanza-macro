@@ -27,3 +27,11 @@ jobs:
         run: node --check avanza_macro_maestro_v4.user.js
       - name: Version and collision safety regression tests
         run: node --test tests/macro-compatibility.test.mjs
+      - name: Prepare isolated Chromium UI smoke test
+        run: |
+          npm install --no-save --ignore-scripts playwright-core@1.56.1
+          CHROME_PATH="$(command -v google-chrome || command -v chromium || command -v chromium-browser)"
+          test -n "$CHROME_PATH"
+          echo "CHROME_PATH=$CHROME_PATH" >> "$GITHUB_ENV"
+      - name: Floating panel and collision fail-safe in isolated Chromium
+        run: node tests/macro-ui-smoke.mjs
