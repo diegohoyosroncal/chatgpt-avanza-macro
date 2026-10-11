@@ -23,7 +23,7 @@ function harness(oldPrefs) {
 }
 test('metadata and installed version are unique and update from main',()=>{
   assert.match(src,/\/\/ @version\s+4\.4\.0/);
-  assert.match(src,/const INSTALLED_VERSION = '4\.4\.0-explicit-auto'/);
+  assert.match(src,/const INSTALLED_VERSION = '4\.4\.0-decision-optin'/);
   assert.match(src,/\/\/ @updateURL\s+https:\/\/raw\.githubusercontent\.com\/diegohoyosroncal\/chatgpt-avanza-macro\/main\/avanza_macro_maestro_v4\.user\.js/);
   assert.match(src,/\/\/ @noframes/);
 });
