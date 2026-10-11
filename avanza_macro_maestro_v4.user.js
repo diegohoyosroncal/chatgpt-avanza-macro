@@ -728,7 +728,8 @@
     discoverVisibleProjects();
     const id=projectKey(); if(!id) return false;
     const mode=projectMode(id); if(!mode.enabled||!mode.auto) return false;
-    const L=learningFor(id); if(moduleOn('game')&&L?.status==='AWAITING_USER') return false;
+    // AWAITING_USER is a process-local human input gate, not a condition imposed by GAME ON/OFF.
+    const L=learningFor(id); if(L?.status==='AWAITING_USER') return false;
     if(draft(findComposer())) return false;
     if(state.lastStatus&&EXIT.has(state.lastStatus)) return false;
     if(typeof state.lastPercent==='number'&&state.lastPercent>=100) return false;
