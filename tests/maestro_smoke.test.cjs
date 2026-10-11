@@ -249,3 +249,31 @@ test('historical seeded percentages are quarantined while original goals survive
   assert.match(script,/control\.autoRunOptIn!==true/);
   assert.match(script,/control\.backgroundOptIn===true/);
 });
+
+test('cross-process receipts cannot affect current objective or terminal status',()=>{
+  const start=script.indexOf('  function receiptMatchesProcess(');
+  const end=script.indexOf('  function parseReceipt(s) {',start);
+  assert.ok(start>=0&&end>start);
+  const matches=new Function(script.slice(start,end)+'return receiptMatchesProcess;')();
+  const ok={processId:'GVO',objective:'Goal'};
+  assert.equal(matches(ok,'GVO','Goal'),true);
+  assert.equal(matches({...ok,processId:'CFI'},'GVO','Goal'),false);
+  assert.equal(matches({...ok,processId:''},'GVO','Goal'),false);
+  assert.equal(matches({...ok,objective:'Different'},'GVO','Goal'),false);
+  assert.equal(matches(null,'GVO','Goal'),false);
+  assert.match(script,/const receiptAccepted = receiptMatchesProcess\(receipt,state\.processId,state\.objective\)/);
+  assert.match(script,/if \(receiptAccepted && EXIT\.has\(receipt\.status\)\)/);
+});
+test('reported progress remains visibly unverified and input controls are normalized',()=>{
+  assert.match(script,/AVANCE REPORTADO/);
+  assert.match(script,/reportado; fuente externa pendiente/);
+  assert.match(script,/control=normalizeControl\(/);
+});
+test('AVANZA is the last panel element after status and footer',()=>{
+  const start=script.indexOf('    panel.innerHTML=`<div class="top">');
+  const end=script.indexOf('    button=panel.querySelector',start);
+  const html=script.slice(start,end);
+  assert.ok(start>=0&&end>start);
+  assert.ok(html.lastIndexOf('data-action="avanzar"')>html.lastIndexOf('class="foot"'));
+  assert.ok(html.lastIndexOf('data-action="avanzar"')>html.lastIndexOf('class="status"'));
+});

@@ -299,7 +299,7 @@
       channel.onmessage=event=>{
         const msg=event.data||{}; if(msg.source===TAB_OWNER) return;
         if(msg.type==='projects'&&msg.projects&&typeof msg.projects==='object'){ projects={...projects,...msg.projects}; try{localStorage.setItem(PROJECTS_KEY,JSON.stringify(projects));}catch{} renderProjects(); }
-        if(msg.type==='control'&&msg.control&&typeof msg.control==='object'){ control={...control,...msg.control,modules:{...control.modules,...(msg.control.modules||{})},projectModes:{...control.projectModes,...(msg.control.projectModes||{})}}; try{localStorage.setItem(CONTROL_KEY,JSON.stringify(control));}catch{} renderModules();renderProjects();applyAura(); }
+        if(msg.type==='control'&&msg.control&&typeof msg.control==='object'){ control=normalizeControl({...control,...msg.control,modules:{...control.modules,...(msg.control.modules||{})},projectModes:{...control.projectModes,...(msg.control.projectModes||{})}}); try{localStorage.setItem(CONTROL_KEY,JSON.stringify(control));}catch{} renderModules();renderProjects();applyAura(); }
         if(msg.type==='learning'&&msg.learning&&typeof msg.learning==='object'){ learning={...learning,...msg.learning}; try{localStorage.setItem(LEARN_KEY,JSON.stringify(learning));}catch{} renderGame(); }
       };
     } catch { channel=null; }
@@ -408,6 +408,14 @@
     const assistants = after.filter(x => x.getAttribute('data-message-author-role') === 'assistant');
     return assistants.length ? (assistants[assistants.length - 1].innerText || assistants[assistants.length - 1].textContent || '').trim() : '';
   }
+  // Source-bound to this CHAT: reject a different process or renamed goal.
+  function receiptMatchesProcess(receipt,activeId,activeObjective) {
+    if(!receipt) return false;
+    if(activeId && receipt.processId!==activeId) return false;
+    if(activeObjective && receipt.objective &&
+        activeObjective.trim().toLocaleLowerCase()!==receipt.objective.trim().toLocaleLowerCase()) return false;
+    return true;
+  }
   function parseReceipt(s) {
     const lines = s.match(/AVANZA_CONTROL\s*:\s*\{[^\n]*\}/ig) || [];
     for (const item of lines.reverse()) {
@@ -497,7 +505,7 @@
       return String(b.updated_at||'').localeCompare(String(a.updated_at||''));
     }).slice(0,6);
     box.hidden=false;
-    box.innerHTML=rows.length?rows.map(p=>'<span class="progress-chip" data-active="'+(p.id===projectKey()?'true':'false')+'"><b>'+escapeHtml(shortProjectLabel(p.id),22)+'</b> '+escapeHtml(formatPercent(p.current_pct),8)+'</span>').join(''):'<span class="progress-chip">📈 sin % verificable aún</span>';
+    box.innerHTML=rows.length?rows.map(p=>'<span class="progress-chip" data-active="'+(p.id===projectKey()?'true':'false')+'"><b>'+escapeHtml(shortProjectLabel(p.id),22)+'</b> '+escapeHtml(formatPercent(p.current_pct),8)+' <small>reportado; fuente externa pendiente</small></span>').join(''):'<span class="progress-chip">📈 sin % reportado con fracción</span>';
   }
   function updateDashboard() {
     if (!dashboard) return;
@@ -684,7 +692,9 @@
     state.repeatedResponses = identicalResponse ? (state.repeatedResponses || 0) + 1 : 0;
     state.lastResponseFingerprint = key;
     const receipt = parseReceipt(reply);
-    if (!receipt) {
+    const receiptAccepted = receiptMatchesProcess(receipt,state.processId,state.objective);
+    if (!receiptAccepted) {
+      if(receipt) state.blocker='Recibo de otro PROCESS_ID u objetivo incompatible: se preservan estado y porcentaje de este chat';
       state.missingReceipts++;
       state.stalled++;
       state.lastDelta = null;
@@ -721,7 +731,7 @@
     pending = null; state.inFlightTicket=''; state.inFlightSentAt=0;
     if (state.repeatedResponses >= 4) { state.stalled=Math.max(state.stalled,3); state.lastStrategy='FORZAR_RUTA_MATERIALMENTE_DISTINTA'; setStatus('Respuesta repetida: cambio material de estrategia obligatorio; continúo.', true); }
     saveState();
-    if (receipt && EXIT.has(receipt.status)) {
+    if (receiptAccepted && EXIT.has(receipt.status)) {
       pause(receipt.status === 'VERIFIED_COMPLETE' ? 'El asistente declaró objetivo completado: revisa recibos independientes.' :
         receipt.status === 'HUMAN_GATE_PROVEN' ? 'El asistente declaró una intervención humana imprescindible.' :
         'No quedan acciones seguras verificadas; detengo el ciclo.', true);
@@ -1035,9 +1045,9 @@
     const rows=Object.values(projects).sort((a,b)=>String(b.updated_at||'').localeCompare(String(a.updated_at||''))).slice(0,12);
     if(!rows.length){ box.innerHTML='<div class="empty">abre/visita un chat con 🧩 PROCESO y aparecerá aquí automáticamente</div>'; return; }
     box.innerHTML=rows.map(p=>{
-      const mode=projectMode(p.id), pct=typeof p.current_pct==='number'?formatPercent(p.current_pct):'—';
+      const mode=projectMode(p.id), pct=typeof p.current_pct==='number'?formatPercent(p.current_pct):'—', provenance=p.metric_source==='assistant_report_not_primary_receipt'?' · reportado':'';
       const frac=p.numerator!==null&&p.denominator?p.numerator+'/'+p.denominator:'—';
-      return '<div class="project-card" data-current="'+(p.id===projectKey()?'true':'false')+'"><div class="project-main"><b>'+escapeText(p.id,34)+'</b><span>'+pct+' · '+frac+'</span></div><div class="project-actions"><button type="button" data-project-enabled="'+p.id+'">'+(mode.enabled?'🟢 ON':'⚫ OFF')+'</button><button type="button" data-project-auto="'+p.id+'">'+(mode.auto?'♾️ AUTO':'✋ MANUAL')+'</button></div></div>';
+      return '<div class="project-card" data-current="'+(p.id===projectKey()?'true':'false')+'"><div class="project-main"><b>'+escapeText(p.id,34)+'</b><span>'+pct+' · '+frac+provenance+'</span></div><div class="project-actions"><button type="button" data-project-enabled="'+p.id+'">'+(mode.enabled?'🟢 ON':'⚫ OFF')+'</button><button type="button" data-project-auto="'+p.id+'">'+(mode.auto?'♾️ AUTO':'✋ MANUAL')+'</button></div></div>';
     }).join('');
   }
 
@@ -1253,13 +1263,13 @@
       <div class="section"><div class="section-title">🗺️ PROYECTOS · PARALELO</div><div class="projects" data-value="projects"></div></div>
       <div class="game" data-value="game"></div>
       <div class="title" data-value="objective">Objetivo del chat · por recuperar</div>
-      <div class="metrics"><div class="ring"><div class="center"><span class="pct" data-value="percent" aria-label="Porcentaje actual">—</span><span class="caption">AVANCE</span></div></div><div class="stat"><div class="transition" data-value="transition">— → —</div><div class="delta" data-value="delta">Δ — pp</div><div class="frac" data-value="fraction">Base no validada</div><div class="pending" data-value="pending">Pendiente —</div></div></div>
+      <div class="metrics"><div class="ring"><div class="center"><span class="pct" data-value="percent" aria-label="Porcentaje reportado, no comprobado con fuente externa">—</span><span class="caption">AVANCE REPORTADO</span></div></div><div class="stat"><div class="transition" data-value="transition">— → —</div><div class="delta" data-value="delta">Δ — pp</div><div class="frac" data-value="fraction">Base no validada</div><div class="pending" data-value="pending">Pendiente —</div></div></div>
       <div class="bar" role="progressbar" aria-label="Progreso reportado del objetivo del chat"><div class="bar-fill"></div></div>
       <div class="tinyrow"><span class="tone" data-level="idle" data-value="stage">DISPONIBLE</span><span data-value="loops">0 ciclos · 0 sin avance</span></div>
       <div class="next" data-value="next">El siguiente hito se decide según evidencia del chat.</div>
-      <button class="go" data-action="avanzar" type="button" aria-label="Avanzar según el contexto o detener el ciclo">▶  AVANZAR</button>
       <div class="status" data-warning="false" role="status" aria-live="polite">Un botón. Decide la ruta según cada respuesta.</div>
-      <div class="foot"><span>Informe del asistente ≠ prueba independiente</span><span class="scope">v${INSTALLED_VERSION} · POR CHAT</span></div>`;
+      <div class="foot"><span>Informe del asistente ≠ prueba independiente</span><span class="scope">v${INSTALLED_VERSION} · POR CHAT</span></div>
+      <button class="go" data-action="avanzar" type="button" aria-label="Avanzar según el contexto o detener el ciclo">▶  AVANZAR</button>`;
     button=panel.querySelector('[data-action="avanzar"]');
     statusNode=panel.querySelector('.status');
     button.addEventListener('click',toggle);
