@@ -1,0 +1,33 @@
+name: Macro compatibility smoke
+
+on:
+  pull_request:
+    paths:
+      - 'avanza_macro_maestro_v4.user.js'
+      - 'tests/maestro_smoke.test.cjs'
+      - '.github/workflows/macro-smoke.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'avanza_macro_maestro_v4.user.js'
+      - 'tests/maestro_smoke.test.cjs'
+      - '.github/workflows/macro-smoke.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: macro-smoke-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Check out sources
+        uses: actions/checkout@v4
+      - name: Check JavaScript syntax
+        run: node --check avanza_macro_maestro_v4.user.js
+      - name: Run offline non-network unit tests
+        run: node --test tests/maestro_smoke.test.cjs
