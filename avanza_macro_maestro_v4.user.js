@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         AVANZA — Macro Maestro · Piloto Automático
 // @namespace    https://chatgpt.com/
-// @version      4.4.6
+// @version      4.4.7
 // @description  Cockpit multiproyecto + Learn Quest: módulos ON/OFF, AUTO/MANUAL, progreso serio independiente, misiones jugables y sincronización entre pestañas.
 // @updateURL    https://raw.githubusercontent.com/diegohoyosroncal/chatgpt-avanza-macro/main/avanza_macro_maestro_v4.user.js
 // @downloadURL  https://raw.githubusercontent.com/diegohoyosroncal/chatgpt-avanza-macro/main/avanza_macro_maestro_v4.user.js
@@ -22,7 +22,7 @@
   const SINGLETON = 'data-avanza-maestro-v4-runner';
   if (document.documentElement?.getAttribute(SINGLETON) === '1') return;
   document.documentElement?.setAttribute(SINGLETON, '1');
-  const INSTALLED_VERSION = '4.4.6-button-feedback';
+  const INSTALLED_VERSION = '4.4.7-safe-focus';
   const LEARN_KEY = 'avanza-v4-learn-quest-v1';
   const CONTROL_KEY = 'avanza-v4-control-center-v1';
   const PROJECTS_KEY = 'avanza-v4-project-registry-v1';
@@ -107,12 +107,24 @@
     catch { /* inaccessible profile storage */ }
   }
 
+  function normalizeControl(raw) {
+    const defaults={modules:{engine:true,auto:false,background:false,progress:true,sync:true,game:true,aura:true},
+      backgroundAuto:false,autoRunOptIn:false,backgroundOptIn:false,projectModes:{}};
+    if(!raw || typeof raw!=='object' || Array.isArray(raw)) return defaults;
+    // Prior defaults to AUTO=true and FONDO=true were never user consent.
+    const autoRunOptIn=raw.autoRunOptIn===true,backgroundOptIn=raw.backgroundOptIn===true;
+    const modules={...defaults.modules,...(raw.modules||{})};
+    if(!autoRunOptIn) modules.auto=false;
+    if(!backgroundOptIn) modules.background=false;
+    const projectModes={...(raw.projectModes||{})};
+    if(!autoRunOptIn) for(const id of Object.keys(projectModes))
+      projectModes[id]={...projectModes[id],auto:false};
+    return {...defaults,...raw,modules,projectModes,autoRunOptIn,backgroundOptIn,
+      backgroundAuto:backgroundOptIn && raw.backgroundAuto===true};
+  }
   function readControl() {
-    const defaults = { modules:{engine:true,auto:true,progress:true,sync:true,game:true,aura:true}, backgroundAuto:true, projectModes:{} };
-    try {
-      const raw = JSON.parse(localStorage.getItem(CONTROL_KEY) || 'null');
-      return raw && typeof raw === 'object' ? { ...defaults, ...raw, modules:{...defaults.modules,...(raw.modules||{})}, projectModes:{...(raw.projectModes||{})} } : defaults;
-    } catch { return defaults; }
+    try { return normalizeControl(JSON.parse(localStorage.getItem(CONTROL_KEY) || 'null')); }
+    catch { return normalizeControl(null); }
   }
   function saveControl() {
     try { localStorage.setItem(CONTROL_KEY, JSON.stringify(control)); } catch {}
@@ -121,7 +133,7 @@
   function moduleOn(name) { return control.modules?.[name] !== false; }
   function projectMode(id) {
     const row=control.projectModes?.[id]||{};
-    return { enabled:row.enabled!==false, auto:row.auto!==false };
+    return { enabled:row.enabled!==false, auto:row.auto===true };
   }
   function setProjectMode(id,patch) {
     if(!id) return;
@@ -564,14 +576,14 @@
     return commit(); // Legacy Web Locks absence: retain profile lease, fail-closed.
   }
   async function deliver(step) {
-    if (checkConflicts() || !moduleOn('engine')) return;
-    if (busy || phase !== STATES.READY || pending) return;
+    if (checkConflicts() || !moduleOn('engine') || !moduleOn('auto') || control.autoRunOptIn!==true) return;
+    if (busy || phase !== STATES.READY || pending || state.autoConsented!==true) return;
     busy = true; render();
     try {
       syncRoute();
-      if (phase !== STATES.READY) return;
+      if (phase !== STATES.READY || state.autoConsented!==true || !moduleOn('auto')) return;
       if (!renewLease()) { pause('Otro panel tiene el control de este chat; no duplico envíos.', true); return; }
-      if (document.hidden && !control.backgroundAuto) { setStatus('Pestaña en segundo plano: AUTO-background está OFF.'); return; }
+      if (document.hidden && !(control.backgroundAuto===true && control.backgroundOptIn===true)) { setStatus('Pestaña en segundo plano: AUTO-background está OFF.'); return; }
       if (isGenerating()) { setStatus('Respuesta en curso; no duplico mensajes.'); return; }
       const c = findComposer();
       if (!c) { pause('No encuentro el cuadro de mensaje; no se envió nada.', true); return; }
@@ -590,7 +602,7 @@
         liveSend = findSend();
         if (liveSend) break;
       }
-      if (!renewLease() || phase !== STATES.READY || isGenerating() || currentChatKey() !== chatKey) {
+      if (!renewLease() || phase !== STATES.READY || state.autoConsented!==true || !moduleOn('auto') || isGenerating() || currentChatKey() !== chatKey) {
         pause('El chat cambió antes del envío. No pulsé Enviar.', true); return;
       }
       if (draft(c) !== message.trim()) {
@@ -623,8 +635,9 @@
     if (busy) return;
     syncRoute();
     if (phase !== STATES.READY && phase !== STATES.WAITING) return;
+    if(!moduleOn('engine')||!moduleOn('auto')||control.autoRunOptIn!==true||state.autoConsented!==true) { pause('AUTO OFF: sin envíos nuevos.'); return; }
     if (!renewLease()) { pause('El control de este chat está activo en otra pestaña; no duplico mensajes.', true); return; }
-    if (document.hidden && !control.backgroundAuto) return;
+    if (document.hidden && !(control.backgroundAuto===true && control.backgroundOptIn===true)) return;
     if (phase === STATES.READY) {
       if (now() - lastAudit < MIN_SEND_GAP_MS) return;
       lastAudit = now();
@@ -724,7 +737,10 @@
       return;
     }
     if (!moduleOn('engine')) { setStatus('⚡ MOTOR está OFF. Enciéndelo desde MACROS.', true); return; }
-    if (!moduleOn('auto')) { control.modules.auto=true; saveControl(); }
+    // AVANZAR authorizes only this chat and its identified process; not other chats.
+    control.autoRunOptIn=true; control.modules.auto=true;
+    if(id) control.projectModes[id]={...projectMode(id),enabled:true,auto:true};
+    saveControl();
     if (!acquireLease()) { setStatus('Este chat ya está controlado por otra pestaña; no duplico acciones.', true); return; }
     if (id && !projectMode(id).enabled) setProjectMode(id,{enabled:true});
     state.autoConsented=true; state.parkFingerprint=''; state.parkSince=0;
@@ -818,12 +834,12 @@
       state.parkFingerprint=''; state.parkSince=0;
       state.stalled=0; state.missingReceipts=0; saveState();
     }
-    if(!moduleOn('engine')||!moduleOn('auto')||checkConflicts()||isGenerating()) return false;
+    if(!moduleOn('engine')||!moduleOn('auto')||control.autoRunOptIn!==true||checkConflicts()||isGenerating()) return false;
     discoverVisibleProjects();
     const id=projectKey();
     const mode=id?projectMode(id):{enabled:true,auto:true};
     if(!mode.enabled||!mode.auto) return false;
-    const L=id?learningFor(id):null; if(moduleOn('game')&&L?.status==='AWAITING_USER') return false;
+    const L=id?learningFor(id):null; if(looksLearningProcess()&&L?.status==='AWAITING_USER') return false; // academic-only pause
     if(draft(findComposer())) return false;
     if(state.lastStatus&&EXIT.has(state.lastStatus)) return false;
     if(typeof state.lastPercent==='number'&&state.lastPercent>=100) return false;
