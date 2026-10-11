@@ -21,7 +21,7 @@ try {
     await host.waitFor({timeout:7000});
     const dock = host.locator('.panel');
     const localVersion = await host.locator('[data-value="health"]').innerText();
-    assert.match(localVersion,/4\.2\.0-learn1/);
+    assert.match(localVersion,/4\.3\.0-interactive1/);
     assert.match(localVersion,/remota NO verificada/);
     assert.equal(await host.locator('[data-module]').count(),6);
     assert.match(await host.locator('[data-module="auto"]').innerText(),/AUTO ON/);
@@ -29,7 +29,7 @@ try {
     assert.match(await host.locator('[data-module="aura"]').innerText(),/AURA ON/);
     await page.evaluate(() => {
       const a=document.createElement('div'); a.setAttribute('data-message-author-role','assistant');
-      a.innerText='🧩 PROCESO CFI-E2-2026-10-16 | 📈 AVANCE 15.8%→15.8% | 3/19 | Δ 0 pp\n🎮 QUEST | CFI | M40-4 | ⭐100 XP | ⚔️2/5 | Modelo del costo';
+      a.innerText='🧩 PROCESO CFI-E2-2026-10-16 | 📈 AVANCE 15.8%→15.8% | 3/19 | Δ 0 pp\n🎮 QUEST | CFI | M40-4 | ⭐100 XP | ⚔️2/5 | Modelo del costo\n🎲 QUEST_CHOICES | M40-4 | A=S/30,000 | B=S/90,000 | C=S/1,350,000 | D=No se deprecia';
       document.body.append(a);
     });
     await page.waitForFunction(() => {
@@ -39,9 +39,20 @@ try {
     assert.match(await host.locator('[data-value="game"]').innerText(),/M40-4/);
     assert.match(await host.locator('[data-value="game"]').innerText(),/100 XP/);
     assert.equal(await host.locator('[data-learn-action]').count(),5);
+    assert.match(await host.locator('[data-value="progress-ribbon"]').innerText(),/CFI/);
+    assert.match(await host.locator('[data-value="progress-ribbon"]').innerText(),/15,8%|15\.8%/);
+    assert.equal(await host.locator('[data-quest-choice]').count(),4);
+    assert.equal(await host.locator('[data-learn-answer]').count(),1);
+    await host.locator('[data-quest-choice="A"]').click();
+    assert.match(await page.locator('#prompt-textarea').inputValue(),/LEARN_ANSWER/);
+    await page.locator('#prompt-textarea').fill('');
     await host.locator('[data-module="aura"]').click();
     assert.match(await host.locator('[data-module="aura"]').innerText(),/AURA OFF/);
     await host.locator('[data-module="aura"]').click();
+    await page.evaluate(() => { const h=document.getElementById('avanza-macro-maestro-v4'); h.style.left='5000px'; h.style.top='5000px'; h.style.right='auto'; h.style.bottom='auto'; });
+    await page.waitForTimeout(1100);
+    const rescued = await host.boundingBox();
+    assert.ok(rescued.x < size.width && rescued.y < size.height, 'HUD rescue must restore an offscreen panel');
     const before = await host.boundingBox();
     await page.evaluate(() => scrollTo(0,2100));
     await page.waitForTimeout(950);
@@ -74,7 +85,7 @@ try {
       return h?.querySelector('[data-value="health"]')?.dataset.warning === 'false';
     },{timeout:5000});
     assert.equal(await host.locator('[data-action="avanzar"]').isEnabled(),true);
-    results.push(size.width+'x'+size.height+': fixed/drag/theme/compact/version/conflict PASS');
+    results.push(size.width+'x'+size.height+': ribbon/interactive/rescue/fixed/drag/theme/compact/version/conflict PASS');
     await page.close();
   }
   console.log(results.join('\n'));
