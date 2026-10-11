@@ -111,9 +111,9 @@ test('permanent health badge names the installed version without pretending the 
   assert.match(script, /updateHealth\(\)/);
 });
 test('registry matches stable and candidate versions and records native-app limitations', () => {
-  assert.equal(registry.channels.stable.version_verified_in_repository, '4.1.0');
-  assert.equal(registry.channels.candidate.version, '4.1.1');
-  assert.equal(registry.channels.candidate.status, 'draft_seeded_catalog');
+  assert.equal(registry.channels.stable.version_verified_in_repository, '4.1.1');
+  assert.equal(registry.channels.candidate.version, '4.2.0');
+  assert.equal(registry.channels.candidate.status, 'draft_learn_quest');
   assert.ok(registry.limitations.some(text => text.includes('Native Android/iOS')));
   assert.ok(registry.release_gates.includes('authenticated_chatgpt_browser_smoke_pass'));
 });
@@ -143,7 +143,7 @@ test('continuity has no fixed execution-count stop', () => {
   assert.match(script, /Estancamiento alto: auditoría profunda y cambio de estrategia; NO es señal de STOP/);
 });
 test('game mode keeps XP explicitly separate from verified progress', () => {
-  assert.match(script, /XP visual ≠ % verificado/);
+  assert.match(script, /XP\/racha = motivación/);
   assert.match(script, /CFI\/APRENDIZAJE/);
 });
 
@@ -151,4 +151,26 @@ test('seed catalog includes active projects and never fabricates percentages for
   for (const id of ['COCKPIT-TOTAL-v1','CFI-E2-2026-10-16','GLOBAL-VALUE-OS','BTS-LIMA','VELVETBOX','KASA-VIVA','YERABELL','AR-TRACKER-ETSY']) assert.match(script,new RegExp("'"+id+"'"));
   assert.match(script,/current_pct:null/);
   assert.match(script,/CFI-E2-2026-10-16[\s\S]*?current_pct:15\.8/);
+});
+
+
+test('Learn Quest protocol is readable and generic across courses', () => {
+  assert.match(script,/function parseQuestLine\(text\)/);
+  assert.match(script,/🎮\\s\*QUEST/);
+  assert.match(script,/function parseQuestResult\(text\)/);
+  assert.match(script,/QUEST_RESULT/);
+  assert.match(script,/LEARN QUEST/);
+});
+test('Learn Quest persists XP separately from verified project percentage', () => {
+  assert.match(script,/const LEARN_KEY = 'avanza-v4-learn-quest-v1'/);
+  assert.match(script,/localStorage\.setItem\(LEARN_KEY/);
+  assert.match(script,/XP\/racha = motivación · 📈 % = dominio verificado/);
+});
+test('academic AUTO lane waits while a learner owes an answer', () => {
+  assert.match(script,/L\?\.status==='AWAITING_USER'/);
+  assert.match(script,/return false;/);
+});
+test('Learn Quest offers mission hint retry boss and map controls', () => {
+  for (const action of ['start','hint','retry','boss','map']) assert.match(script,new RegExp('data-learn-action="'+action+'"'));
+  assert.match(script,/function sendLearningAction\(kind\)/);
 });
