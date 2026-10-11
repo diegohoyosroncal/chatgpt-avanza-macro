@@ -28,8 +28,9 @@ try {
     const localVersion = await host.locator('[data-value="health"]').innerText();
     assert.match(localVersion,/4\.4\.[0-9]+-[a-z0-9-]+/);
     assert.match(localVersion,/remota NO verificada/);
-    assert.equal(await host.locator('[data-module]').count(),6);
-    assert.match(await host.locator('[data-module="auto"]').innerText(),/AUTO ON/);
+    assert.equal(await host.locator('[data-module]').count(),7);
+    assert.match(await host.locator('[data-module="auto"]').innerText(),/AUTO OFF/);
+    assert.match(await host.locator('[data-module="background"]').innerText(),/FONDO OFF/);
     assert.match(await host.locator('[data-module="game"]').innerText(),/QUEST ON/);
     assert.match(await host.locator('[data-module="aura"]').innerText(),/AURA ON/);
     await page.evaluate(() => {
@@ -93,7 +94,7 @@ try {
       const h=document.getElementById('avanza-macro-maestro-v4')?.shadowRoot;
       return h?.querySelector('[data-value="health"]')?.dataset.warning === 'true';
     },{timeout:5000});
-    assert.equal(await host.locator('[data-action="avanzar"]').isDisabled(),true);
+    assert.equal(await host.locator('[data-action="avanzar"]').isEnabled(),true);
     await page.evaluate(() => document.getElementById('diego-mision-autonomia-v1').remove());
     await page.waitForFunction(() => {
       const h=document.getElementById('avanza-macro-maestro-v4')?.shadowRoot;
