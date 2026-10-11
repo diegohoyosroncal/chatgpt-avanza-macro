@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         AVANZA — Macro Maestro · Piloto Automático
 // @namespace    https://chatgpt.com/
-// @version      4.0.1
+// @version      4.0.2
 // @description  Un solo control inteligente para ChatGPT web: reevalúa cada respuesta, continúa de forma acotada y cambia de estrategia ante estancamiento.
 // @updateURL    https://raw.githubusercontent.com/diegohoyosroncal/chatgpt-avanza-macro/main/avanza_macro_maestro_v4.user.js
 // @downloadURL  https://raw.githubusercontent.com/diegohoyosroncal/chatgpt-avanza-macro/main/avanza_macro_maestro_v4.user.js
@@ -53,7 +53,7 @@
   function freshState() {
     return { cycles: 0, totalSent: 0, stalled: 0, missingReceipts: 0,
       lastPercent: null, lastDenominator: null, lastDelta: null,
-      lastResponseFingerprint: '', lastStrategy: '', lastStatus: '',
+      lastResponseFingerprint: '', repeatedResponses: 0, lastStrategy: '', lastStatus: '',
       objective: '', nextAction: '', blocker: '', lastNumerator: null,
       lastProof: '', lastUpdated: '', lastTicket: '' };
   }
@@ -331,7 +331,11 @@
       return;
     }
     if (now() - replyCandidate.firstSeen < RESPONSE_STABLE_MS || now() - pending.sentAt < RESPONSE_STABLE_MS) return;
-    if (state.lastResponseFingerprint === key) { pause('Respuesta idéntica detectada; no envío un ciclo duplicado.', true); return; }
+    // Do not silently stop after just one repetition: bounded self-challenge first.
+    // The next prompt changes strategy at three stalled cycles; identical replies
+    // after that intervention are still capped, so we do not hot-loop forever.
+    const identicalResponse = state.lastResponseFingerprint === key;
+    state.repeatedResponses = identicalResponse ? (state.repeatedResponses || 0) + 1 : 0;
     state.lastResponseFingerprint = key;
     const receipt = parseReceipt(reply);
     if (!receipt) {
@@ -368,6 +372,11 @@
     }
     state.lastUpdated = new Date().toISOString();
     pending = null;
+    if (state.repeatedResponses >= 4) {
+      saveState();
+      pause('Cuatro respuestas consecutivas repetidas: ya intenté cambio de ruta. No repito un bucle inútil.', true);
+      return;
+    }
     saveState();
     if (receipt && EXIT.has(receipt.status)) {
       pause(receipt.status === 'VERIFIED_COMPLETE' ? 'El asistente declaró objetivo completado: revisa recibos independientes.' :
