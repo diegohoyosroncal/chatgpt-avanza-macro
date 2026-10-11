@@ -48,6 +48,10 @@ test('legacy preferences with previously true defaults do NOT authorize automati
   const prefs=qa.readControl();
   assert.equal(prefs.autoRunOptIn,false);
   assert.equal(prefs.backgroundOptIn,false);
+  assert.equal(prefs.modules.auto,false);
+  assert.equal(prefs.modules.background,false);
+  assert.equal(prefs.backgroundAuto,false);
+  assert.equal(qa.projectMode('ANY-PROJECT').auto,false);
   qa.setProcess('ANY-PROJECT');
   assert.equal(qa.shouldAutoStart(),false);
 });
