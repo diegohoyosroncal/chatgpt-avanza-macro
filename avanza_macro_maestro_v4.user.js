@@ -424,6 +424,28 @@
     return typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= 100 ? (Math.round(value * 100) / 100).toLocaleString('es-PE', {maximumFractionDigits: 2}) + '%' : '—';
   }
   function escapeText(value, max=100) { return String(value || '').replace(/[\u0000-\u001f]/g, ' ').slice(0,max); }
+  function escapeHtml(value,max=160) {
+    return escapeText(value,max).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+  }
+  function shortProjectLabel(id) {
+    if(/^CFI-/i.test(id)) return '🎓 CFI';
+    if(/^COCKPIT/i.test(id)) return '🧩 COCKPIT';
+    if(/VELVET/i.test(id)) return '🎬 VELVET';
+    if(/BTS/i.test(id)) return '💜 BTS';
+    if(/KASA/i.test(id)) return '🏠 KASA';
+    if(/YERABELL/i.test(id)) return '🎞️ YERABELL';
+    return '🚀 '+String(id||'').replace(/-v\d+$/i,'').slice(0,12);
+  }
+  function renderProgressRibbon() {
+    const box=dashboard?.querySelector('[data-value="progress-ribbon"]'); if(!box) return;
+    if(!moduleOn('progress')) { box.hidden=true; return; }
+    const rows=Object.values(projects||{}).filter(p=>typeof p.current_pct==='number'&&Number.isFinite(p.current_pct)).sort((a,b)=>{
+      if(a.id===projectKey()) return -1; if(b.id===projectKey()) return 1;
+      return String(b.updated_at||'').localeCompare(String(a.updated_at||''));
+    }).slice(0,6);
+    box.hidden=false;
+    box.innerHTML=rows.length?rows.map(p=>'<span class="progress-chip" data-active="'+(p.id===projectKey()?'true':'false')+'"><b>'+escapeHtml(shortProjectLabel(p.id),22)+'</b> '+escapeHtml(formatPercent(p.current_pct),8)+'</span>').join(''):'<span class="progress-chip">📈 sin % verificable aún</span>';
+  }
   function updateDashboard() {
     if (!dashboard) return;
     const pct = moduleOn('progress') ? state.lastPercent : null;
@@ -444,7 +466,7 @@
     const bar = dashboard.querySelector('.bar-fill'); if (bar) { bar.style.width = known ? `${pct}%` : '0%'; if (known) { bar.parentElement.setAttribute('aria-valuemin','0'); bar.parentElement.setAttribute('aria-valuemax','100'); bar.parentElement.setAttribute('aria-valuenow',String(pct)); bar.parentElement.removeAttribute('aria-valuetext'); } else { bar.parentElement.removeAttribute('aria-valuenow'); bar.parentElement.setAttribute('aria-valuetext','Progreso aún no verificable'); } }
     const tone = dashboard.querySelector('.tone');
     if (tone) tone.dataset.level=state.stalled>=3?'risk':phase===STATES.WAITING||phase===STATES.READY?'live':'idle';
-    renderGame(); renderModules(); renderProjects();
+    renderGame(); renderModules(); renderProjects(); renderProgressRibbon();
   }
   function render() {
     if (!button) return;
@@ -741,12 +763,18 @@
     const m=String(id||'').match(/(20\d{2})-(\d{2})-(\d{2})/);
     return m?new Date(Number(m[1]),Number(m[2])-1,Number(m[3]),23,59,59):null;
   }
+  function sendLearningPayload(message,label) {
+    if(isGenerating()){ setStatus('La respuesta sigue en curso; no interrumpo.',true); return false; }
+    const composer=findComposer(); if(!composer){ setStatus('No encuentro el cuadro de mensaje.',true); return false; }
+    if(draft(composer)){ setStatus('Tu borrador sigue intacto. Envíalo o bórralo antes de usar QUEST.',true); return false; }
+    if(!fillComposer(composer,message)){ setStatus('No pude preparar la acción QUEST sin tocar tu borrador.',true); return false; }
+    const send=findSend(); if(!send){ setStatus('Acción QUEST preparada; botón Enviar no disponible todavía.',true); return false; }
+    send.click(); setStatus('🎮 '+label+' enviada');
+    return true;
+  }
   function sendLearningAction(kind) {
     const id=projectKey(), L=learningFor(id);
     if(!id){ setStatus('No hay PROCESS_ID académico activo todavía.',true); return; }
-    if(isGenerating()){ setStatus('La respuesta sigue en curso; no interrumpo.',true); return; }
-    const composer=findComposer(); if(!composer){ setStatus('No encuentro el cuadro de mensaje.',true); return; }
-    if(draft(composer)){ setStatus('Tu borrador sigue intacto. Termínalo o envíalo antes de usar un botón QUEST.',true); return; }
     const mission=L?.missionId||'SIGUIENTE';
     const actions={
       start:'🎮 LEARN_ACTION | START | PROCESS '+id+' | Activa la siguiente micro-misión del curso. Hazla interactiva y no reveles la solución antes de mi intento.',
@@ -755,17 +783,23 @@
       boss:'👾 LEARN_ACTION | BOSS | PROCESS '+id+' | Lanza un boss/simulacro acumulativo apropiado a mi nivel actual; puntúa por gates, no por estilo.',
       map:'🗺️ LEARN_ACTION | MAP | PROCESS '+id+' | Muéstrame el mapa de misiones: completadas, actual, siguientes y boss. No cambies el % sin evidencia.'
     };
-    const message=actions[kind]||actions.start;
-    if(!fillComposer(composer,message)){ setStatus('No pude preparar la acción QUEST sin tocar tu borrador.',true); return; }
-    const send=findSend(); if(!send){ setStatus('Acción QUEST preparada; botón Enviar no disponible todavía.',true); return; }
-    send.click(); setStatus('🎮 Acción QUEST enviada: '+kind.toUpperCase());
+    sendLearningPayload(actions[kind]||actions.start,'acción '+kind.toUpperCase());
+  }
+  function sendLearningAnswer(answer) {
+    const id=projectKey(), L=learningFor(id), clean=String(answer||'').trim();
+    if(!id||!L?.missionId){ setStatus('Primero activa una misión.',true); return; }
+    if(!clean){ setStatus('Escribe o elige una respuesta primero.',true); return; }
+    const message='🎮 LEARN_ANSWER | PROCESS '+id+' | MISSION '+L.missionId+' | ANSWER '+clean.slice(0,1200)+' | Evalúa mi razonamiento; no me premies por estilo. Si PASS, acredita solo el gate demostrado y lanza la siguiente QUEST en esta misma respuesta.';
+    if(sendLearningPayload(message,'respuesta')){
+      const input=dashboard?.querySelector('[data-learn-answer]'); if(input) input.value='';
+    }
   }
   function renderGame() {
     const box=dashboard?.querySelector('[data-value="game"]'); if(!box) return;
     box.hidden=!moduleOn('game'); if(box.hidden) return;
     const id=projectKey(), L=learningFor(id);
     if(!id || !looksLearningProcess()){
-      box.innerHTML='<div class="quest-head"><b>🎮 LEARN QUEST</b><span>modo universal</span></div><div class="quest-empty">Se activa automáticamente en procesos de aprendizaje.</div>';
+      box.innerHTML='<div class="quest-head"><b>🎮 LEARN QUEST</b><span>modo universal</span></div><div class="quest-empty">Se activa automáticamente en procesos de aprendizaje.</div><div class="quest-actions single"><button type="button" data-learn-action="start">🎯 crear misión</button></div>';
       return;
     }
     const xp=L?.xp||0, level=1+Math.floor(xp/500), reward=L?.reward||100, streak=L?.streak||0;
@@ -775,12 +809,15 @@
     const boss=deadline?'👾 '+deadline.toLocaleDateString('es-PE',{day:'2-digit',month:'2-digit'})+' · '+Math.ceil(left/86400000)+'d':'👾 boss dinámico';
     const mission=L?.missionId||'SIGUIENTE', title=L?.title||'Listo para generar la siguiente misión';
     const status=L?.status==='AWAITING_USER'?'🎯 TU TURNO':L?.lastResult==='PASS'?'✅ GATE CERRADO':'🛰️ LISTO';
+    const choices=(L?.choices||[]).map(c=>'<button type="button" class="quest-choice" data-quest-choice="'+escapeHtml(c.key,4)+'"><b>'+escapeHtml(c.key,4)+'</b> '+escapeHtml(c.label,90)+'</button>').join('');
     box.innerHTML='<div class="quest-head"><b>🎮 LEARN QUEST</b><span>🔥 '+streak+'</span></div>'+
-      '<div class="quest-title">'+escapeText(mission,26)+' · '+escapeText(title,70)+'</div>'+
+      '<div class="quest-title">'+escapeHtml(mission,26)+' · '+escapeHtml(title,70)+'</div>'+
       '<div class="quest-meta"><span>LVL '+level+'</span><span>✨ '+xp+' XP</span><span>'+stars+'</span></div>'+
       '<div class="quest-state">'+status+' · recompensa '+reward+' XP · '+boss+'</div>'+
+      (choices?'<div class="quest-choices">'+choices+'</div>':'')+
+      '<div class="quest-answer"><textarea data-learn-answer rows="2" placeholder="✍️ responde aquí… (Enter envía · Shift+Enter salto)"></textarea><button type="button" data-learn-submit>🚀</button></div>'+
       '<div class="quest-actions"><button type="button" data-learn-action="start">🎯 misión</button><button type="button" data-learn-action="hint">💡 pista</button><button type="button" data-learn-action="retry">🔁 retry</button><button type="button" data-learn-action="boss">👾 boss</button><button type="button" data-learn-action="map">🗺️ mapa</button></div>'+
-      '<div class="quest-rule">XP/racha = motivación · 📈 % = dominio verificado</div>';
+      '<div class="quest-rule">✨ XP/racha motivan · 📈 porcentaje = dominio verificado · otros proyectos AUTO siguen aparte</div>';
   }
   function renderProjects() {
     const box=dashboard?.querySelector('[data-value="projects"]'); if(!box) return;
