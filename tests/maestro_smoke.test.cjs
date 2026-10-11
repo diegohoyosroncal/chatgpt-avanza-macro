@@ -76,7 +76,7 @@ test('dragging records position and disposes pointer event handlers', () => {
 });
 test('concurrent-script guard executes before send or auto cycle, progress not fabricated', () => {
   assert.match(script, /function toggle\(\) \{\s*syncRoute\(\);\s*if \(checkConflicts\(\)\) return;/);
-  assert.match(script, /async function deliver\(step\) \{\s*if \(checkConflicts\(\) \|\| !moduleOn\('engine'\)\) return;/);
+  assert.match(script, /async function deliver\(step\) \{\s*if \(checkConflicts\(\) \|\| !moduleOn\('engine'\) \|\| !moduleOn\('auto'\)/);
   assert.match(script, /Progreso aún no verificable/);
   assert.match(script, /lastDenominator/);
 });
