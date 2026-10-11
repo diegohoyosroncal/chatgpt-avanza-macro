@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         AVANZA — Macro Maestro · Piloto Automático
 // @namespace    https://chatgpt.com/
-// @version      4.0.4
-// @description  Un solo control inteligente para ChatGPT web: reevalúa cada respuesta, continúa de forma acotada y cambia de estrategia ante estancamiento.
+// @version      4.1.0
+// @description  Cockpit multiproyecto para ChatGPT web: módulos ON/OFF, AUTO/MANUAL, progreso independiente, misiones y sincronización segura entre pestañas.
 // @updateURL    https://raw.githubusercontent.com/diegohoyosroncal/chatgpt-avanza-macro/main/avanza_macro_maestro_v4.user.js
 // @downloadURL  https://raw.githubusercontent.com/diegohoyosroncal/chatgpt-avanza-macro/main/avanza_macro_maestro_v4.user.js
 // @match        https://chatgpt.com/*
@@ -15,15 +15,19 @@
 
 (() => {
   'use strict';
-  // Never auto-start on page load, after reload, or when navigating to another chat.
-  // The userscript never calls a remote API, reads credentials or controls ChatGPT tools.
+  // Auto-continúa solo proyectos identificados que estén explícitamente en AUTO.
+  // No llama APIs remotas, no lee credenciales y no elude permisos/herramientas de ChatGPT.
   const APP = 'avanza-macro-maestro-v4';
-  const INSTALLED_VERSION = '4.0.4-rc1';
+  const INSTALLED_VERSION = '4.1.0-multi1';
+  const CONTROL_KEY = 'avanza-v4-control-center-v1';
+  const PROJECTS_KEY = 'avanza-v4-project-registry-v1';
+  const CHANNEL_NAME = 'avanza-v4-project-bus-v1';
+  const AURA_STYLE_ID = 'avanza-v4-aura-style';
   const UI_KEY = 'avanza-master-ui-v4';
   const LEGACY_IDS = ['avanza-universal-control-v1','avanza-macro-maestro-v2','avanza-macro-maestro-v3','diego-mision-autonomia-v1'];
   const MARK = 'MACRO MAESTRO — AVANZA AL OBJETIVO';
   const RECEIPT = 'AVANZA_CICLO_ID:';
-  const MAX_AUTOMATIC_FOLLOWUPS = 12; // bounded safety budget, not claimed objective completion
+  // Sin STOP por número de ejecuciones: el ciclo termina por objetivo verificado, gate real, OFF manual o falta demostrada de acción segura.
   const MAX_STALLED_CYCLES = 6;
   const MAX_NO_RECEIPT_CYCLES = 3;
   const MIN_SEND_GAP_MS = 3200;
@@ -54,6 +58,9 @@
   let presentation = readPresentation();
   let drag = null;
   let conflictSummary = '';
+  let control = readControl();
+  let projects = readProjects();
+  let channel = null;
 
   function currentChatKey() {
     // Route is scoped to this web chat, not a global prompt or another chat.
