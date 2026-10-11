@@ -1,20 +1,20 @@
 {
   "schema_version": 2,
-  "updated_at": "2026-10-11T00:16:00-05:00",
+  "updated_at": "2026-10-11T00:45:00-05:00",
   "purpose": "Single macro source of truth; user projects, economic state and native app execution are independent",
   "primary_repository": "diegohoyosroncal/chatgpt-avanza-macro",
   "channels": {
     "stable": {
       "path": "avanza_macro_maestro_v4.user.js",
       "branch": "main",
-      "version_verified_in_repository": "4.3.0",
+      "version_verified_in_repository": "4.4.0",
       "installed_profiles": "not_verified",
-      "ci": "27/27 offline + Chromium interactive HUD PASS before merge"
+      "ci": "29/29 offline + Chromium Mission Control PASS; PR #13 merged as dd0340ebbdd04ac53e5c63878390b77e1412f770"
     },
     "candidate": {
       "path": "avanza_macro_maestro_v4.user.js",
-      "branch": "feat/interactive-quest-progress-ribbon-20261011",
-      "version": "4.3.0",
+      "branch": "feat/v4-4-neon-control-rebased-20261011",
+      "version": "4.4.0",
       "status": "promoted_to_stable",
       "installed_profiles": "not_verified"
     }
@@ -68,6 +68,13 @@
       "executor": "userscript_web",
       "branch": "main",
       "status": "stable"
+    },
+    {
+      "name": "AVANZA Neon Mission Control",
+      "version": "4.4.0-neon-control",
+      "executor": "userscript_web",
+      "branch": "main",
+      "status": "stable"
     }
   ],
   "related_independent_systems": [
@@ -106,11 +113,12 @@
   ],
   "rollback": "Restore avanza_macro_maestro_v4.user.js from commit ad812155a070654770508cfae6f677bd8d8fdecf (v4.0.3); never delete project state.",
   "release_evidence": {
-    "pr": 7,
-    "merge_commit": "ea3eede6d72397834ee6b96f79c75cc7e67105c6",
-    "offline_tests": "27/27 PASS",
-    "chromium_hud": "PASS interactive ribbon/choices/free-text/rescue",
+    "pr": 13,
+    "merge_commit": "dd0340ebbdd04ac53e5c63878390b77e1412f770",
+    "offline_tests": "29/29 PASS",
+    "chromium_hud": "PASS neon Mission Control + ribbon + interactive choices/free-text + rescue + fixed/drag/theme/compact",
     "authenticated_profile": "not_verified",
-    "learn_quest": "PASS"
+    "learn_quest": "PASS",
+    "cfi_quest_bank": "verified in Google Drive"
   }
 }
