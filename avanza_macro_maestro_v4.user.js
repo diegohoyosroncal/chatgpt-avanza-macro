@@ -500,20 +500,53 @@
     syncRoute();
     if (checkConflicts()) return;
     if (busy) return;
+    const id=projectKey();
     if (phase === STATES.READY || phase === STATES.WAITING) {
-      pause('Pausada manualmente. Ningún envío nuevo.', false);
+      if (id) setProjectMode(id,{auto:false});
+      pause('Pausada manualmente. El proyecto queda en MANUAL hasta reactivar AUTO.', false);
       return;
     }
-    // A fresh click resets only local circuit breakers, never canon/effects.
+    if (!moduleOn('engine')) { setStatus('⚡ MOTOR está OFF. Enciéndelo desde MACROS.', true); return; }
     if (!acquireLease()) { setStatus('Este chat ya está controlado por otra pestaña; no duplico acciones.', true); return; }
-    state.totalSent = 0;
-    state.stalled = 0;
-    state.missingReceipts = 0;
-    phase = STATES.READY;
-    lastAudit = 0;
-    setStatus('Evaluando el contexto para avanzar…');
+    if (id) setProjectMode(id,{enabled:true});
+    state.stalled=0; state.missingReceipts=0;
+    phase=STATES.READY; lastAudit=0;
+    setStatus('Evaluando el contexto para avanzar…'); render(); tick();
+  }
+  function discoverVisibleProjects() {
+    const nodes=[...document.querySelectorAll('[data-message-author-role="assistant"]')].slice(-30);
+    for (const node of nodes) {
+      const text=(node.innerText||node.textContent||'');
+      const re=/🧩\s*PROCESO\s+([A-Za-z0-9._:-]+)[^\n]*?📈\s*(?:AVANCE\s*)?([0-9]+(?:[.,][0-9]+)?)%\s*→\s*([0-9]+(?:[.,][0-9]+)?)%[^\n]*?(\d+)\s*\/\s*(\d+)/gi;
+      let m;
+      while((m=re.exec(text))) {
+        const id=safeId(m[1]), current=Number(m[3].replace(',','.')), previous=Number(m[2].replace(',','.')), numerator=Number(m[4]), denominator=Number(m[5]);
+        if(!id||denominator<=0||numerator>denominator||Math.abs(100*numerator/denominator-current)>0.5) continue;
+        const old=projects[id]||{};
+        projects[id]={...old,id,current_pct:Math.max(old.current_pct??0,current),previous_pct:previous,delta_pp:current-previous,numerator,denominator,chatKey,updated_at:new Date().toISOString(),objective:old.objective||id,status:old.status||'CONTINUE'};
+        if(!state.processId){ state.processId=id; state.lastPercent=current; state.lastDelta=current-previous; state.lastNumerator=numerator; state.lastDenominator=denominator; }
+      }
+    }
+    if(Object.keys(projects).length){ try{localStorage.setItem(PROJECTS_KEY,JSON.stringify(projects));}catch{} renderProjects(); }
+  }
+  function shouldAutoStart() {
+    if(!moduleOn('engine')||!moduleOn('auto')||checkConflicts()||isGenerating()) return false;
+    discoverVisibleProjects();
+    const id=projectKey(); if(!id) return false;
+    const mode=projectMode(id); if(!mode.enabled||!mode.auto) return false;
+    if(draft(findComposer())) return false;
+    if(state.lastStatus&&EXIT.has(state.lastStatus)) return false;
+    if(typeof state.lastPercent==='number'&&state.lastPercent>=100) return false;
+    return true;
+  }
+  function maybeAutoStart() {
+    if(phase!==STATES.IDLE&&phase!==STATES.PAUSED) return;
+    if(stopReason&&/HUMAN_GATE|NO_SAFE_ACTION|completado/i.test(stopReason)) return;
+    if(!shouldAutoStart()) return;
+    if(!acquireLease()) return;
+    stopReason=''; phase=STATES.READY;
+    setStatus(document.hidden?'♾️ AUTO multiproyecto en segundo plano…':'♾️ AUTO multiproyecto activo…');
     render();
-    tick();
   }
   function readPresentation() {
     try {
