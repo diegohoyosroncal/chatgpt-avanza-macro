@@ -112,8 +112,8 @@ test('permanent health badge names the installed version without pretending the 
 });
 test('registry matches stable and candidate versions and records native-app limitations', () => {
   assert.equal(registry.channels.stable.version_verified_in_repository, '4.1.1');
-  assert.equal(registry.channels.candidate.version, '4.2.0');
-  assert.equal(registry.channels.candidate.status, 'draft_learn_quest');
+  assert.equal(registry.channels.candidate.version, '4.3.0');
+  assert.equal(registry.channels.candidate.status, 'draft_interactive_quest_ribbon');
   assert.ok(registry.limitations.some(text => text.includes('Native Android/iOS')));
   assert.ok(registry.release_gates.includes('authenticated_chatgpt_browser_smoke_pass'));
 });
@@ -173,4 +173,28 @@ test('academic AUTO lane waits while a learner owes an answer', () => {
 test('Learn Quest offers mission hint retry boss and map controls', () => {
   for (const action of ['start','hint','retry','boss','map']) assert.match(script,new RegExp('data-learn-action="'+action+'"'));
   assert.match(script,/function sendLearningAction\(kind\)/);
+});
+
+
+test('verified percentages have a persistent ribbon independent of the current ring', () => {
+  assert.match(script,/data-value="progress-ribbon"/);
+  assert.match(script,/function renderProgressRibbon\(\)/);
+  assert.match(script,/progress-chip/);
+  assert.match(script,/CONTRATO VISUAL DE PORCENTAJE/);
+});
+test('HUD rescue restores a panel that became invisible or offscreen', () => {
+  assert.match(script,/function ensurePanelVisible\(\)/);
+  assert.match(script,/HUD rescatado a una posición visible/);
+  assert.match(script,/ensurePanelVisible\(\); maybeAutoStart/);
+});
+test('interactive quest supports direct free-text answers and click choices', () => {
+  assert.match(script,/function sendLearningAnswer\(answer\)/);
+  assert.match(script,/data-learn-answer/);
+  assert.match(script,/data-learn-submit/);
+  assert.match(script,/data-quest-choice/);
+  assert.match(script,/QUEST_CHOICES/);
+});
+test('quest choices parser accepts multiple labeled options', () => {
+  assert.match(script,/function parseQuestChoices\(text\)/);
+  assert.match(script,/A-F1-6/);
 });
