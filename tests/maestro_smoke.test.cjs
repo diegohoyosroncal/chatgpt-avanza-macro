@@ -111,11 +111,12 @@ test('permanent health badge names the installed version without pretending the 
   assert.match(script, /updateHealth\(\)/);
 });
 test('registry matches stable and candidate versions and records native-app limitations', () => {
-  assert.equal(registry.channels.stable.version_verified_in_repository, '4.3.0');
-  assert.equal(registry.channels.candidate.version, '4.3.0');
+  assert.equal(registry.channels.stable.version_verified_in_repository, '4.4.0');
+  assert.equal(registry.channels.candidate.version, '4.4.0');
   assert.equal(registry.channels.candidate.status, 'promoted_to_stable');
   assert.ok(registry.limitations.some(text => text.includes('Native Android/iOS')));
   assert.ok(registry.release_gates.includes('authenticated_chatgpt_browser_smoke_pass'));
+  assert.ok(registry.variants.some(v => v.name === 'AVANZA Neon Mission Control' && v.status === 'stable'));
 });
 
 test('multiproject cockpit exposes six independent module switches', () => {
