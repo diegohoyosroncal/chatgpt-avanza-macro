@@ -13,9 +13,9 @@
     },
     "candidate": {
       "path": "avanza_macro_maestro_v4.user.js",
-      "branch": "feat/multiproject-cockpit-20261010",
-      "version": "4.1.0",
-      "status": "promoted_to_stable",
+      "branch": "feat/seed-active-projects-20261010",
+      "version": "4.1.1",
+      "status": "draft_seeded_catalog",
       "installed_profiles": "not_verified"
     }
   },
