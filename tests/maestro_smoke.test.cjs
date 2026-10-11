@@ -221,3 +221,11 @@ test('Mission Control keeps project percentages and Learn Quest interactions wir
   assert.match(script,/data-learn-action="boss"/);
   assert.match(script,/formatPercent\(projects\['CFI-E2-2026-10-16'\]\?\.current_pct\)/);
 });
+
+
+test('v4.4.7 carries the same global recovery key as Android AVANZA', () => {
+  assert.match(script,/4\.4\.7-global-recovery/);
+  assert.match(script,/1epHKEGs6SjTzrfDi5SeHNaxH7CHX09VTfmYNa7WxIcY/);
+  assert.match(script,/RECOVERY GLOBAL/);
+  assert.match(script,/No me pidas repetir contexto recuperable/);
+});
