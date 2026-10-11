@@ -21,7 +21,7 @@ try {
     await host.waitFor({timeout:7000});
     const dock = host.locator('.panel');
     const localVersion = await host.locator('[data-value="health"]').innerText();
-    assert.match(localVersion,/4\.4\.0-neon-control/);
+    assert.match(localVersion,/4\.4\.1-auto-latch/);
     assert.match(localVersion,/remota NO verificada/);
     assert.equal(await host.locator('[data-module]').count(),6);
     assert.match(await host.locator('[data-module="auto"]').innerText(),/AUTO ON/);
@@ -71,9 +71,9 @@ try {
     await host.locator('[data-action="theme"]').click();
     assert.equal(await host.getAttribute('data-theme'),'ocean');
     await host.locator('[data-action="collapse"]').click();
-    assert.match(await dock.getAttribute('class'),/compact/);
-    await host.locator('[data-action="collapse"]').click();
     assert.doesNotMatch(await dock.getAttribute('class'),/compact/);
+    await host.locator('[data-action="collapse"]').click();
+    assert.match(await dock.getAttribute('class'),/compact/);
     const top = host.locator('.brand');
     const start = await host.boundingBox();
     const rect = await top.boundingBox();
@@ -98,5 +98,25 @@ try {
     results.push(size.width+'x'+size.height+': mission-control/ribbon/interactive/rescue/fixed/drag/theme/compact/version/conflict PASS');
     await page.close();
   }
+  const work=await browser.newPage({viewport:{width:1280,height:800}});
+  await work.setContent('<!doctype html><html><body><textarea id="prompt-textarea"></textarea><button type="button" data-testid="send-button">Enviar</button></body></html>');
+  await work.addScriptTag({content:script});
+  await work.evaluate(() => {
+    const a=document.createElement('div');a.setAttribute('data-message-author-role','assistant');
+    a.innerText='🧩 PROCESO VELVETBOX | 📈 AVANCE NO DETERMINABLE\nSiguiente: construir un entregable verificable.';
+    document.body.append(a);
+  });
+  await work.waitForTimeout(900);
+  const workHost=work.locator('#'+hostId);
+  assert.match(await workHost.locator('[data-value="game"]').innerText(),/TRABAJO PRODUCTIVO/);
+  await workHost.locator('[data-action="cinema"]').click();
+  const workMc=workHost.locator('.mc-overlay');
+  await workMc.waitFor({state:'visible'});
+  assert.match(await workMc.innerText(),/Construir un resultado/);
+  assert.doesNotMatch(await workMc.innerText(),/NIC 40|SIMULACRO E2|BOSS BATTLE/);
+  assert.equal(await workMc.locator('[data-quest-choice]').count(),0);
+  assert.match(await workMc.locator('a').getAttribute('href'),/mundo-vivo-play-safe-demo-pdess2573\.vercel\.app/);
+  results.push('Business chat: contextual production mission / no academic quiz PASS');
+  await work.close();
   console.log(results.join('\n'));
 } finally { await browser.close(); }
