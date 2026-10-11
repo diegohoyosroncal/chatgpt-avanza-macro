@@ -142,8 +142,8 @@
   }
   function seedProjects() {
     return {
-      'COCKPIT-TOTAL-v1': {id:'COCKPIT-TOTAL-v1',objective:'Cockpit multiproyecto estable, instalado y verificado en perfil real',current_pct:87.5,previous_pct:75,delta_pp:12.5,numerator:7,denominator:8,next_action:'Verificar actualización/instalación real y canary autenticado',blocker:'Perfil real aún no verificado',updated_at:'2026-10-10T23:53:00-05:00',status:'CONTINUE',seeded:true},
-      'CFI-E2-2026-10-16': {id:'CFI-E2-2026-10-16',objective:'Llegar a la E2 del 16/10 con dominio verificable de NIC 38/40/23/36',current_pct:15.8,previous_pct:15.8,delta_pp:0,numerator:3,denominator:19,next_action:'Cerrar NIC 40 modelo del costo + transferencias; luego NIC 23',blocker:'NIC 36 requiere puente de rúbrica antes de cambiar denominador',updated_at:'2026-10-10T23:53:00-05:00',status:'CONTINUE',seeded:true},
+      'COCKPIT-TOTAL-v1': {id:'COCKPIT-TOTAL-v1',objective:'Cockpit multiproyecto estable, instalado y verificado en perfil real',current_pct:null,previous_pct:null,delta_pp:null,numerator:null,denominator:null,legacy_claim:'7/8 = 87.5% (seed histórico sin recibo primario)',next_action:'Verificar actualización/instalación real y canary autenticado',blocker:'Perfil real aún no verificado',updated_at:'2026-10-10T23:53:00-05:00',status:'CONTINUE',seeded:true},
+      'CFI-E2-2026-10-16': {id:'CFI-E2-2026-10-16',objective:'Llegar a la E2 del 16/10 con dominio verificable de NIC 38/40/23/36',current_pct:null,previous_pct:null,delta_pp:null,numerator:null,denominator:null,legacy_claim:'3/19 = 15.8% (seed histórico sin recibo primario)',next_action:'Cerrar NIC 40 modelo del costo + transferencias; luego NIC 23',blocker:'NIC 36 requiere puente de rúbrica antes de cambiar denominador',updated_at:'2026-10-10T23:53:00-05:00',status:'CONTINUE',seeded:true},
       'GLOBAL-VALUE-OS': {id:'GLOBAL-VALUE-OS',objective:'Convertir selección económica autónoma en ejecución autorizada con efecto real',current_pct:null,previous_pct:null,delta_pp:null,numerator:null,denominator:null,next_action:'Demostrar selección nueva → ejecución autorizada → efecto → nueva frontera',blocker:'Autonomía integral aún no demostrada',updated_at:'2026-10-10T23:53:00-05:00',status:'CONTINUE',seeded:true},
       'BTS-LIMA': {id:'BTS-LIMA',objective:'Convertir stock BTS/GLOW en pedidos cobrados',current_pct:null,previous_pct:null,delta_pp:null,numerator:null,denominator:null,next_action:'Usar producción READY para capturar lead → pedido → cobro sin comprar más stock',blocker:'Producción Vercel verificada READY; 0 ventas cobradas siguen siendo el cuello de botella',updated_at:'2026-10-11T00:36:00-05:00',status:'CONTINUE',seeded:true},
       'VELVETBOX': {id:'VELVETBOX',objective:'Validar flujo E2E actual de producción y pagos sin regresiones',current_pct:null,previous_pct:null,delta_pp:null,numerator:null,denominator:null,next_action:'Corregir CI de correlación exacta de payment-status; luego validar y promover solo con verde',blocker:'Producción main READY; rama fix/payment-status-require-orderid-20261009 mantiene CI typecheck en rojo',updated_at:'2026-10-11T00:36:00-05:00',status:'CONTINUE',seeded:true},
@@ -251,7 +251,17 @@
     const seeds=seedProjects();
     try {
       const raw=JSON.parse(localStorage.getItem(PROJECTS_KEY)||'{}');
-      return raw&&typeof raw==='object'?{...seeds,...raw}:seeds;
+      const rows=raw&&typeof raw==='object'&&!Array.isArray(raw)?{...seeds,...raw}:seeds;
+      // Preserve original objectives and legacy metrics without claiming independent proof.
+      for(const row of Object.values(rows)){
+        if(!row || row.seeded!==true || row.metric_source) continue;
+        if(typeof row.current_pct==='number' && Number.isFinite(row.current_pct)){
+          row.legacy_claim=row.legacy_claim||[row.numerator,row.denominator,row.current_pct].join('/');
+          row.current_pct=null; row.previous_pct=null; row.delta_pp=null;
+          row.numerator=null; row.denominator=null;
+        }
+      }
+      return rows;
     } catch { return seeds; }
   }
   function saveProjects() {
@@ -263,7 +273,7 @@
   function upsertProjectSnapshot() {
     const id=projectKey(); if(!id) return;
     const prev=projects[id]||{};
-    projects[id]={...prev,id,chatKey,objective:state.objective||prev.objective||id,current_pct:state.lastPercent,previous_pct:state.lastDelta!==null&&state.lastPercent!==null?state.lastPercent-state.lastDelta:(prev.previous_pct??null),delta_pp:state.lastDelta,numerator:state.lastNumerator,denominator:state.lastDenominator,next_action:state.nextAction||prev.next_action||'',blocker:state.blocker||'',updated_at:state.lastUpdated||new Date().toISOString(),status:state.lastStatus||prev.status||'CONTINUE'};
+    projects[id]={...prev,id,chatKey,objective:state.objective||prev.objective||id,current_pct:state.lastPercent,previous_pct:state.lastDelta!==null&&state.lastPercent!==null?state.lastPercent-state.lastDelta:(prev.previous_pct??null),delta_pp:state.lastDelta,numerator:state.lastNumerator,denominator:state.lastDenominator,next_action:state.nextAction||prev.next_action||'',blocker:state.blocker||'',updated_at:state.lastUpdated||new Date().toISOString(),status:state.lastStatus||prev.status||'CONTINUE',seeded:state.lastPercent!==null?false:prev.seeded,metric_source:state.lastPercent!==null?'assistant_report_not_primary_receipt':prev.metric_source};
     saveProjects();
   }
   function freshState() {
@@ -482,7 +492,7 @@
   function renderProgressRibbon() {
     const box=dashboard?.querySelector('[data-value="progress-ribbon"]'); if(!box) return;
     if(!moduleOn('progress')) { box.hidden=true; return; }
-    const rows=Object.values(projects||{}).filter(p=>typeof p.current_pct==='number'&&Number.isFinite(p.current_pct)).sort((a,b)=>{
+    const rows=Object.values(projects||{}).filter(p=>p.seeded!==true&&Number.isInteger(p.numerator)&&Number.isInteger(p.denominator)&&p.denominator>0&&p.numerator>=0&&p.numerator<=p.denominator&&typeof p.current_pct==='number'&&Number.isFinite(p.current_pct)&&Math.abs(100*p.numerator/p.denominator-p.current_pct)<=0.35).sort((a,b)=>{
       if(a.id===projectKey()) return -1; if(b.id===projectKey()) return 1;
       return String(b.updated_at||'').localeCompare(String(a.updated_at||''));
     }).slice(0,6);
@@ -691,7 +701,7 @@
       const sameCohort = state.lastDenominator === null || receipt.denominator === state.lastDenominator;
       const mathematicallyConsistent = receipt.previous === null || receipt.delta === null || receipt.percent === null || Math.abs((receipt.percent - receipt.previous) - receipt.delta) <= 0.11;
       const numeratorConsistent = receipt.numerator === null || receipt.denominator === null || (receipt.numerator <= receipt.denominator && Math.abs(100 * receipt.numerator / receipt.denominator - receipt.percent) <= 0.3);
-      const validProgress = numbersPlausible && sameCohort && mathematicallyConsistent && numeratorConsistent && !changedObjective && receipt.percent !== null && receipt.denominator !== null;
+      const validProgress = numbersPlausible && sameCohort && mathematicallyConsistent && numeratorConsistent && !changedObjective && receipt.percent !== null && receipt.denominator !== null && receipt.numerator !== null;
       if (validProgress) {
         if (receipt.delta !== null && receipt.delta > 0 && receipt.evidence.trim()) state.stalled = 0;
         else state.stalled++;
@@ -809,7 +819,7 @@
         if(!id||denominator<=0||numerator>denominator||Math.abs(100*numerator/denominator-current)>0.5) continue;
         const old=projects[id]||{};
         detected.add(id);
-        projects[id]={...old,id,current_pct:current,previous_pct:previous,delta_pp:current-previous,numerator,denominator,chatKey,updated_at:new Date().toISOString(),objective:old.objective||id,status:old.status||'CONTINUE'};
+        projects[id]={...old,id,current_pct:current,previous_pct:previous,delta_pp:current-previous,numerator,denominator,chatKey,updated_at:new Date().toISOString(),objective:old.objective||id,status:old.status||'CONTINUE',seeded:false,metric_source:'assistant_report_not_primary_receipt'};
       }
     }
     // Bind automatically only when precisely one process is visible in this chat.
@@ -1238,7 +1248,7 @@
     const panel=document.createElement('div');panel.className='panel';
     panel.innerHTML=`<div class="top"><span class="logo" aria-hidden="true">↗</span><div class="topname"><div class="brand">AVANZA</div><div class="sub">MACRO MAESTRO · v4</div></div><button type="button" data-action="cinema" title="Abrir Mission Control">🌌</button><button type="button" data-action="theme" title="Cambiar color">◐</button><button type="button" data-action="collapse" title="Compactar / ampliar">▁</button><span class="pill" data-value="live-indicator" data-live="false">◇ LISTO</span></div>
       <div class="health" data-value="health" data-warning="false">Versión remota sin verificar</div>
-      <div class="progress-ribbon" data-value="progress-ribbon" aria-label="Porcentajes verificados de proyectos"></div>
+      <div class="progress-ribbon" data-value="progress-ribbon" aria-label="Porcentajes reportados con fracción, sujetos a comprobación primaria"></div>
       <div class="section"><div class="section-title">🎛️ MACROS · ON/OFF</div><div class="modules"><button data-module="engine"></button><button data-module="auto"></button><button data-module="background"></button><button data-module="progress"></button><button data-module="sync"></button><button data-module="game"></button><button data-module="aura"></button></div></div>
       <div class="section"><div class="section-title">🗺️ PROYECTOS · PARALELO</div><div class="projects" data-value="projects"></div></div>
       <div class="game" data-value="game"></div>

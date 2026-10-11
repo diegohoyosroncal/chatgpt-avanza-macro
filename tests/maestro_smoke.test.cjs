@@ -154,7 +154,7 @@ test('game mode keeps XP explicitly separate from verified progress', () => {
 test('seed catalog includes active projects and never fabricates percentages for unscored lanes', () => {
   for (const id of ['COCKPIT-TOTAL-v1','CFI-E2-2026-10-16','GLOBAL-VALUE-OS','BTS-LIMA','VELVETBOX','KASA-VIVA','YERABELL','AR-TRACKER-ETSY']) assert.match(script,new RegExp("'"+id+"'"));
   assert.match(script,/current_pct:null/);
-  assert.match(script,/CFI-E2-2026-10-16[\s\S]*?current_pct:15\.8/);
+  assert.match(script,/CFI-E2-2026-10-16': \{[^\n]*current_pct:null/);
 });
 
 
@@ -220,4 +220,32 @@ test('Mission Control keeps project percentages and Learn Quest interactions wir
   assert.match(script,/data-learn-submit/);
   assert.match(script,/data-learn-action="boss"/);
   assert.match(script,/formatPercent\(projects\['CFI-E2-2026-10-16'\]\?\.current_pct\)/);
+});
+
+test('historical seeded percentages are quarantined while original goals survive', () => {
+  const first=script.indexOf('  function seedProjects() {');
+  const second=script.indexOf('  function readLearning() {',first);
+  assert.ok(first>=0 && second>first);
+  const seedProjects=new Function(script.slice(first,second)+'return seedProjects;')();
+  const seeded=seedProjects();
+  for(const id of ['COCKPIT-TOTAL-v1','CFI-E2-2026-10-16']) {
+    assert.equal(seeded[id].current_pct,null);
+    assert.ok(seeded[id].legacy_claim);
+    assert.ok(seeded[id].objective);
+  }
+  const readStart=script.indexOf('  function readProjects() {');
+  const readEnd=script.indexOf('  function saveProjects() {',readStart);
+  const storage={getItem:()=>JSON.stringify({'CFI-E2-2026-10-16':{
+    id:'CFI-E2-2026-10-16',seeded:true,objective:'ORIGINAL GOAL',
+    current_pct:15.8,previous_pct:15.8,delta_pp:0,numerator:3,denominator:19}})};
+  const readProjects=new Function('localStorage','PROJECTS_KEY','seedProjects',
+    script.slice(readStart,readEnd)+'return readProjects;')(storage,'t',seedProjects);
+  const old=readProjects()['CFI-E2-2026-10-16'];
+  assert.equal(old.objective,'ORIGINAL GOAL');
+  assert.equal(old.current_pct,null);
+  assert.ok(old.legacy_claim);
+  assert.match(script,/receipt\.numerator !== null/);
+  assert.match(script,/assistant_report_not_primary_receipt/);
+  assert.match(script,/control\.autoRunOptIn!==true/);
+  assert.match(script,/control\.backgroundOptIn===true/);
 });
