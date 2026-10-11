@@ -300,3 +300,50 @@ test('cross-tab cosmetic sync never overrides AUTO FONDO engine or local project
  assert.equal(kept.modules.auto,true); assert.equal(kept.projectModes.P.auto,true);
  assert.match(script,/control=mergeIncomingCosmeticControl\(control,msg\.control\)/);
 });
+
+test('passive progress never replaces a stored untagged original goal',()=>{
+  const body=section('  function hydrateVisibleReportedProgress() {','  function discoverVisibleProjects() {');
+  const make=(state)=>{
+    let wrote=0;
+    const f=new Function('state','moduleOn','document','saveState','updateDashboard',body+'return hydrateVisibleReportedProgress;')(
+      state,()=>true,{querySelectorAll:()=>[{innerText:'Continuidad entre chats 2/4 = 50%'}]},
+      ()=>{wrote++;},()=>{});
+    return {run:f,get writes(){return wrote;}};
+  };
+  const kept={processId:'',objective:'Original business goal',lastPercent:null,lastDenominator:null};
+  const locked=make(kept);locked.run();
+  assert.equal(kept.objective,'Original business goal');
+  assert.equal(kept.lastPercent,null);
+  assert.equal(locked.writes,0);
+  const fresh={processId:'',objective:'',lastPercent:null,lastDenominator:null};
+  const blank=make(fresh);blank.run();
+  assert.equal(fresh.objective,'Continuidad entre chats');
+  assert.equal(fresh.lastPercent,50);
+  assert.equal(blank.writes,1);
+});
+test('historical tagged progress binds only a new or identical goal',()=>{
+  const body=section('  function discoverVisibleProjects() {','  function shouldAutoStart() {');
+  const sourceLine='🧩 PROCESO PROCESS-PROVEN | 📈 AVANCE 0%→50% | 2/4';
+  function run(goal){
+    const state={processId:'',objective:goal,lastPercent:null,lastNumerator:null,lastDenominator:null};
+    const projects={};
+    const probe=new Function('state','projects','document','safeId','chatKey','localStorage',
+      'PROJECTS_KEY','renderProjects','hydrateVisibleReportedProgress','lastPassiveProgressScan',
+      body+'return discoverVisibleProjects;')(
+      state,projects,{querySelectorAll:()=>[{innerText:sourceLine}]},
+      x=>x,'/c/only', {setItem:()=>{}},'k',()=>{},()=>{},Date.now()
+    );
+    probe();return {state,projects};
+  }
+  const different=run('Preserve independent goal');
+  assert.equal(different.state.processId,'');
+  assert.equal(different.state.objective,'Preserve independent goal');
+  assert.equal(different.state.lastPercent,null);
+  assert.ok(different.projects['PROCESS-PROVEN']);
+  const same=run('PROCESS-PROVEN');
+  assert.equal(same.state.processId,'PROCESS-PROVEN');
+  assert.equal(same.state.lastPercent,50);
+  const empty=run('');
+  assert.equal(empty.state.processId,'PROCESS-PROVEN');
+  assert.equal(empty.state.lastPercent,50);
+});

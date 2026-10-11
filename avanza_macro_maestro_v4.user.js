@@ -791,7 +791,7 @@
   // Never treat a statement from the assistant as independent primary proof.
   let lastPassiveProgressScan = 0;
   function hydrateVisibleReportedProgress() {
-    if (!moduleOn('progress') || state.processId) return; // do not override canonical tagged project
+    if (!moduleOn('progress') || state.processId || String(state.objective||'').trim()) return; // preserve any existing goal, even without PROCESS_ID
     if (state.lastDenominator && state.lastPercent !== null
         && state.lastProof !== 'ASISTENTE_VISIBLE_NO_PRUEBA_PRIMARIA') return;
     const labels = [
@@ -851,8 +851,13 @@
     // Multiple processes remain visible as separate cards; the assistant recovers the correct active objective.
     if(!state.processId && detected.size===1) {
       const id=[...detected][0], p=projects[id];
-      state.processId=id; state.lastPercent=p.current_pct; state.lastDelta=p.delta_pp;
-      state.lastNumerator=p.numerator; state.lastDenominator=p.denominator;
+      const storedGoal=String(state.objective||'').trim().toLocaleLowerCase();
+      const discoveredGoal=String(p.objective||'').trim().toLocaleLowerCase();
+      // Past assistant messages cannot silently bind another process to an existing goal.
+      if(!storedGoal || (discoveredGoal && storedGoal===discoveredGoal)) {
+        state.processId=id; state.lastPercent=p.current_pct; state.lastDelta=p.delta_pp;
+        state.lastNumerator=p.numerator; state.lastDenominator=p.denominator;
+      }
     }
     if(Object.keys(projects).length){ try{localStorage.setItem(PROJECTS_KEY,JSON.stringify(projects));}catch{} renderProjects(); }
     if (Date.now() - lastPassiveProgressScan > 3500) {
