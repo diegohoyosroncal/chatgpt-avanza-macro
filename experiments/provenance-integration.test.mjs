@@ -1,0 +1,17 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {evaluateProgress,displayProgress} from './provenance-gate.mjs';
+const r={process_id:'AVANZA',chat_id:'A',objective:'audit',numerator:4,denominator:6,current_pct:66.6666666667};
+const p={...r,source_type:'primary',authenticated:true,receipt_id:'R1',timestamp:100,verified_hitos:['1','2','3','4']};
+test('assistant report is not primary evidence',()=>assert.equal(evaluateProgress(r,null).verified_pct,null));
+test('unverified URL cannot validate',()=>assert.equal(evaluateProgress(r,{url:'https://github.com/x'}).verified_pct,null));
+test('primary source accepted when matched',()=>assert.equal(evaluateProgress(r,p).verified_pct,r.current_pct));
+test('replay blocked',()=>assert.equal(evaluateProgress(r,p,{receipt_id:'R1',timestamp:99}).verified_pct,null));
+test('cohort conflict blocked',()=>assert.equal(evaluateProgress(r,{...p,denominator:8}).verified_pct,null));
+test('stale receipt blocked',()=>assert.equal(evaluateProgress(r,p,{receipt_id:'R0',timestamp:101}).verified_pct,null));
+test('wrong chat blocked',()=>assert.equal(evaluateProgress(r,{...p,chat_id:'B'}).verified_pct,null));
+test('legacy percentage remains unverified',()=>assert.equal(evaluateProgress({...r,numerator:7,denominator:8,current_pct:87.5},null).verified_pct,null));
+test('connector unavailable fails closed',()=>assert.equal(evaluateProgress(r,undefined).verified_pct,null));
+test('display distinguishes reported from verified',()=>assert.deepEqual(displayProgress(evaluateProgress(r,null)),{verified:'NO VERIFICADO',reported:r.current_pct,source:'assistant_report_not_primary_receipt'}));
+test('fake verified_hitos rejected',()=>assert.equal(evaluateProgress(r,{...p,verified_hitos:['1','1','2','3']}).verified_pct,null));
+test('source must explicitly be primary',()=>assert.equal(evaluateProgress(r,{...p,source_type:'assistant'}).verified_pct,null));
