@@ -774,8 +774,11 @@
     if (observer) return;
     observer = new MutationObserver(() => { if (!document.getElementById(APP)) scheduleMount(); });
     observer.observe(document.documentElement, { childList: true, subtree: true });
-    timer = setInterval(() => { if (!document.getElementById(APP)) scheduleMount(); checkConflicts(); tick(); }, CHECK_EVERY_MS);
-    window.addEventListener('pagehide', () => { if (phase === STATES.READY || phase === STATES.WAITING) pause('Navegación de página: ciclo suspendido.'); });
+    timer = setInterval(() => {
+      if (!document.getElementById(APP)) scheduleMount();
+      checkConflicts(); discoverVisibleProjects(); maybeAutoStart(); tick();
+    }, CHECK_EVERY_MS);
+    window.addEventListener('pagehide', () => { releaseLease(); saveState(); });
     document.addEventListener('keydown', e => {
       if (e.repeat || !e.altKey || !e.shiftKey || e.ctrlKey || e.metaKey || String(e.key).toLowerCase() !== 'a') return;
       e.preventDefault();
@@ -784,6 +787,7 @@
       toggle();
     }, true);
   }
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => { mount(); observe(); }, { once: true });
-  else { mount(); observe(); }
+  initChannel();
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => { mount(); observe(); maybeAutoStart(); }, { once: true });
+  else { mount(); observe(); maybeAutoStart(); }
 })();
