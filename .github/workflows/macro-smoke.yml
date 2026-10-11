@@ -7,6 +7,7 @@ on:
       - 'tests/maestro_smoke.test.cjs'
       - 'tests/auto_optin.test.cjs'
       - 'tests/context_decision.test.cjs'
+      - 'tests/chat_scope.test.cjs'
       - 'tests/maestro_ui_smoke.mjs'
       - 'macro-registry.json'
       - '.github/workflows/macro-smoke.yml'
@@ -38,7 +39,7 @@ jobs:
       - name: Run offline non-network unit tests
         run: node --test tests/maestro_smoke.test.cjs
       - name: Contextual decision and AUTO opt-in regressions
-        run: node --test tests/auto_optin.test.cjs tests/context_decision.test.cjs
+        run: node --test tests/auto_optin.test.cjs tests/context_decision.test.cjs tests/chat_scope.test.cjs
       - name: Install small browser test harness
         run: |
           npm install --no-save --ignore-scripts playwright-core@1.56.1
