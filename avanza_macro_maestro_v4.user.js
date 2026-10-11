@@ -937,7 +937,7 @@
     box.hidden=!moduleOn('game'); if(box.hidden) return;
     const id=projectKey(), L=learningFor(id);
     if(!id || !looksLearningProcess()){
-      box.innerHTML='<div class="quest-head"><b>🎮 LEARN QUEST</b><span>modo universal</span></div><div class="quest-empty">Se activa automáticamente en procesos de aprendizaje.</div><div class="quest-actions single"><button type="button" data-learn-action="start">🎯 crear misión</button></div>';
+      box.innerHTML='<div class="quest-head"><b>⚒️ TRABAJO PRODUCTIVO</b><span>contexto independiente</span></div><div class="quest-empty">En este proceso no hay quiz: construye una entrega verificable sin afectar su porcentaje o AUTO.</div><div class="quest-actions single"><a href="https://mundo-vivo-play-safe-demo-pdess2573.vercel.app/" target="_blank" rel="noopener noreferrer">⚒️ Abrir taller MUNDO VIVO 0.5 ↗</a></div>';
       return;
     }
     const xp=L?.xp||0, level=1+Math.floor(xp/500), reward=L?.reward||100, streak=L?.streak||0;
@@ -981,6 +981,31 @@
   }
   function renderMissionControl() {
     if(!missionOverlay) return;
+    // Mission Control must never copy an academic lesson into an unrelated chat.
+    // Productive missions are links to an independent workspace, never gates for AUTO.
+    const localId = projectKey();
+    const academic = Boolean(localId && /^CFI(?:-|$)/i.test(localId));
+    if (!academic) {
+      const local = localId && projects[localId] ? projects[localId] : {};
+      const scopedId = escapeHtml(shortProjectLabel(localId || 'CHAT-SIN-OBJETIVO'), 36);
+      const scopedPct = typeof local.current_pct === 'number' ? local.current_pct : null;
+      const scopeBasis = Number.isInteger(local.numerator) && Number.isInteger(local.denominator)
+        ? local.numerator + '/' + local.denominator : 'DENOMINADOR NO DETERMINABLE';
+      const localNext = escapeHtml(local.next_action || 'Recuperar el próximo objetivo y construir un entregable comprobable.', 230);
+      missionOverlay.innerHTML =
+        '<div class="mc-shell"><div class="mc-topbar"><div class="mc-brand">🚀 AVANZA <span>MISSION CONTROL · CONTEXTUAL</span></div>'+
+        '<button type="button" data-action="cinema-close">✕</button></div>'+
+        '<div class="mc-grid"><aside class="mc-left"><div class="mc-orb" style="--mc:'+(scopedPct??0)+'"><div><strong>'+formatPercent(scopedPct)+'</strong><small>REPORTE DEL PROCESO</small></div></div>'+
+        '<div class="mc-card"><h4>🎯 PROCESO INDEPENDIENTE</h4><p>'+scopedId+'</p><p>'+escapeHtml(scopeBasis,60)+'</p></div></aside>'+
+        '<main class="mc-center"><section class="mc-hero"><div><small>CONTEXTO DEL CHAT · SIN EXÁMENES</small>'+
+        '<h2>⚒️ Construir un resultado, no acertar un quiz</h2><p>'+localNext+'</p></div></section>'+
+        '<div class="mc-card"><h4>🛠️ TALLER DE ENTREGABLES</h4>'+
+        '<p>Construye una especificación, experimento o prueba. Un entregable producido no equivale a un efecto aceptado o dinero ingresado.</p>'+
+        '<a href="https://mundo-vivo-play-safe-demo-pdess2573.vercel.app/" target="_blank" rel="noopener noreferrer">Abrir MUNDO VIVO 0.5 · taller real ↗</a></div></main>'+
+        '<aside class="mc-right"><div class="mc-card"><h4>🛡️ SIN INTERFERENCIA</h4>'+
+        '<p>JUEGO ON/OFF no altera ejecución, propietarios, autorizaciones ni porcentajes canónicos.</p></div></aside></div></div>';
+      return;
+    }
     const id=projectKey()||'CFI-E2-2026-10-16';
     const p=projects[id]||projects['CFI-E2-2026-10-16']||{};
     const L=learningFor(id)||{};

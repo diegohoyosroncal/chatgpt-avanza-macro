@@ -42,10 +42,10 @@ test('restores compatible color, compact and position preferences', () => {
   assert.equal(t.readPresentation().compact, true);
   assert.equal(t.readPresentation().x, 100);
 });
-test('malformed local preferences revert safely to defaults', () => {
+test('malformed local preferences revert safely to current compact-safe defaults', () => {
   const {t,mem} = harness(); mem['avanza-master-ui-v4'] = '{broken';
   assert.equal(t.readPresentation().theme, 'amber');
-  assert.equal(t.readPresentation().compact, false);
+  assert.equal(t.readPresentation().compact, true);
 });
 test('detects older MISION VIVA v3.1 and blocks macros running simultaneously', () => {
   const {t,dom}=harness();dom['diego-mision-autonomia-v1'] = {};
@@ -141,7 +141,8 @@ test('cross-tab project registry uses BroadcastChannel without remote APIs', () 
 test('continuity has no fixed execution-count stop', () => {
   assert.doesNotMatch(script, /Límite de 12 continuaciones automáticas/);
   assert.doesNotMatch(script, /MAX_AUTOMATIC_FOLLOWUPS/);
-  assert.match(script, /Estancamiento alto: auditoría profunda y cambio de estrategia; NO es señal de STOP/);
+  assert.match(script, /if \(state\.stalled >= MAX_STALLED_CYCLES\) \{ parkUnproductiveLoop\(\); return; \}/);
+  assert.match(script, /state\.parkFingerprint/);
 });
 test('game mode keeps XP explicitly separate from verified progress', () => {
   assert.match(script, /XP\/racha motivan/);
@@ -201,8 +202,8 @@ test('quest choices parser accepts multiple labeled options', () => {
 });
 
 
-test('v4.4 exposes a full-screen Mission Control visual mode', () => {
-  assert.match(script,/4\.4\.0-neon-control/);
+test('v4.4.1 exposes a full-screen Mission Control visual mode', () => {
+  assert.match(script,/4\.4\.1-auto-latch/);
   assert.match(script,/data-action="cinema"/);
   assert.match(script,/function renderMissionControl\(\)/);
   assert.match(script,/function toggleMissionControl\(force\)/);
@@ -217,4 +218,13 @@ test('Mission Control keeps project percentages and Learn Quest interactions wir
   assert.match(script,/data-learn-submit/);
   assert.match(script,/data-learn-action="boss"/);
   assert.match(script,/formatPercent\(projects\['CFI-E2-2026-10-16'\]\?\.current_pct\)/);
+});
+
+test('non-academic mission control is process-scoped and never defaults to CFI', () => {
+  assert.match(script, /const localId = projectKey\(\)/);
+  assert.match(script, /const academic = Boolean\(localId && \/\^CFI/);
+  assert.match(script, /if \(!academic\) \{/);
+  assert.match(script, /CHAT-SIN-OBJETIVO/);
+  assert.match(script, /MUNDO VIVO 0\.5 · taller real/);
+  assert.match(script, /Un entregable producido no equivale a un efecto aceptado/);
 });
