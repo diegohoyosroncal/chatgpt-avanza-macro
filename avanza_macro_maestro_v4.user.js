@@ -917,7 +917,7 @@
     box.hidden=!moduleOn('game'); if(box.hidden) return;
     const id=projectKey(), L=learningFor(id);
     if(!id || !looksLearningProcess()){
-      box.innerHTML='<div class="quest-head"><b>🎮 LEARN QUEST</b><span>modo universal</span></div><div class="quest-empty">Se activa automáticamente en procesos de aprendizaje.</div><div class="quest-actions single"><button type="button" data-learn-action="start">🎯 crear misión</button></div>';
+      box.innerHTML='<div class="quest-head"><b>⚒️ TRABAJO PRODUCTIVO</b><span>contexto independiente</span></div><div class="quest-empty">En este proceso no hay quiz: construye una entrega verificable sin afectar su porcentaje o AUTO.</div><div class="quest-actions single"><a href="https://mundo-vivo-play-safe-demo-pdess2573.vercel.app/" target="_blank" rel="noopener noreferrer">⚒️ Abrir taller MUNDO VIVO 0.5 ↗</a></div>';
       return;
     }
     const xp=L?.xp||0, level=1+Math.floor(xp/500), reward=L?.reward||100, streak=L?.streak||0;
