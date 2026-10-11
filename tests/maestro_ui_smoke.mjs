@@ -15,7 +15,7 @@ try {
     const page = await browser.newPage({viewport:size});
     await page.setContent(`<!doctype html><html><body style="min-height:4000px;background:#141b2b">
       <form style="position:fixed;bottom:0"><textarea id="prompt-textarea"></textarea>
-      <button data-testid="send-button">Enviar</button></form></body></html>`);
+      <button type="button" data-testid="send-button">Enviar</button></form></body></html>`);
     await page.addScriptTag({content:script});
     const host = page.locator('#'+hostId);
     await host.waitFor({timeout:7000});
