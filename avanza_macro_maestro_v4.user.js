@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         AVANZA — Macro Maestro · Piloto Automático
 // @namespace    https://chatgpt.com/
-// @version      4.0.2
+// @version      4.0.3
 // @description  Un solo control inteligente para ChatGPT web: reevalúa cada respuesta, continúa de forma acotada y cambia de estrategia ante estancamiento.
 // @updateURL    https://raw.githubusercontent.com/diegohoyosroncal/chatgpt-avanza-macro/main/avanza_macro_maestro_v4.user.js
 // @downloadURL  https://raw.githubusercontent.com/diegohoyosroncal/chatgpt-avanza-macro/main/avanza_macro_maestro_v4.user.js
@@ -17,6 +17,9 @@
   // Never auto-start on page load, after reload, or when navigating to another chat.
   // The userscript never calls a remote API, reads credentials or controls ChatGPT tools.
   const APP = 'avanza-macro-maestro-v4';
+  const VERSION = '4.0.3';
+  // No script-manager inventory API is accessible with @grant none.
+  const LEGACY_PANEL_IDS = Object.freeze(['avanza-universal-control-v1', 'avanza-macro-maestro-v2', 'avanza-macro-maestro-v3']);
   const MARK = 'MACRO MAESTRO — AVANZA AL OBJETIVO';
   const RECEIPT = 'AVANZA_CICLO_ID:';
   const MAX_AUTOMATIC_FOLLOWUPS = 12; // bounded safety budget, not claimed objective completion
@@ -208,6 +211,25 @@
     return typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= 100 ? (Math.round(value * 100) / 100).toLocaleString('es-PE', {maximumFractionDigits: 2}) + '%' : '—';
   }
   function escapeText(value, max=100) { return String(value || '').replace(/[\u0000-\u001f]/g, ' ').slice(0,max); }
+  function knownLegacyPanels() {
+    return LEGACY_PANEL_IDS.filter(id => Boolean(document.getElementById(id)));
+  }
+  function ensureNoLegacyInterference() {
+    const conflicts = knownLegacyPanels();
+    if (!conflicts.length) return true;
+    pause('Posible macro duplicada (' + conflicts.join(', ') + '). Se bloquea AVANZAR: desactiva la variante antigua en el gestor. Ocultar su panel NO detiene el script.', true);
+    return false;
+  }
+  function updateHealth() {
+    if (!dashboard) return;
+    const el = dashboard.querySelector('[data-value="health"]');
+    if (!el) return;
+    const conflicts = knownLegacyPanels();
+    el.dataset.warning = conflicts.length ? 'true' : 'false';
+    el.textContent = conflicts.length
+      ? '⚠ v' + VERSION + ' · posible duplicado: ' + conflicts.length + ' panel(es). AVANZAR bloqueado.'
+      : 'v' + VERSION + ' instalada · versión remota NO verificada · sin paneles antiguos conocidos';
+  }
   function updateDashboard() {
     if (!dashboard) return;
     const pct = state.lastPercent;
@@ -228,6 +250,7 @@
     const bar = dashboard.querySelector('.bar-fill'); if (bar) { bar.style.width = known ? `${pct}%` : '0%'; if (known) { bar.parentElement.setAttribute('aria-valuemin','0'); bar.parentElement.setAttribute('aria-valuemax','100'); bar.parentElement.setAttribute('aria-valuenow',String(pct)); bar.parentElement.removeAttribute('aria-valuetext'); } else { bar.parentElement.removeAttribute('aria-valuenow'); bar.parentElement.setAttribute('aria-valuetext','Progreso aún no verificable'); } }
     const tone = dashboard.querySelector('.tone');
     if (tone) tone.dataset.level=state.stalled>=3?'risk':phase===STATES.WAITING||phase===STATES.READY?'live':'idle';
+    updateHealth();
   }
   function render() {
     if (!button) return;
@@ -267,6 +290,7 @@
     try {
       syncRoute();
       if (phase !== STATES.READY) return;
+      if (!ensureNoLegacyInterference()) return;
       if (document.hidden) { pause('Pausada: pestaña no visible. Evita envíos inesperados.', true); return; }
       if (isGenerating()) { setStatus('Respuesta en curso; no duplico mensajes.'); return; }
       if (state.totalSent >= MAX_AUTOMATIC_FOLLOWUPS + 1) { pause('Límite de seguridad alcanzado: revisa el resultado antes de reactivar.', true); return; }
@@ -301,6 +325,7 @@
     if (busy) return;
     syncRoute();
     if (phase !== STATES.READY && phase !== STATES.WAITING) return;
+    if (!ensureNoLegacyInterference()) return;
     if (document.hidden) return; // hidden tab cannot surprise-send
     if (phase === STATES.READY) {
       if (now() - lastAudit < MIN_SEND_GAP_MS) return;
@@ -406,6 +431,7 @@
       pause('Pausada manualmente. Ningún envío nuevo.', false);
       return;
     }
+    if (!ensureNoLegacyInterference()) return;
     // A fresh click resets only local circuit breakers, never canon/effects.
     state.totalSent = 0;
     state.stalled = 0;
@@ -432,12 +458,14 @@
       .stat{flex:1;min-width:0}.transition{font-weight:800;font-size:14px;font-variant-numeric:tabular-nums;white-space:nowrap}.delta{font-size:11px;font-weight:800;color:#facc15;margin:7px 0}.frac,.pending{font-size:10px;color:#bac9d9}.bar{margin:13px 0 0;height:6px;background:#334155;border-radius:99px;overflow:hidden}.bar-fill{height:100%;background:linear-gradient(90deg,#fbbf24,#fde68a);border-radius:99px;transition:width .35s ease}
       .tinyrow{display:flex;align-items:center;justify-content:space-between;gap:6px;margin:12px 0 8px;color:#9eacc1;font-size:9px}.tone:before{content:'';display:inline-block;width:6px;height:6px;background:#94a3b8;border-radius:100%;margin-right:5px}.tone[data-level=live]:before{background:#34d399;box-shadow:0 0 9px #34d399aa}.tone[data-level=risk]:before{background:#fb923c}.next{color:#cbd5e1;font-size:10px;line-height:1.35;min-height:14px;max-height:42px;overflow:hidden;margin-bottom:12px}
       .go{position:relative;width:100%;border:0;border-radius:12px;min-height:47px;cursor:pointer;background:linear-gradient(120deg,#fde68a,#fbbf24 56%,#f59e0b);color:#281b07;font:900 14px/1.2 ui-sans-serif,system-ui,sans-serif;letter-spacing:.08em;box-shadow:0 5px 19px #fbbf2440;transition:transform .15s,filter .15s}.go:hover{filter:brightness(1.06);transform:translateY(-1px)}.go.active{background:linear-gradient(120deg,#64748b,#475569);color:white;box-shadow:none}.go:focus-visible{outline:3px solid #38bdf8;outline-offset:3px}.go:disabled{opacity:.7;cursor:wait;transform:none}
-      .status{font-size:9.5px;color:#cbd5e1;margin-top:10px;min-height:25px;max-height:56px;overflow:hidden}.status[data-warning=true]{color:#fdba74}.foot{font-size:9px;color:#8799ae;border-top:1px solid var(--stroke);padding-top:8px;margin-top:4px;display:flex;justify-content:space-between;gap:5px}.scope{font-weight:700;color:#9fc3d8}
+      .health{font-size:9px;line-height:1.35;margin-top:10px;padding:7px 9px;border-radius:9px;color:#a6cee7;background:#0a1b2c;border:1px solid var(--stroke)}.health[data-warning=true]{color:#fdba74;border-color:#c2410c}
+       .status{font-size:9.5px;color:#cbd5e1;margin-top:10px;min-height:25px;max-height:56px;overflow:hidden}.status[data-warning=true]{color:#fdba74}.foot{font-size:9px;color:#8799ae;border-top:1px solid var(--stroke);padding-top:8px;margin-top:4px;display:flex;justify-content:space-between;gap:5px}.scope{font-weight:700;color:#9fc3d8}
       @media(max-width:460px){.panel{padding:12px;border-radius:18px}.ring{width:88px;height:88px;flex-basis:88px}.center{width:69px;height:69px}.pct{font-size:19px}}
       @media(prefers-reduced-motion:reduce){.go,.bar-fill{transition:none}}
     `;
     const panel=document.createElement('div');panel.className='panel';
-    panel.innerHTML=`<div class="top"><span class="logo" aria-hidden="true">↗</span><div class="topname"><div class="brand">AVANZA</div><div class="sub">MACRO MAESTRO · v4</div></div><span class="pill">CON CONTROL</span></div>
+    panel.innerHTML=`<div class="top"><span class="logo" aria-hidden="true">↗</span><div class="topname"><div class="brand">AVANZA</div><div class="sub">MACRO MAESTRO · v4.0.3</div></div><span class="pill">CON CONTROL</span></div>
+       <div class="health" data-value="health" data-warning="false">v4.0.3 instalada · versión remota NO verificada</div>
       <div class="title" data-value="objective">Objetivo del chat · por recuperar</div>
       <div class="metrics"><div class="ring"><div class="center"><span class="pct" data-value="percent" aria-label="Porcentaje actual">—</span><span class="caption">AVANCE</span></div></div><div class="stat"><div class="transition" data-value="transition">— → —</div><div class="delta" data-value="delta">Δ — pp</div><div class="frac" data-value="fraction">Base no validada</div><div class="pending" data-value="pending">Pendiente —</div></div></div>
       <div class="bar" role="progressbar" aria-label="Progreso reportado del objetivo del chat"><div class="bar-fill"></div></div>
@@ -458,7 +486,7 @@
   function hideLegacyPanels() {
     // Do not delete, modify or overwrite legacy scripts: only hide older widgets
     // while this new panel is visible. A browser reload without v4 restores them.
-    for (const id of ['avanza-universal-control-v1', 'avanza-macro-maestro-v2', 'avanza-macro-maestro-v3']) {
+    for (const id of LEGACY_PANEL_IDS) {
       const old = document.getElementById(id);
       if (old && old !== root && old.style.display !== 'none') old.style.display = 'none';
     }
@@ -472,7 +500,7 @@
     if (observer) return;
     observer = new MutationObserver(() => { if (!document.getElementById(APP)) scheduleMount(); });
     observer.observe(document.documentElement, { childList: true, subtree: true });
-    timer = setInterval(() => { if (!document.getElementById(APP)) scheduleMount(); hideLegacyPanels(); tick(); }, CHECK_EVERY_MS);
+    timer = setInterval(() => { if (!document.getElementById(APP)) scheduleMount(); hideLegacyPanels(); updateHealth(); tick(); }, CHECK_EVERY_MS);
     window.addEventListener('pagehide', () => { if (phase === STATES.READY || phase === STATES.WAITING) pause('Navegación de página: ciclo suspendido.'); });
     document.addEventListener('keydown', e => {
       if (e.repeat || !e.altKey || !e.shiftKey || e.ctrlKey || e.metaKey || String(e.key).toLowerCase() !== 'a') return;
