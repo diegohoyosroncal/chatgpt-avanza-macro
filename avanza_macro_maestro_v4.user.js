@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         AVANZA — Macro Maestro · Piloto Automático
 // @namespace    https://chatgpt.com/
-// @version      4.3.0
+// @version      4.3.1
 // @description  Cockpit multiproyecto + Learn Quest: módulos ON/OFF, AUTO/MANUAL, progreso serio independiente, misiones jugables y sincronización entre pestañas.
 // @updateURL    https://raw.githubusercontent.com/diegohoyosroncal/chatgpt-avanza-macro/main/avanza_macro_maestro_v4.user.js
 // @downloadURL  https://raw.githubusercontent.com/diegohoyosroncal/chatgpt-avanza-macro/main/avanza_macro_maestro_v4.user.js
@@ -18,7 +18,7 @@
   // Auto-continúa solo proyectos identificados que estén explícitamente en AUTO.
   // No llama APIs remotas, no lee credenciales y no elude permisos/herramientas de ChatGPT.
   const APP = 'avanza-macro-maestro-v4';
-  const INSTALLED_VERSION = '4.3.0-interactive1';
+  const INSTALLED_VERSION = '4.3.1-explicit-auto';
   const LEARN_KEY = 'avanza-v4-learn-quest-v1';
   const CONTROL_KEY = 'avanza-v4-control-center-v1';
   const PROJECTS_KEY = 'avanza-v4-project-registry-v1';
@@ -103,7 +103,7 @@
   }
 
   function readControl() {
-    const defaults = { modules:{engine:true,auto:true,progress:true,sync:true,game:true,aura:true}, backgroundAuto:true, projectModes:{} };
+    const defaults = { modules:{engine:true,auto:false,progress:true,sync:true,game:true,aura:true}, backgroundAuto:false, autoRunOptIn:false, projectModes:{} };
     try {
       const raw = JSON.parse(localStorage.getItem(CONTROL_KEY) || 'null');
       return raw && typeof raw === 'object' ? { ...defaults, ...raw, modules:{...defaults.modules,...(raw.modules||{})}, projectModes:{...(raw.projectModes||{})} } : defaults;
@@ -116,7 +116,7 @@
   function moduleOn(name) { return control.modules?.[name] !== false; }
   function projectMode(id) {
     const row=control.projectModes?.[id]||{};
-    return { enabled:row.enabled!==false, auto:row.auto!==false };
+    return { enabled:row.enabled!==false, auto:row.auto===true };
   }
   function setProjectMode(id,patch) {
     if(!id) return;
@@ -669,7 +669,7 @@
     if(Object.keys(projects).length){ try{localStorage.setItem(PROJECTS_KEY,JSON.stringify(projects));}catch{} renderProjects(); }
   }
   function shouldAutoStart() {
-    if(!moduleOn('engine')||!moduleOn('auto')||checkConflicts()||isGenerating()) return false;
+    if(!moduleOn('engine')||!moduleOn('auto')||control.autoRunOptIn!==true||checkConflicts()||isGenerating()) return false;
     discoverVisibleProjects();
     const id=projectKey(); if(!id) return false;
     const mode=projectMode(id); if(!mode.enabled||!mode.auto) return false;
@@ -768,7 +768,7 @@
   }
   function renderModules() {
     if(!dashboard) return;
-    const labels={engine:'⚡ MOTOR',auto:'♾️ AUTO',progress:'📈 %',sync:'🌐 SYNC',game:'🎮 QUEST',aura:'🎨 AURA'};
+    const labels={engine:'⚡ MOTOR',auto:'♾️ AUTOENVÍOS',progress:'📈 %',sync:'🌐 SYNC',game:'🎮 QUEST',aura:'🎨 AURA'};
     for(const b of dashboard.querySelectorAll('[data-module]')){
       const name=b.dataset.module,on=moduleOn(name); b.dataset.on=on?'true':'false'; b.textContent=(labels[name]||name)+' '+(on?'ON':'OFF');
     }
@@ -936,6 +936,18 @@
       const mod=event.target.closest('[data-module]');
       if(mod){
         const name=mod.dataset.module; control.modules[name]=!moduleOn(name);
+        if(name==='auto'){
+          // Persist consent per browser; never infer consent from historic default=true.
+          control.autoRunOptIn=moduleOn('auto');
+          if(control.autoRunOptIn){
+            const id=projectKey();
+            if(id) control.projectModes[id]={...projectMode(id),enabled:true,auto:true};
+            setStatus('♾️ AUTO ON, activado explícitamente. Solo proyectos autorizados.');
+          } else {
+            if(phase===STATES.READY||phase===STATES.WAITING) pause('AUTO OFF: envíos detenidos; progreso conservado.');
+            else setStatus('AUTO OFF: el panel sigue visible; envíos solo al pulsar AVANZAR.');
+          }
+        }
         if(name==='sync') initChannel();
         if(name==='engine'&&!moduleOn('engine')&&(phase===STATES.READY||phase===STATES.WAITING)) pause('⚡ MOTOR OFF desde el cockpit.');
         saveControl(); render(); return;
@@ -943,7 +955,14 @@
       const en=event.target.closest('[data-project-enabled]');
       if(en){ const id=en.dataset.projectEnabled; setProjectMode(id,{enabled:!projectMode(id).enabled}); return; }
       const au=event.target.closest('[data-project-auto]');
-      if(au){ const id=au.dataset.projectAuto; setProjectMode(id,{auto:!projectMode(id).auto,enabled:true}); return; }
+      if(au){
+        const id=au.dataset.projectAuto,next=!projectMode(id).auto;
+        if(next){ control.modules.auto=true; control.autoRunOptIn=true; }
+        setProjectMode(id,{auto:next,enabled:true});
+        if(!next&&id===projectKey()&&(phase===STATES.READY||phase===STATES.WAITING))
+          pause('AUTO OFF para este proceso. Progreso conservado.');
+        saveControl(); render(); return;
+      }
       const learn=event.target.closest('[data-learn-action]');
       if(learn){ sendLearningAction(learn.dataset.learnAction); return; }
       const choice=event.target.closest('[data-quest-choice]');
