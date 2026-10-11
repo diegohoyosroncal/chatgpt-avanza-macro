@@ -234,6 +234,7 @@
         const msg=event.data||{}; if(msg.source===TAB_OWNER) return;
         if(msg.type==='projects'&&msg.projects&&typeof msg.projects==='object'){ projects={...projects,...msg.projects}; try{localStorage.setItem(PROJECTS_KEY,JSON.stringify(projects));}catch{} renderProjects(); }
         if(msg.type==='control'&&msg.control&&typeof msg.control==='object'){ control={...control,...msg.control,modules:{...control.modules,...(msg.control.modules||{})},projectModes:{...control.projectModes,...(msg.control.projectModes||{})}}; try{localStorage.setItem(CONTROL_KEY,JSON.stringify(control));}catch{} renderModules();renderProjects();applyAura(); }
+        if(msg.type==='learning'&&msg.learning&&typeof msg.learning==='object'){ learning={...learning,...msg.learning}; try{localStorage.setItem(LEARN_KEY,JSON.stringify(learning));}catch{} renderGame(); }
       };
     } catch { channel=null; }
   }
@@ -365,6 +366,8 @@
       'Antes de terminar repite la revisión de fronteras útiles, guarda checkpoint con objetivo, owner, receipt, bloqueo, siguiente acción exacta y condición de reanudación si procede. Reporta SIEMPRE objetivo, porcentaje anterior→actual con numerador/denominador, delta pp, pendiente, efecto realmente verificado, bloqueo y siguiente hito. Si no existe denominador defendible di NO DETERMINABLE.',
       'MULTIPROYECTO: identifica un PROCESS_ID estable para este objetivo y NO mezcles su porcentaje con otro proceso. Otros proyectos independientes pueden avanzar en sus propios chats/tabs; conserva owner y escala del proceso actual.',
       'CFI/APRENDIZAJE: usa misiones cortas, feedback interactivo, colores y juego cuando ayuden, pero XP/estética jamás sustituyen dominio verificable. El porcentaje solo sube al cerrar gates de conocimiento o práctica.',
+      'LEARN QUEST: si el proceso es de aprendizaje, NO entregues una pared de teoría. Presenta una micro-misión resoluble por el usuario, evalúa su respuesta, explica el error o acierto y encadena la siguiente misión sin que tenga que escribir "sigue". Usa dificultad progresiva, recuperación espaciada, variación de datos y boss/simulacro cuando proceda.',
+      'PROTOCOLO VISIBLE PARA EL HUD: cuando presentes una misión termina el bloque con una línea legible EXACTA del formato: 🎮 QUEST | <curso> | <mission_id> | ⭐<xp 0-500> XP | ⚔️<1-5>/5 | <título>. Cuando evalúes una respuesta, añade una línea: 🏆 QUEST_RESULT | <mission_id> | PASS | +<xp> XP | 🔥<racha> o 🔁 QUEST_RESULT | <mission_id> | RETRY | +0 XP | 🔥0. Si haces PASS, presenta en esa misma respuesta la siguiente QUEST salvo que corresponda boss, pausa pedagógica o gate humano real.'
       'Para el control local termina con EXACTAMENTE UNA línea JSON de metadatos, después del informe: AVANZA_CONTROL: {"status":"CONTINUE","process_id":"","objective":"","previous_pct":null,"current_pct":null,"delta_pp":null,"numerator":null,"denominator":null,"evidence":"","blocker":"","next_action":""}. Estos valores son declaraciones del asistente y NO recibos independientes. Usa VERIFIED_COMPLETE solo si el OBJETIVO PRINCIPAL está completamente verificado con fuente primaria, HUMAN_GATE_PROVEN solo si se agotaron alternativas legítimas, NO_SAFE_ACTION solo si realmente no queda acción segura positiva. Nunca afirmes resultado final por CI, cola DONE, pruebas aisladas, documentos o esta macro. Mantén el denominador del MISMO objetivo, no mezcles ámbitos.',
       `${RECEIPT} ${ticket}`,
     ];
@@ -608,6 +611,7 @@
     discoverVisibleProjects();
     const id=projectKey(); if(!id) return false;
     const mode=projectMode(id); if(!mode.enabled||!mode.auto) return false;
+    const L=learningFor(id); if(moduleOn('game')&&L?.status==='AWAITING_USER') return false;
     if(draft(findComposer())) return false;
     if(state.lastStatus&&EXIT.has(state.lastStatus)) return false;
     if(typeof state.lastPercent==='number'&&state.lastPercent>=100) return false;
@@ -850,7 +854,7 @@
     observer.observe(document.documentElement, { childList: true, subtree: true });
     timer = setInterval(() => {
       if (!document.getElementById(APP)) scheduleMount();
-      checkConflicts(); discoverVisibleProjects(); maybeAutoStart(); tick();
+      checkConflicts(); discoverVisibleProjects(); discoverLearning(); maybeAutoStart(); tick();
     }, CHECK_EVERY_MS);
     window.addEventListener('pagehide', () => { releaseLease(); saveState(); });
     document.addEventListener('keydown', e => {
@@ -862,6 +866,6 @@
     }, true);
   }
   initChannel();
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => { mount(); observe(); maybeAutoStart(); }, { once: true });
-  else { mount(); observe(); maybeAutoStart(); }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => { mount(); observe(); discoverLearning(); maybeAutoStart(); }, { once: true });
+  else { mount(); observe(); discoverLearning(); maybeAutoStart(); }
 })();
