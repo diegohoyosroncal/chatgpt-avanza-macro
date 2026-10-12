@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         AVANZA — Macro Maestro · Piloto Automático
 // @namespace    https://chatgpt.com/
-// @version      4.6.0
+// @version      4.7.0
 // @description  Cockpit multiproyecto + Learn Quest: módulos ON/OFF, AUTO/MANUAL, progreso serio independiente, misiones jugables y sincronización entre pestañas.
 // @updateURL    https://raw.githubusercontent.com/diegohoyosroncal/chatgpt-avanza-macro/main/avanza_macro_maestro_v4.user.js
 // @downloadURL  https://raw.githubusercontent.com/diegohoyosroncal/chatgpt-avanza-macro/main/avanza_macro_maestro_v4.user.js
@@ -22,7 +22,7 @@
   const SINGLETON = 'data-avanza-maestro-v4-runner';
   if (document.documentElement?.getAttribute(SINGLETON) === '1') return;
   document.documentElement?.setAttribute(SINGLETON, '1');
-  const INSTALLED_VERSION = '4.6.0-universal-bootstrap';
+  const INSTALLED_VERSION = '4.7.0-full-spectrum-operator';
   document.documentElement?.setAttribute('data-avanza-client-version', INSTALLED_VERSION);
   const LEARN_KEY = 'avanza-v4-learn-quest-v1';
   const CONTROL_KEY = 'avanza-v4-control-center-v1';
@@ -417,8 +417,8 @@
     return null;
   }
   function strategy() {
-    if (state.stalled >= 6) return 'AUDITORIA_PROFUNDA_CREAR_O_SUSTITUIR_CAPACIDAD';
-    if (state.stalled >= 3 || state.missingReceipts >= 2) return 'REVISAR_RUTA_Y_CAMBIAR_ESTRATEGIA';
+    if (state.stalled >= 6) return 'OPERADOR_TOTAL_EXPANDIR_UNIVERSO_CREAR_O_SUSTITUIR';
+    if (state.stalled >= 3 || state.missingReceipts >= 2) return 'CAMBIAR_CLASE_DE_SOLUCION_Y_EJECUTAR';
     if (state.lastDelta === null) return 'RECUPERAR_METRICA_Y_VERIFICAR';
     if (state.lastDelta > 0) return 'EJECUTAR_SIGUIENTE_HITO';
     if (state.stalled >= 1) return 'COMPARAR_ALTERNATIVAS_Y_EJECUTAR';
@@ -428,10 +428,13 @@
     const chosen = strategy();
     const core = [
       `${MARK} — CONTROL ADAPTATIVO ${ticket}. Esta señal AGREGA capacidades; NO reemplaza objetivo, autorizaciones, decisiones, instrucciones ni checkpoints de este chat.`,
-      `AVANZA_CLIENT_PROOF: 4.6.0-universal-bootstrap | ${ticket}`,
+      `AVANZA_CLIENT_PROOF: 4.7.0-full-spectrum-operator | ${ticket}`,
       `Decisión interna de interfaz: ${chosen}. PROCESS_ID actual: ${state.processId || 'POR RECUPERAR'}. Ciclo local ${step}. Anterior conocido (NO prueba externa): progreso ${state.lastPercent ?? 'NO DETERMINABLE'}%, denominador ${state.lastDenominator ?? 'NO DETERMINABLE'}, delta ${state.lastDelta ?? 'NO DETERMINABLE'} pp, ciclos sin progreso ${state.stalled}.`,
       'RECUPERA estado actual desde este chat y fuentes canónicas disponibles. Si falta contexto transversal, usa primero el canon global compartido de Drive ID 1epHKEGs6SjTzrfDi5SeHNaxH7CHX09VTfmYNa7WxIcY y después el canon específico del PROCESS_ID. Evalúa cuál es el objetivo pendiente, su dueño y qué cambió desde la respuesta anterior. No dependas de una cifra inferida de la interfaz para afirmar efectos.',
       'DECIDE TÚ la mejor acción: ejecutar, verificar, conciliar, corregir, investigar globalmente, adoptar/reutilizar/integrar/fusionar/delegar legítimamente/sustituir/adaptar/construir una capacidad faltante, detener una estrategia de valor negativo o cambiar de rumbo. No conviertas AVANZAR en ejecutar por ejecutar, ni le pidas al usuario escoger entre alternativas.',
+      'CONTRATO OPERADOR TOTAL: no termines con solo explicación, estado, plan, lista de opciones o una pregunta si todavía existe alguna acción material que puedas ejecutar en este turno. Ante una carencia puntual de herramienta, acceso, proveedor o canal, NO la generalices a imposibilidad del objetivo: busca otra herramienta/conector/plugin, otra API o runtime ya disponible, otro proveedor/canal, recuperación de acceso, integración, adopción, reutilización, delegación al owner correcto, composición entre sistemas o construcción mínima. Elige tú la mejor ruta y ejecútala.',
+      'AGOTAMIENTO MATERIAL OBLIGATORIO: antes de HUMAN_GATE_PROVEN o NO_SAFE_ACTION, revisa clases de solución distintas, no variaciones cosméticas de la misma. Documenta qué clases ya se intentaron y qué evidencia descartó cada una. Tras tres intentos equivalentes sin delta, prohíbe el cuarto intento equivalente y cambia arquitectura, canal, proveedor, herramienta o mecanismo causal. Mantén abiertas y avanza en paralelo las fronteras independientes.',
+      'BÚSQUEDA ACTIVA DE CAPACIDAD: cuando una capacidad externa pueda cambiar el resultado, descubre plugins/conectores disponibles y usa investigación web actual para encontrar soluciones, prácticas o proveedores mejores. Prefiere adoptar/integrar/componer una solución existente cuando domina construirla; si queda una brecha demostrada, construye el componente mínimo que desbloquee el efecto. No pidas al usuario repetir contexto recuperable ni elegir entre rutas que puedes comparar tú.',
       'EJECUTA dentro de este turno las acciones seguras y autorizadas con valor positivo, verifica cada una en una fuente independiente, distingue COLA→ENTREGA→ACCIÓN→EFECTO y sigue con las demás. Si llevamos 3 intentos sin DELTA verificable, identifica causa raíz y realiza una intervención MATERIALMENTE diferente antes de repetir.',
       'Puedes evaluar alternativas mundiales y crear componentes faltantes cuando sea legítimo, pero NUNCA saltar permisos, MFA, consentimiento, términos, límites de herramienta o costos. No generar gastos, pagos, contratos, cambios irreversibles o despliegues riesgosos sin autorización precisa. Preserva single-owner, deduplicación, idempotencia y protección de secretos.',
       'SEPARA CAPAS: continuidad conversacional ≠ tareas programadas ≠ ejecución externa. Una respuesta, checkpoint, porcentaje intermedio o cambio de hilo NO son STOP. No crees cron/tareas para simular que el chat sigue; reserva Tasks únicamente para un evento realmente futuro/periódico/condicional. La continuidad fuera del chat requiere el ejecutor persistente autorizado y recibos; esta macro reanuda hilos web reconocidos, pero la ejecución externa real debe comprobarse en herramientas autorizadas.',
@@ -446,9 +449,9 @@
       'Para el control local termina con EXACTAMENTE UNA línea JSON de metadatos, después del informe: AVANZA_CONTROL: {"status":"CONTINUE","process_id":"","objective":"","previous_pct":null,"current_pct":null,"delta_pp":null,"numerator":null,"denominator":null,"evidence":"","blocker":"","next_action":""}. Estos valores son declaraciones del asistente y NO recibos independientes. Usa VERIFIED_COMPLETE solo si el OBJETIVO PRINCIPAL está completamente verificado con fuente primaria, HUMAN_GATE_PROVEN solo si se agotaron alternativas legítimas, NO_SAFE_ACTION solo si realmente no queda acción segura positiva. Nunca afirmes resultado final por CI, cola DONE, pruebas aisladas, documentos o esta macro. Mantén el denominador del MISMO objetivo, no mezcles ámbitos.',
       `${RECEIPT} ${ticket}`,
     ];
-    if (state.terminalCandidate) core.push('TERMINAL_CANDIDATE EN REVISIÓN: no detengas por repetición verbal. Revalida desde fuente primaria/recibo independiente la condición terminal anterior; si no se sostiene, vuelve a CONTINUE y cambia de ruta.');
-    if (state.stalled >= 3) core.push('AUDITORÍA DE ESTANCAMIENTO: identifica causa raíz y audita TODAS las clases de alternativas pertinentes, no solo repetir herramientas: herramientas y conectores ya autorizados, recuperación de acceso legítima, ejecución externa existente, investigación global, adopción, compra cuando autorizada, integración, colaboración, delegación permitida, adaptación, sustitución, combinación y construcción mínima si no existe solución mejor. Compara valor esperado, tiempo, riesgo, coste, reversibilidad y evidencia primaria; ELIGE tú la mejor ruta para ESTE chat sin pedirme que la seleccione. Evita prometer más de lo verificado.');
-    if (state.stalled >= MAX_STALLED_CYCLES) core.push('ÚLTIMA REVISIÓN PROFUNDA antes de cualquier espera: ejecuta la mejor alternativa segura y materialmente distinta, verifica por separado acción y efecto, y deja condición de reanudación concreta para los frentes donde un evento externo sea necesario. No emitas otro informe vacío ni gastes ciclos en la misma operación improductiva.');
+    if (state.terminalCandidate) core.push('TERMINAL_CANDIDATE EN REVISIÓN: no detengas por repetición verbal. Reabre el universo de rutas, busca una clase de solución no probada y revalida desde fuente primaria/recibo independiente la condición terminal anterior; si no se sostiene, vuelve a CONTINUE y ejecuta la mejor alternativa materialmente distinta.');
+    if (state.stalled >= 3) core.push('AUDITORÍA DE ESTANCAMIENTO: identifica causa raíz y abre un UNIVERSO MATERIALMENTE DISTINTO de soluciones. Audita herramientas/conectores instalados y alternativos, plugins disponibles, APIs/runtimes existentes, recuperación de acceso, investigación web actual, adopción, integración, colaboración, delegación al owner correcto, adaptación, sustitución de proveedor/canal, combinación y construcción mínima. Compara valor esperado, rapidez, coste total, reversibilidad, autonomía, dependencias y evidencia primaria; ELIGE y EJECUTA la mejor ruta sin pedirme que la seleccione. No repitas una consulta negativa como si agotara la clase de solución.');
+    if (state.stalled >= MAX_STALLED_CYCLES) core.push('REVISIÓN TOTAL antes de cualquier espera: realiza inventario de clases de ruta ya intentadas y aún no intentadas, descubre capacidad externa faltante, cambia mecanismo causal y ejecuta al menos una alternativa materialmente distinta si existe. Verifica acción y efecto por separado. Un bloqueo de una herramienta no es bloqueo del objetivo. No emitas otro informe vacío ni gastes ciclos en la misma operación improductiva.');
     return core.join('\n\n');
   }
   function setStatus(message, warning = false) {
