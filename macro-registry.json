@@ -1,23 +1,23 @@
 {
   "schema_version": 2,
-  "updated_at": "2026-10-11T22:20:00-05:00",
+  "updated_at": "2026-10-11T22:25:00-05:00",
   "purpose": "Single macro source of truth; user projects, economic state and native app execution are independent",
   "primary_repository": "diegohoyosroncal/chatgpt-avanza-macro",
   "channels": {
     "stable": {
       "path": "avanza_macro_maestro_v4.user.js",
       "branch": "main",
-      "version_verified_in_repository": "4.7.0",
+      "version_verified_in_repository": "4.7.1",
       "installed_profiles": "not_verified",
-      "ci": "PR #24 green: syntax PASS, 44/44 unit tests PASS, headless Chromium UI smoke PASS at 1280x800 and 390x844; merged as 223b3749a464f90415d8b9c1f15c54e462f3deb5"
+      "ci": "PR #25 green: syntax PASS, 45/45 unit tests PASS, headless Chromium UI smoke PASS at 1280x800 and 390x844; merged as c0863638601bc8d033630cde36f7762645a24592"
     },
     "candidate": {
       "path": "avanza_macro_maestro_v4.user.js",
       "branch": "main",
       "version": "4.7.1",
-      "status": "candidate_case_specific_requirements",
+      "status": "promoted_to_stable",
       "installed_profiles": "not_verified",
-      "purpose": "full-spectrum operator with requirements scoped to concrete actions; a blocked route is not generalized to the whole objective"
+      "purpose": "full-spectrum operator with requirements scoped to concrete actions; route-specific blockers never become global objective blockers"
     }
   },
   "variants": [
@@ -117,15 +117,15 @@
   ],
   "rollback": "Restore avanza_macro_maestro_v4.user.js from commit ad812155a070654770508cfae6f677bd8d8fdecf (v4.0.3); never delete project state.",
   "release_evidence": {
-    "pr": null,
-    "merge_commit": null,
-    "offline_tests": "pending",
-    "chromium_hud": "pending",
+    "pr": 25,
+    "merge_commit": "c0863638601bc8d033630cde36f7762645a24592",
+    "offline_tests": "45/45 PASS",
+    "chromium_hud": "PASS 1280x800 + 390x844",
     "authenticated_profile": "not_verified",
     "learn_quest": "PASS",
     "cfi_quest_bank": "verified in Google Drive",
     "candidate_branch": "fix/v4-7-1-wording-20261011",
     "candidate_version": "4.7.1",
-    "workflow_run": 38198164145
+    "workflow_run": 38198371620
   }
 }
