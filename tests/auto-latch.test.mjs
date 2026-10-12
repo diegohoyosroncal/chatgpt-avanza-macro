@@ -17,7 +17,7 @@ function makeAuto(input={}){
   const state={autoConsented:false,inFlightTicket:'',parkFingerprint:'',parkSince:0,retryAfter:0,stalled:4,missingReceipts:2,lastPercent:40,lastStatus:'',processId:'',...input};
   let saves=0;
   const fn=new Function('state','moduleOn','checkConflicts','isGenerating','discoverVisibleProjects','projectKey','projectMode','learningFor','draft','findComposer','EXIT','lastVisibleAssistantFingerprint','saveState','now',section('  function shouldAutoStart() {','  function maybeAutoStart() {')+'return shouldAutoStart;')(
-    state,()=>true,()=>false,()=>false,()=>{},()=>state.projectId||state.processId||'',()=>({enabled:true,auto:true}),
+    state,()=>true,()=>false,()=>false,()=>{ if(state.projectId&&!state.processId) state.processId=state.projectId; },()=>state.projectId||state.processId||'',()=>({enabled:true,auto:true}),
     ()=>null,()=>'',()=>null,new Set(['VERIFIED_COMPLETE','NO_SAFE_ACTION','HUMAN_GATE_PROVEN']),()=>state.newFingerprint||'old',()=>{saves++;},()=>Date.now());
   return {start:fn(),state,saves};
 }
