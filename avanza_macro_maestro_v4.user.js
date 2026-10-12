@@ -259,7 +259,7 @@
     saveProjects();
   }
   function freshState() {
-    return { cycles:0,totalSent:0,stalled:0,missingReceipts:0,lastPercent:null,lastDenominator:null,lastDelta:null,lastResponseFingerprint:'',repeatedResponses:0,lastStrategy:'',lastStatus:'',objective:'',nextAction:'',blocker:'',lastNumerator:null,lastProof:'',lastUpdated:'',lastTicket:'',processId:'',autoConsented:false,inFlightTicket:'',inFlightSentAt:0,parkFingerprint:'',parkSince:0,retryAfter:0 };
+    return { cycles:0,totalSent:0,stalled:0,missingReceipts:0,lastPercent:null,lastDenominator:null,lastDelta:null,lastResponseFingerprint:'',repeatedResponses:0,lastStrategy:'',lastStatus:'',objective:'',nextAction:'',blocker:'',lastNumerator:null,lastProof:'',lastUpdated:'',lastTicket:'',processId:'',autoConsented:false,terminalCandidate:'',terminalConfirmations:0,inFlightTicket:'',inFlightSentAt:0,parkFingerprint:'',parkSince:0,retryAfter:0 };
   }
   function recoverState() {
     try {
@@ -446,6 +446,7 @@
       'Para el control local termina con EXACTAMENTE UNA línea JSON de metadatos, después del informe: AVANZA_CONTROL: {"status":"CONTINUE","process_id":"","objective":"","previous_pct":null,"current_pct":null,"delta_pp":null,"numerator":null,"denominator":null,"evidence":"","blocker":"","next_action":""}. Estos valores son declaraciones del asistente y NO recibos independientes. Usa VERIFIED_COMPLETE solo si el OBJETIVO PRINCIPAL está completamente verificado con fuente primaria, HUMAN_GATE_PROVEN solo si se agotaron alternativas legítimas, NO_SAFE_ACTION solo si realmente no queda acción segura positiva. Nunca afirmes resultado final por CI, cola DONE, pruebas aisladas, documentos o esta macro. Mantén el denominador del MISMO objetivo, no mezcles ámbitos.',
       `${RECEIPT} ${ticket}`,
     ];
+    if (state.terminalCandidate) core.push('TERMINAL_CANDIDATE EN REVISIÓN: no detengas por repetición verbal. Revalida desde fuente primaria/recibo independiente la condición terminal anterior; si no se sostiene, vuelve a CONTINUE y cambia de ruta.');
     if (state.stalled >= 3) core.push('AUDITORÍA DE ESTANCAMIENTO: identifica causa raíz y audita TODAS las clases de alternativas pertinentes, no solo repetir herramientas: herramientas y conectores ya autorizados, recuperación de acceso legítima, ejecución externa existente, investigación global, adopción, compra cuando autorizada, integración, colaboración, delegación permitida, adaptación, sustitución, combinación y construcción mínima si no existe solución mejor. Compara valor esperado, tiempo, riesgo, coste, reversibilidad y evidencia primaria; ELIGE tú la mejor ruta para ESTE chat sin pedirme que la seleccione. Evita prometer más de lo verificado.');
     if (state.stalled >= MAX_STALLED_CYCLES) core.push('ÚLTIMA REVISIÓN PROFUNDA antes de cualquier espera: ejecuta la mejor alternativa segura y materialmente distinta, verifica por separado acción y efecto, y deja condición de reanudación concreta para los frentes donde un evento externo sea necesario. No emitas otro informe vacío ni gastes ciclos en la misma operación improductiva.');
     return core.join('\n\n');
@@ -726,10 +727,22 @@
     if (state.repeatedResponses >= 4) { state.stalled=Math.max(state.stalled,3); state.lastStrategy='FORZAR_RUTA_MATERIALMENTE_DISTINTA'; setStatus('Respuesta repetida: cambio material de estrategia obligatorio; continúo.', true); }
     saveState();
     if (receipt && EXIT.has(receipt.status)) {
-      pause(receipt.status === 'VERIFIED_COMPLETE' ? 'El asistente declaró objetivo completado: revisa recibos independientes.' :
-        receipt.status === 'HUMAN_GATE_PROVEN' ? 'El asistente declaró una intervención humana imprescindible.' :
-        'No quedan acciones seguras verificadas; detengo el ciclo.', true);
-      return;
+      const candidateKey = receipt.status + '|' + (receipt.evidence || '').trim();
+      if (state.terminalCandidate === candidateKey && state.terminalConfirmations >= 1) {
+        pause(receipt.status === 'VERIFIED_COMPLETE' ? 'Cierre confirmado en dos ciclos: objetivo declarado completo con evidencia revalidada.' :
+          receipt.status === 'HUMAN_GATE_PROVEN' ? 'Gate humano confirmado en dos ciclos tras reauditoría.' :
+          'Ausencia de acción segura confirmada en dos ciclos tras reauditoría.', true);
+        return;
+      }
+      state.terminalCandidate = candidateKey;
+      state.terminalConfirmations = 1;
+      state.lastStatus = 'CONTINUE';
+      state.stalled = Math.max(state.stalled, 3);
+      saveState();
+      setStatus('Terminal candidato NO cerrado: ejecuto una reauditoría independiente antes de detener.', true);
+    } else if (receipt) {
+      state.terminalCandidate = '';
+      state.terminalConfirmations = 0;
     }
     if (state.missingReceipts >= MAX_NO_RECEIPT_CYCLES) { state.stalled=Math.max(state.stalled,3); setStatus('Faltan metadatos: fuerzo recuperación de métrica/objetivo y continúo con ruta distinta.', true); }
     if (state.stalled > MAX_STALLED_CYCLES && state.lastStrategy === 'AUDITORIA_PROFUNDA_CREAR_O_SUSTITUIR_CAPACIDAD') {
