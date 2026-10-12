@@ -110,10 +110,10 @@ test('permanent health badge names the installed version without pretending the 
   assert.match(script, /function updateHealth\(\)/);
   assert.match(script, /updateHealth\(\)/);
 });
-test('registry keeps stable v4.7.0 while v4.7.1 wording candidate is tested', () => {
-  assert.equal(registry.channels.stable.version_verified_in_repository, '4.7.0');
+test('registry records promoted stable v4.7.1 operator channel', () => {
+  assert.equal(registry.channels.stable.version_verified_in_repository, '4.7.1');
   assert.equal(registry.channels.candidate.version, '4.7.1');
-  assert.equal(registry.channels.candidate.status, 'candidate_case_specific_requirements');
+  assert.equal(registry.channels.candidate.status, 'promoted_to_stable');
   assert.ok(registry.limitations.some(text => text.includes('Native Android/iOS')));
   assert.ok(registry.release_gates.includes('authenticated_chatgpt_browser_smoke_pass'));
   assert.ok(registry.variants.some(v => v.name === 'AVANZA Neon Mission Control' && v.status === 'stable'));
