@@ -216,6 +216,14 @@ test('quest choices parser accepts multiple labeled options', () => {
 });
 
 
+test('recoverable editor and macro-conflict failures defer instead of clearing AUTO', () => {
+  const deliver=script.slice(script.indexOf('  async function deliver(step) {'),script.indexOf('  async function tick() {'));
+  assert.match(deliver,/El editor no aceptó el mensaje todavía; no se envió nada y AUTO reintentará/);
+  assert.match(deliver,/Error recuperable del editor antes del envío; AUTO reintentará/);
+  assert.doesNotMatch(deliver,/pause\('El editor no aceptó/);
+  assert.match(script,/Conflicto de macro detectado: bloqueo envíos y reevalúo automáticamente/);
+});
+
 test('v4.5 exposes a full-screen Mission Control visual mode', () => {
   assert.match(script,/const INSTALLED_VERSION = '4\.5\.[0-9]+-[^']+'/);
   assert.match(script,/data-action="cinema"/);
