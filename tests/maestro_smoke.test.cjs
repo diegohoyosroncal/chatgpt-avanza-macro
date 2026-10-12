@@ -113,7 +113,7 @@ test('permanent health badge names the installed version without pretending the 
 test('registry records universal-bootstrap v4.6.0 candidate channel', () => {
   assert.equal(registry.channels.stable.version_verified_in_repository, '4.6.0');
   assert.equal(registry.channels.candidate.version, '4.6.0');
-  assert.equal(registry.channels.candidate.status, 'candidate_client_proof');
+  assert.equal(registry.channels.candidate.status, 'candidate_universal_bootstrap');
   assert.ok(registry.limitations.some(text => text.includes('Native Android/iOS')));
   assert.ok(registry.release_gates.includes('authenticated_chatgpt_browser_smoke_pass'));
   assert.ok(registry.variants.some(v => v.name === 'AVANZA Neon Mission Control' && v.status === 'stable'));
@@ -224,8 +224,8 @@ test('recoverable editor and macro-conflict failures defer instead of clearing A
   assert.match(script,/Conflicto de macro detectado: bloqueo envíos y reevalúo automáticamente/);
 });
 
-test('v4.5 exposes a full-screen Mission Control visual mode', () => {
-  assert.match(script,/const INSTALLED_VERSION = '4\.5\.[0-9]+-[^']+'/);
+test('v4.6 exposes a full-screen Mission Control visual mode', () => {
+  assert.match(script,/const INSTALLED_VERSION = '4\.6\.[0-9]+-[^']+'/);
   assert.match(script,/data-action="cinema"/);
   assert.match(script,/function renderMissionControl\(\)/);
   assert.match(script,/function toggleMissionControl\(force\)/);
