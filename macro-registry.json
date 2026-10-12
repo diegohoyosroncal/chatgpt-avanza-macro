@@ -1,23 +1,23 @@
 {
   "schema_version": 2,
-  "updated_at": "2026-10-11T20:01:00-05:00",
+  "updated_at": "2026-10-11T20:00:00-05:00",
   "purpose": "Single macro source of truth; user projects, economic state and native app execution are independent",
   "primary_repository": "diegohoyosroncal/chatgpt-avanza-macro",
   "channels": {
     "stable": {
       "path": "avanza_macro_maestro_v4.user.js",
       "branch": "main",
-      "version_verified_in_repository": "4.5.0",
+      "version_verified_in_repository": "4.5.1",
       "installed_profiles": "not_verified",
-      "ci": "PR #21 green: syntax PASS, 37/37 unit tests PASS, headless Chromium UI smoke PASS; merged as 41ebff997617ade732bf1f9022b8322acea72a3b"
+      "ci": "v4.5.1 candidate: self-verifying DOM + conversation proof; CI pending on candidate branch"
     },
     "candidate": {
       "path": "avanza_macro_maestro_v4.user.js",
       "branch": "main",
-      "version": "4.5.0",
-      "status": "promoted_to_stable",
+      "version": "4.5.1",
+      "status": "candidate_client_proof",
       "installed_profiles": "not_verified",
-      "purpose": "continuity-first stable: recognized PROCESS_ID chats resume AUTO without per-chat click; legacy park migration; tasks reserved for true future/periodic/conditional work"
+      "purpose": "continuity-first + self-verifying client proof: DOM data-avanza-client-version and AVANZA_CLIENT_PROOF receipt on real auto continuations"
     }
   },
   "variants": [
@@ -125,6 +125,6 @@
     "learn_quest": "PASS",
     "cfi_quest_bank": "verified in Google Drive",
     "candidate_branch": "fix/v4-5-0-continuity-first-20261011",
-    "candidate_version": "4.5.0"
+    "candidate_version": "4.5.1"
   }
 }
