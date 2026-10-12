@@ -85,3 +85,10 @@ test('SPA route settle suppresses accidental bootstrap while navigating old chat
   assert.match(source,/routeSettleUntil = now\(\) \+ 1000/);
   assert.match(source,/pageBaselineAssistantFingerprint = lastVisibleAssistantFingerprint\(\)/);
 });
+
+test('terminal declarations are challenged once before any permanent stop',()=>{
+  assert.match(source,/Terminal candidato NO cerrado: ejecuto una reauditoría independiente/);
+  assert.match(source,/TERMINAL_CANDIDATE EN REVISIÓN/);
+  assert.match(source,/terminalConfirmations/);
+  assert.match(source,/state\.lastStatus = 'CONTINUE'/);
+});
