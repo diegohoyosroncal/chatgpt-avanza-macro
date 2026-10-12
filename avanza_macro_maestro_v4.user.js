@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         AVANZA — Macro Maestro · Piloto Automático
 // @namespace    https://chatgpt.com/
-// @version      4.5.1
+// @version      4.6.0
 // @description  Cockpit multiproyecto + Learn Quest: módulos ON/OFF, AUTO/MANUAL, progreso serio independiente, misiones jugables y sincronización entre pestañas.
 // @updateURL    https://raw.githubusercontent.com/diegohoyosroncal/chatgpt-avanza-macro/main/avanza_macro_maestro_v4.user.js
 // @downloadURL  https://raw.githubusercontent.com/diegohoyosroncal/chatgpt-avanza-macro/main/avanza_macro_maestro_v4.user.js
@@ -22,7 +22,7 @@
   const SINGLETON = 'data-avanza-maestro-v4-runner';
   if (document.documentElement?.getAttribute(SINGLETON) === '1') return;
   document.documentElement?.setAttribute(SINGLETON, '1');
-  const INSTALLED_VERSION = '4.5.1-client-proof';
+  const INSTALLED_VERSION = '4.6.0-universal-bootstrap';
   document.documentElement?.setAttribute('data-avanza-client-version', INSTALLED_VERSION);
   const LEARN_KEY = 'avanza-v4-learn-quest-v1';
   const CONTROL_KEY = 'avanza-v4-control-center-v1';
@@ -69,6 +69,7 @@
   let channel = null;
   let learning = readLearning();
   let missionOverlay = null;
+  let pageBaselineAssistantFingerprint = '';
 
   function currentChatKey() {
     // Route is scoped to this web chat, not a global prompt or another chat.
@@ -289,6 +290,7 @@
     for (let i = 0; i < s.length; i++) { x ^= s.charCodeAt(i); x = Math.imul(x, 16777619); }
     return (x >>> 0).toString(36) + ':' + s.length;
   }
+  function fallbackProcessId() { return 'CHAT-' + fingerprint(chatKey).split(':')[0].toUpperCase(); }
   function now() { return Date.now(); }
   function visible(e) {
     if (!e || !e.isConnected) return false;
@@ -424,7 +426,7 @@
     const chosen = strategy();
     const core = [
       `${MARK} — CONTROL ADAPTATIVO ${ticket}. Esta señal AGREGA capacidades; NO reemplaza objetivo, autorizaciones, decisiones, instrucciones ni checkpoints de este chat.`,
-      `AVANZA_CLIENT_PROOF: 4.5.1-client-proof | ${ticket}`,
+      `AVANZA_CLIENT_PROOF: 4.6.0-universal-bootstrap | ${ticket}`,
       `Decisión interna de interfaz: ${chosen}. PROCESS_ID actual: ${state.processId || 'POR RECUPERAR'}. Ciclo local ${step}. Anterior conocido (NO prueba externa): progreso ${state.lastPercent ?? 'NO DETERMINABLE'}%, denominador ${state.lastDenominator ?? 'NO DETERMINABLE'}, delta ${state.lastDelta ?? 'NO DETERMINABLE'} pp, ciclos sin progreso ${state.stalled}.`,
       'RECUPERA estado actual desde este chat y fuentes canónicas disponibles. Si falta contexto transversal, usa primero el canon global compartido de Drive ID 1epHKEGs6SjTzrfDi5SeHNaxH7CHX09VTfmYNa7WxIcY y después el canon específico del PROCESS_ID. Evalúa cuál es el objetivo pendiente, su dueño y qué cambió desde la respuesta anterior. No dependas de una cifra inferida de la interfaz para afirmar efectos.',
       'DECIDE TÚ la mejor acción: ejecutar, verificar, conciliar, corregir, investigar globalmente, adoptar/reutilizar/integrar/fusionar/delegar legítimamente/sustituir/adaptar/construir una capacidad faltante, detener una estrategia de valor negativo o cambiar de rumbo. No conviertas AVANZAR en ejecutar por ejecutar, ni le pidas al usuario escoger entre alternativas.',
@@ -833,7 +835,19 @@
     discoverVisibleProjects();
     // Continuity is automatic for a chat that identifies a durable PROCESS_ID.
     // Untagged casual/new chats remain passive until an objective is recognized.
-    const continuityArmed = state.autoConsented === true || Boolean(state.processId);
+    let continuityArmed = state.autoConsented === true || Boolean(state.processId);
+    if (!continuityArmed) {
+      const latestFingerprint = lastVisibleAssistantFingerprint();
+      // Universal bootstrap: a newly produced assistant response arms this chat once.
+      // Merely opening an old untagged chat does not trigger a continuation.
+      if (latestFingerprint && latestFingerprint !== pageBaselineAssistantFingerprint) {
+        state.processId = fallbackProcessId();
+        state.objective = state.objective || 'Objetivo actual de este chat';
+        state.autoConsented = true;
+        saveState();
+        continuityArmed = true;
+      }
+    }
     if (!continuityArmed || state.inFlightTicket) return false;
     if (state.retryAfter && now() < state.retryAfter) return false;
     if (state.parkFingerprint) {
@@ -1349,6 +1363,7 @@
   }
   initChannel();
   function boot() {
+    pageBaselineAssistantFingerprint = lastVisibleAssistantFingerprint();
     mount(); observe(); discoverLearning();
     if (state.inFlightTicket) restoreOutstanding();
     else maybeAutoStart();
