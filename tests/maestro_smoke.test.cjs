@@ -110,10 +110,10 @@ test('permanent health badge names the installed version without pretending the 
   assert.match(script, /function updateHealth\(\)/);
   assert.match(script, /updateHealth\(\)/);
 });
-test('registry records self-verifying v4.5.1 candidate channel', () => {
+test('registry records universal-bootstrap v4.6.0 candidate channel', () => {
   assert.equal(registry.channels.stable.version_verified_in_repository, '4.5.1');
-  assert.equal(registry.channels.candidate.version, '4.5.1');
-  assert.equal(registry.channels.candidate.status, 'candidate_client_proof');
+  assert.equal(registry.channels.candidate.version, '4.6.0');
+  assert.equal(registry.channels.candidate.status, 'candidate_universal_bootstrap');
   assert.ok(registry.limitations.some(text => text.includes('Native Android/iOS')));
   assert.ok(registry.release_gates.includes('authenticated_chatgpt_browser_smoke_pass'));
   assert.ok(registry.variants.some(v => v.name === 'AVANZA Neon Mission Control' && v.status === 'stable'));
@@ -121,7 +121,13 @@ test('registry records self-verifying v4.5.1 candidate channel', () => {
 
 test('real-browser canary has machine-readable DOM and conversation proof markers', () => {
   assert.match(script, /data-avanza-client-version/);
-  assert.match(script, /AVANZA_CLIENT_PROOF: 4\.5\.1-client-proof/);
+  assert.match(script, /AVANZA_CLIENT_PROOF: 4\.6\.0-universal-bootstrap/);
+});
+
+test('new chat bootstrap is change-triggered, not load-triggered', () => {
+  assert.match(script,/pageBaselineAssistantFingerprint/);
+  assert.match(script,/latestFingerprint !== pageBaselineAssistantFingerprint/);
+  assert.match(script,/fallbackProcessId\(\)/);
 });
 
 test('multiproject cockpit exposes six independent module switches', () => {
@@ -210,8 +216,16 @@ test('quest choices parser accepts multiple labeled options', () => {
 });
 
 
-test('v4.5 exposes a full-screen Mission Control visual mode', () => {
-  assert.match(script,/const INSTALLED_VERSION = '4\.5\.[0-9]+-[^']+'/);
+test('recoverable editor and macro-conflict failures defer instead of clearing AUTO', () => {
+  const deliver=script.slice(script.indexOf('  async function deliver(step) {'),script.indexOf('  async function tick() {'));
+  assert.match(deliver,/El editor no aceptó el mensaje todavía; no se envió nada y AUTO reintentará/);
+  assert.match(deliver,/Error recuperable del editor antes del envío; AUTO reintentará/);
+  assert.doesNotMatch(deliver,/pause\('El editor no aceptó/);
+  assert.match(script,/Conflicto de macro detectado: bloqueo envíos y reevalúo automáticamente/);
+});
+
+test('v4.6 exposes a full-screen Mission Control visual mode', () => {
+  assert.match(script,/const INSTALLED_VERSION = '4\.6\.[0-9]+-[^']+'/);
   assert.match(script,/data-action="cinema"/);
   assert.match(script,/function renderMissionControl\(\)/);
   assert.match(script,/function toggleMissionControl\(force\)/);

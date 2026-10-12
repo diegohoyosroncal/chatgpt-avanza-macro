@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         AVANZA — Macro Maestro · Piloto Automático
 // @namespace    https://chatgpt.com/
-// @version      4.5.1
+// @version      4.6.0
 // @description  Cockpit multiproyecto + Learn Quest: módulos ON/OFF, AUTO/MANUAL, progreso serio independiente, misiones jugables y sincronización entre pestañas.
 // @updateURL    https://raw.githubusercontent.com/diegohoyosroncal/chatgpt-avanza-macro/main/avanza_macro_maestro_v4.user.js
 // @downloadURL  https://raw.githubusercontent.com/diegohoyosroncal/chatgpt-avanza-macro/main/avanza_macro_maestro_v4.user.js
@@ -22,7 +22,7 @@
   const SINGLETON = 'data-avanza-maestro-v4-runner';
   if (document.documentElement?.getAttribute(SINGLETON) === '1') return;
   document.documentElement?.setAttribute(SINGLETON, '1');
-  const INSTALLED_VERSION = '4.5.1-client-proof';
+  const INSTALLED_VERSION = '4.6.0-universal-bootstrap';
   document.documentElement?.setAttribute('data-avanza-client-version', INSTALLED_VERSION);
   const LEARN_KEY = 'avanza-v4-learn-quest-v1';
   const CONTROL_KEY = 'avanza-v4-control-center-v1';
@@ -69,6 +69,9 @@
   let channel = null;
   let learning = readLearning();
   let missionOverlay = null;
+  let pageBaselineAssistantFingerprint = '';
+  let routeSettleUntil = 0;
+  let routeHadGeneration = false;
 
   function currentChatKey() {
     // Route is scoped to this web chat, not a global prompt or another chat.
@@ -256,7 +259,7 @@
     saveProjects();
   }
   function freshState() {
-    return { cycles:0,totalSent:0,stalled:0,missingReceipts:0,lastPercent:null,lastDenominator:null,lastDelta:null,lastResponseFingerprint:'',repeatedResponses:0,lastStrategy:'',lastStatus:'',objective:'',nextAction:'',blocker:'',lastNumerator:null,lastProof:'',lastUpdated:'',lastTicket:'',processId:'',autoConsented:false,inFlightTicket:'',inFlightSentAt:0,parkFingerprint:'',parkSince:0,retryAfter:0 };
+    return { cycles:0,totalSent:0,stalled:0,missingReceipts:0,lastPercent:null,lastDenominator:null,lastDelta:null,lastResponseFingerprint:'',repeatedResponses:0,lastStrategy:'',lastStatus:'',objective:'',nextAction:'',blocker:'',lastNumerator:null,lastProof:'',lastUpdated:'',lastTicket:'',processId:'',autoConsented:false,terminalCandidate:'',terminalConfirmations:0,inFlightTicket:'',inFlightSentAt:0,parkFingerprint:'',parkSince:0,retryAfter:0 };
   }
   function recoverState() {
     try {
@@ -289,6 +292,7 @@
     for (let i = 0; i < s.length; i++) { x ^= s.charCodeAt(i); x = Math.imul(x, 16777619); }
     return (x >>> 0).toString(36) + ':' + s.length;
   }
+  function fallbackProcessId() { return 'CHAT-' + fingerprint(chatKey).split(':')[0].toUpperCase(); }
   function now() { return Date.now(); }
   function visible(e) {
     if (!e || !e.isConnected) return false;
@@ -424,7 +428,7 @@
     const chosen = strategy();
     const core = [
       `${MARK} — CONTROL ADAPTATIVO ${ticket}. Esta señal AGREGA capacidades; NO reemplaza objetivo, autorizaciones, decisiones, instrucciones ni checkpoints de este chat.`,
-      `AVANZA_CLIENT_PROOF: 4.5.1-client-proof | ${ticket}`,
+      `AVANZA_CLIENT_PROOF: 4.6.0-universal-bootstrap | ${ticket}`,
       `Decisión interna de interfaz: ${chosen}. PROCESS_ID actual: ${state.processId || 'POR RECUPERAR'}. Ciclo local ${step}. Anterior conocido (NO prueba externa): progreso ${state.lastPercent ?? 'NO DETERMINABLE'}%, denominador ${state.lastDenominator ?? 'NO DETERMINABLE'}, delta ${state.lastDelta ?? 'NO DETERMINABLE'} pp, ciclos sin progreso ${state.stalled}.`,
       'RECUPERA estado actual desde este chat y fuentes canónicas disponibles. Si falta contexto transversal, usa primero el canon global compartido de Drive ID 1epHKEGs6SjTzrfDi5SeHNaxH7CHX09VTfmYNa7WxIcY y después el canon específico del PROCESS_ID. Evalúa cuál es el objetivo pendiente, su dueño y qué cambió desde la respuesta anterior. No dependas de una cifra inferida de la interfaz para afirmar efectos.',
       'DECIDE TÚ la mejor acción: ejecutar, verificar, conciliar, corregir, investigar globalmente, adoptar/reutilizar/integrar/fusionar/delegar legítimamente/sustituir/adaptar/construir una capacidad faltante, detener una estrategia de valor negativo o cambiar de rumbo. No conviertas AVANZAR en ejecutar por ejecutar, ni le pidas al usuario escoger entre alternativas.',
@@ -442,6 +446,7 @@
       'Para el control local termina con EXACTAMENTE UNA línea JSON de metadatos, después del informe: AVANZA_CONTROL: {"status":"CONTINUE","process_id":"","objective":"","previous_pct":null,"current_pct":null,"delta_pp":null,"numerator":null,"denominator":null,"evidence":"","blocker":"","next_action":""}. Estos valores son declaraciones del asistente y NO recibos independientes. Usa VERIFIED_COMPLETE solo si el OBJETIVO PRINCIPAL está completamente verificado con fuente primaria, HUMAN_GATE_PROVEN solo si se agotaron alternativas legítimas, NO_SAFE_ACTION solo si realmente no queda acción segura positiva. Nunca afirmes resultado final por CI, cola DONE, pruebas aisladas, documentos o esta macro. Mantén el denominador del MISMO objetivo, no mezcles ámbitos.',
       `${RECEIPT} ${ticket}`,
     ];
+    if (state.terminalCandidate) core.push('TERMINAL_CANDIDATE EN REVISIÓN: no detengas por repetición verbal. Revalida desde fuente primaria/recibo independiente la condición terminal anterior; si no se sostiene, vuelve a CONTINUE y cambia de ruta.');
     if (state.stalled >= 3) core.push('AUDITORÍA DE ESTANCAMIENTO: identifica causa raíz y audita TODAS las clases de alternativas pertinentes, no solo repetir herramientas: herramientas y conectores ya autorizados, recuperación de acceso legítima, ejecución externa existente, investigación global, adopción, compra cuando autorizada, integración, colaboración, delegación permitida, adaptación, sustitución, combinación y construcción mínima si no existe solución mejor. Compara valor esperado, tiempo, riesgo, coste, reversibilidad y evidencia primaria; ELIGE tú la mejor ruta para ESTE chat sin pedirme que la seleccione. Evita prometer más de lo verificado.');
     if (state.stalled >= MAX_STALLED_CYCLES) core.push('ÚLTIMA REVISIÓN PROFUNDA antes de cualquier espera: ejecuta la mejor alternativa segura y materialmente distinta, verifica por separado acción y efecto, y deja condición de reanudación concreta para los frentes donde un evento externo sea necesario. No emitas otro informe vacío ni gastes ciclos en la misma operación improductiva.');
     return core.join('\n\n');
@@ -548,6 +553,9 @@
     releaseLease(); // release the previous chat lease BEFORE switching keys
     chatKey = current;
     state = recoverState();
+    routeHadGeneration = isGenerating();
+    routeSettleUntil = now() + 1000;
+    pageBaselineAssistantFingerprint = lastVisibleAssistantFingerprint();
     pending = null;
     replyCandidate = { fingerprint: '', firstSeen: 0 };
     phase = STATES.IDLE;
@@ -594,7 +602,7 @@
       // Never demand an enabled send control BEFORE filling it.
       const ticket = `AVZ4-${String(now())}-${state.totalSent + 1}`;
       const message = buildMessage(ticket, step);
-      if (!fillComposer(c, message)) { pause('El editor no aceptó el mensaje; no se envió nada.', true); return; }
+      if (!fillComposer(c, message)) { defer('El editor no aceptó el mensaje todavía; no se envió nada y AUTO reintentará.', true, 5000); return; }
       // Wait briefly for React/ProseMirror to enable Send after input/change.
       let liveSend = null;
       for (let attempt = 0; attempt < 8; attempt += 1) {
@@ -630,7 +638,14 @@
       setStatus(`Ciclo ${state.cycles} enviado; comprobando respuesta…`);
       saveState();
     } catch {
-      pause('Error del editor: envío no acreditado. Verifica el borrador.', true);
+      if (state.inFlightTicket) {
+        phase = STATES.WAITING;
+        pending = null;
+        setStatus('Error posterior al intento: conservo el ticket y reconcilio sin reenvío.', true);
+        restoreOutstanding();
+      } else {
+        defer('Error recuperable del editor antes del envío; AUTO reintentará sin pedir otro clic.', true, 5000);
+      }
     } finally { busy = false; render(); }
   }
   async function tick() {
@@ -712,10 +727,22 @@
     if (state.repeatedResponses >= 4) { state.stalled=Math.max(state.stalled,3); state.lastStrategy='FORZAR_RUTA_MATERIALMENTE_DISTINTA'; setStatus('Respuesta repetida: cambio material de estrategia obligatorio; continúo.', true); }
     saveState();
     if (receipt && EXIT.has(receipt.status)) {
-      pause(receipt.status === 'VERIFIED_COMPLETE' ? 'El asistente declaró objetivo completado: revisa recibos independientes.' :
-        receipt.status === 'HUMAN_GATE_PROVEN' ? 'El asistente declaró una intervención humana imprescindible.' :
-        'No quedan acciones seguras verificadas; detengo el ciclo.', true);
-      return;
+      const candidateKey = receipt.status + '|' + (receipt.evidence || '').trim();
+      if (state.terminalCandidate === candidateKey && state.terminalConfirmations >= 1) {
+        pause(receipt.status === 'VERIFIED_COMPLETE' ? 'Cierre confirmado en dos ciclos: objetivo declarado completo con evidencia revalidada.' :
+          receipt.status === 'HUMAN_GATE_PROVEN' ? 'Gate humano confirmado en dos ciclos tras reauditoría.' :
+          'Ausencia de acción segura confirmada en dos ciclos tras reauditoría.', true);
+        return;
+      }
+      state.terminalCandidate = candidateKey;
+      state.terminalConfirmations = 1;
+      state.lastStatus = 'CONTINUE';
+      state.stalled = Math.max(state.stalled, 3);
+      saveState();
+      setStatus('Terminal candidato NO cerrado: ejecuto una reauditoría independiente antes de detener.', true);
+    } else if (receipt) {
+      state.terminalCandidate = '';
+      state.terminalConfirmations = 0;
     }
     if (state.missingReceipts >= MAX_NO_RECEIPT_CYCLES) { state.stalled=Math.max(state.stalled,3); setStatus('Faltan metadatos: fuerzo recuperación de métrica/objetivo y continúo con ruta distinta.', true); }
     if (state.stalled > MAX_STALLED_CYCLES && state.lastStrategy === 'AUDITORIA_PROFUNDA_CREAR_O_SUSTITUIR_CAPACIDAD') {
@@ -833,7 +860,24 @@
     discoverVisibleProjects();
     // Continuity is automatic for a chat that identifies a durable PROCESS_ID.
     // Untagged casual/new chats remain passive until an objective is recognized.
-    const continuityArmed = state.autoConsented === true || Boolean(state.processId);
+    let continuityArmed = state.autoConsented === true || Boolean(state.processId);
+    if (!continuityArmed && routeSettleUntil && now() < routeSettleUntil) {
+      routeHadGeneration = routeHadGeneration || isGenerating();
+      if (!routeHadGeneration) pageBaselineAssistantFingerprint = lastVisibleAssistantFingerprint();
+      return false;
+    }
+    if (!continuityArmed) {
+      const latestFingerprint = lastVisibleAssistantFingerprint();
+      // Universal bootstrap: a newly produced assistant response arms this chat once.
+      // Merely opening an old untagged chat does not trigger a continuation.
+      if (latestFingerprint && latestFingerprint !== pageBaselineAssistantFingerprint) {
+        state.processId = fallbackProcessId();
+        state.objective = state.objective || 'Objetivo actual de este chat';
+        state.autoConsented = true;
+        saveState();
+        continuityArmed = true;
+      }
+    }
     if (!continuityArmed || state.inFlightTicket) return false;
     if (state.retryAfter && now() < state.retryAfter) return false;
     if (state.parkFingerprint) {
@@ -1128,7 +1172,7 @@
     if (label === conflictSummary) return competing.length > 0;
     conflictSummary = label;
     if (competing.length) {
-      if (phase === STATES.READY || phase === STATES.WAITING) pause('Conflicto: desactiva las macros antiguas en Tampermonkey antes de AVANZAR.', true);
+      if (phase === STATES.READY || phase === STATES.WAITING) defer('Conflicto de macro detectado: bloqueo envíos y reevalúo automáticamente cuando desaparezca.', true, 5000);
       setStatus('Detectadas macros simultáneas: ' + label + '. Desactívalas en Tampermonkey. No se enviará nada.', true);
     } else if (!stopReason) {
       setStatus('Lista. Versión local ' + INSTALLED_VERSION + '; versión remota no verificada.');
@@ -1349,6 +1393,7 @@
   }
   initChannel();
   function boot() {
+    pageBaselineAssistantFingerprint = lastVisibleAssistantFingerprint();
     mount(); observe(); discoverLearning();
     if (state.inFlightTicket) restoreOutstanding();
     else maybeAutoStart();
