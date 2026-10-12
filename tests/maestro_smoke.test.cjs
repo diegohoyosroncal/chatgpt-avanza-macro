@@ -205,8 +205,8 @@ test('quest choices parser accepts multiple labeled options', () => {
 });
 
 
-test('v4.4 exposes a full-screen Mission Control visual mode', () => {
-  assert.match(script,/const INSTALLED_VERSION = '4\.4\.[0-9]+-[^']+'/);
+test('v4.5 exposes a full-screen Mission Control visual mode', () => {
+  assert.match(script,/const INSTALLED_VERSION = '4\\.5\\.[0-9]+-[^']+'/);
   assert.match(script,/data-action="cinema"/);
   assert.match(script,/function renderMissionControl\(\)/);
   assert.match(script,/function toggleMissionControl\(force\)/);
