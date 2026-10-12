@@ -1,6 +1,6 @@
 {
   "schema_version": 2,
-  "updated_at": "2026-10-11T22:10:00-05:00",
+  "updated_at": "2026-10-11T22:20:00-05:00",
   "purpose": "Single macro source of truth; user projects, economic state and native app execution are independent",
   "primary_repository": "diegohoyosroncal/chatgpt-avanza-macro",
   "channels": {
@@ -14,10 +14,10 @@
     "candidate": {
       "path": "avanza_macro_maestro_v4.user.js",
       "branch": "main",
-      "version": "4.7.0",
-      "status": "promoted_to_stable",
+      "version": "4.7.1",
+      "status": "candidate_case_specific_requirements",
       "installed_profiles": "not_verified",
-      "purpose": "full-spectrum proactive operator: passive-response failure, material route exhaustion, plugin/web capability discovery, materially different strategy after repeated no-delta, universal bootstrap and self-proof"
+      "purpose": "full-spectrum operator with requirements scoped to concrete actions; a blocked route is not generalized to the whole objective"
     }
   },
   "variants": [
@@ -117,15 +117,15 @@
   ],
   "rollback": "Restore avanza_macro_maestro_v4.user.js from commit ad812155a070654770508cfae6f677bd8d8fdecf (v4.0.3); never delete project state.",
   "release_evidence": {
-    "pr": 24,
-    "merge_commit": "223b3749a464f90415d8b9c1f15c54e462f3deb5",
-    "offline_tests": "44/44 PASS",
-    "chromium_hud": "PASS 1280x800 + 390x844; full-spectrum operator + mission-control/ribbon/interactive/rescue/fixed/drag/theme/compact/version/conflict",
+    "pr": null,
+    "merge_commit": null,
+    "offline_tests": "pending",
+    "chromium_hud": "pending",
     "authenticated_profile": "not_verified",
     "learn_quest": "PASS",
     "cfi_quest_bank": "verified in Google Drive",
-    "candidate_branch": "feat/v4-7-0-full-spectrum-operator-20261011",
-    "candidate_version": "4.7.0",
+    "candidate_branch": "fix/v4-7-1-wording-20261011",
+    "candidate_version": "4.7.1",
     "workflow_run": 38198164145
   }
 }

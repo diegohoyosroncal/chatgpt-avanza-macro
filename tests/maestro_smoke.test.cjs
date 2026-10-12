@@ -110,10 +110,10 @@ test('permanent health badge names the installed version without pretending the 
   assert.match(script, /function updateHealth\(\)/);
   assert.match(script, /updateHealth\(\)/);
 });
-test('registry records promoted stable v4.7.0 operator channel', () => {
+test('registry keeps stable v4.7.0 while v4.7.1 wording candidate is tested', () => {
   assert.equal(registry.channels.stable.version_verified_in_repository, '4.7.0');
-  assert.equal(registry.channels.candidate.version, '4.7.0');
-  assert.equal(registry.channels.candidate.status, 'promoted_to_stable');
+  assert.equal(registry.channels.candidate.version, '4.7.1');
+  assert.equal(registry.channels.candidate.status, 'candidate_case_specific_requirements');
   assert.ok(registry.limitations.some(text => text.includes('Native Android/iOS')));
   assert.ok(registry.release_gates.includes('authenticated_chatgpt_browser_smoke_pass'));
   assert.ok(registry.variants.some(v => v.name === 'AVANZA Neon Mission Control' && v.status === 'stable'));
@@ -121,7 +121,7 @@ test('registry records promoted stable v4.7.0 operator channel', () => {
 
 test('real-browser canary has machine-readable DOM and conversation proof markers', () => {
   assert.match(script, /data-avanza-client-version/);
-  assert.match(script, /AVANZA_CLIENT_PROOF: 4\.7\.0-full-spectrum-operator/);
+  assert.match(script, /AVANZA_CLIENT_PROOF: 4\.7\.1-full-spectrum-operator/);
 });
 
 test('new chat bootstrap is change-triggered, not load-triggered', () => {
@@ -136,6 +136,12 @@ test('full-spectrum operator contract rejects passive status-only behavior', () 
   assert.match(script,/BÚSQUEDA ACTIVA DE CAPACIDAD/);
   assert.match(script,/Un bloqueo de una herramienta no es bloqueo del objetivo/);
   assert.match(script,/No repitas una consulta negativa como si agotara la clase de solución/);
+});
+
+test('execution wording scopes requirements to concrete actions instead of generic filters', () => {
+  assert.doesNotMatch(script,/acciones seguras y autorizadas con valor positivo/);
+  assert.match(script,/REQUISITOS REALES DEL CASO/);
+  assert.match(script,/no generalices el bloqueo de una ruta a todo el objetivo/);
 });
 
 test('multiproject cockpit exposes six independent module switches', () => {

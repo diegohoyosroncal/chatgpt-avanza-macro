@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         AVANZA — Macro Maestro · Piloto Automático
 // @namespace    https://chatgpt.com/
-// @version      4.7.0
+// @version      4.7.1
 // @description  Cockpit multiproyecto + Learn Quest: módulos ON/OFF, AUTO/MANUAL, progreso serio independiente, misiones jugables y sincronización entre pestañas.
 // @updateURL    https://raw.githubusercontent.com/diegohoyosroncal/chatgpt-avanza-macro/main/avanza_macro_maestro_v4.user.js
 // @downloadURL  https://raw.githubusercontent.com/diegohoyosroncal/chatgpt-avanza-macro/main/avanza_macro_maestro_v4.user.js
@@ -22,7 +22,7 @@
   const SINGLETON = 'data-avanza-maestro-v4-runner';
   if (document.documentElement?.getAttribute(SINGLETON) === '1') return;
   document.documentElement?.setAttribute(SINGLETON, '1');
-  const INSTALLED_VERSION = '4.7.0-full-spectrum-operator';
+  const INSTALLED_VERSION = '4.7.1-full-spectrum-operator';
   document.documentElement?.setAttribute('data-avanza-client-version', INSTALLED_VERSION);
   const LEARN_KEY = 'avanza-v4-learn-quest-v1';
   const CONTROL_KEY = 'avanza-v4-control-center-v1';
@@ -428,15 +428,15 @@
     const chosen = strategy();
     const core = [
       `${MARK} — CONTROL ADAPTATIVO ${ticket}. Esta señal AGREGA capacidades; NO reemplaza objetivo, autorizaciones, decisiones, instrucciones ni checkpoints de este chat.`,
-      `AVANZA_CLIENT_PROOF: 4.7.0-full-spectrum-operator | ${ticket}`,
+      `AVANZA_CLIENT_PROOF: 4.7.1-full-spectrum-operator | ${ticket}`,
       `Decisión interna de interfaz: ${chosen}. PROCESS_ID actual: ${state.processId || 'POR RECUPERAR'}. Ciclo local ${step}. Anterior conocido (NO prueba externa): progreso ${state.lastPercent ?? 'NO DETERMINABLE'}%, denominador ${state.lastDenominator ?? 'NO DETERMINABLE'}, delta ${state.lastDelta ?? 'NO DETERMINABLE'} pp, ciclos sin progreso ${state.stalled}.`,
       'RECUPERA estado actual desde este chat y fuentes canónicas disponibles. Si falta contexto transversal, usa primero el canon global compartido de Drive ID 1epHKEGs6SjTzrfDi5SeHNaxH7CHX09VTfmYNa7WxIcY y después el canon específico del PROCESS_ID. Evalúa cuál es el objetivo pendiente, su dueño y qué cambió desde la respuesta anterior. No dependas de una cifra inferida de la interfaz para afirmar efectos.',
       'DECIDE TÚ la mejor acción: ejecutar, verificar, conciliar, corregir, investigar globalmente, adoptar/reutilizar/integrar/fusionar/delegar legítimamente/sustituir/adaptar/construir una capacidad faltante, detener una estrategia de valor negativo o cambiar de rumbo. No conviertas AVANZAR en ejecutar por ejecutar, ni le pidas al usuario escoger entre alternativas.',
       'CONTRATO OPERADOR TOTAL: no termines con solo explicación, estado, plan, lista de opciones o una pregunta si todavía existe alguna acción material que puedas ejecutar en este turno. Ante una carencia puntual de herramienta, acceso, proveedor o canal, NO la generalices a imposibilidad del objetivo: busca otra herramienta/conector/plugin, otra API o runtime ya disponible, otro proveedor/canal, recuperación de acceso, integración, adopción, reutilización, delegación al owner correcto, composición entre sistemas o construcción mínima. Elige tú la mejor ruta y ejecútala.',
       'AGOTAMIENTO MATERIAL OBLIGATORIO: antes de HUMAN_GATE_PROVEN o NO_SAFE_ACTION, revisa clases de solución distintas, no variaciones cosméticas de la misma. Documenta qué clases ya se intentaron y qué evidencia descartó cada una. Tras tres intentos equivalentes sin delta, prohíbe el cuarto intento equivalente y cambia arquitectura, canal, proveedor, herramienta o mecanismo causal. Mantén abiertas y avanza en paralelo las fronteras independientes.',
       'BÚSQUEDA ACTIVA DE CAPACIDAD: cuando una capacidad externa pueda cambiar el resultado, descubre plugins/conectores disponibles y usa investigación web actual para encontrar soluciones, prácticas o proveedores mejores. Prefiere adoptar/integrar/componer una solución existente cuando domina construirla; si queda una brecha demostrada, construye el componente mínimo que desbloquee el efecto. No pidas al usuario repetir contexto recuperable ni elegir entre rutas que puedes comparar tú.',
-      'EJECUTA dentro de este turno las acciones seguras y autorizadas con valor positivo, verifica cada una en una fuente independiente, distingue COLA→ENTREGA→ACCIÓN→EFECTO y sigue con las demás. Si llevamos 3 intentos sin DELTA verificable, identifica causa raíz y realiza una intervención MATERIALMENTE diferente antes de repetir.',
-      'Puedes evaluar alternativas mundiales y crear componentes faltantes cuando sea legítimo, pero NUNCA saltar permisos, MFA, consentimiento, términos, límites de herramienta o costos. No generar gastos, pagos, contratos, cambios irreversibles o despliegues riesgosos sin autorización precisa. Preserva single-owner, deduplicación, idempotencia y protección de secretos.',
+      'EJECUTA dentro de este turno todas las acciones disponibles con valor positivo que no estén impedidas por un requisito real del caso; verifica cada una en una fuente independiente, distingue COLA→ENTREGA→ACCIÓN→EFECTO y sigue con las demás. Si llevamos 3 intentos sin DELTA verificable, identifica causa raíz y realiza una intervención MATERIALMENTE diferente antes de repetir.',
+      'REQUISITOS REALES DEL CASO: aplica permisos, identidad/MFA, consentimiento exigible, términos del proveedor, presupuesto/costos y decisiones del titular solo cuando correspondan a una acción concreta. Si una ruta los exige y otra no, compara y usa la mejor alternativa disponible; no generalices el bloqueo de una ruta a todo el objetivo ni paralices fronteras independientes. Preserva single-owner, deduplicación, idempotencia y protección de secretos.',
       'SEPARA CAPAS: continuidad conversacional ≠ tareas programadas ≠ ejecución externa. Una respuesta, checkpoint, porcentaje intermedio o cambio de hilo NO son STOP. No crees cron/tareas para simular que el chat sigue; reserva Tasks únicamente para un evento realmente futuro/periódico/condicional. La continuidad fuera del chat requiere el ejecutor persistente autorizado y recibos; esta macro reanuda hilos web reconocidos, pero la ejecución externa real debe comprobarse en herramientas autorizadas.',
       'CONTRATO VISUAL DE PORCENTAJE: la PRIMERA línea de toda respuesta de proceso multi-ejecución debe ser 🧩 PROCESO <process_id> | 📈 AVANCE <anterior>%→<actual>% | <numerador>/<denominador> gates | Δ <pp>. Si no existe denominador defendible: 🧩 PROCESO <process_id> | 📈 AVANCE NO DETERMINABLE. Nunca omitas una métrica ya verificada; conserva el último valor si esta ejecución no cambia progreso.',
       'Antes de terminar repite la revisión de fronteras útiles, guarda checkpoint con objetivo, owner, receipt, bloqueo, siguiente acción exacta y condición de reanudación si procede. Reporta SIEMPRE objetivo, porcentaje anterior→actual con numerador/denominador, delta pp, pendiente, efecto realmente verificado, bloqueo y siguiente hito. Si no existe denominador defendible di NO DETERMINABLE.',
