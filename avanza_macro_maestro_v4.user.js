@@ -601,7 +601,7 @@
       // Never demand an enabled send control BEFORE filling it.
       const ticket = `AVZ4-${String(now())}-${state.totalSent + 1}`;
       const message = buildMessage(ticket, step);
-      if (!fillComposer(c, message)) { pause('El editor no aceptó el mensaje; no se envió nada.', true); return; }
+      if (!fillComposer(c, message)) { defer('El editor no aceptó el mensaje todavía; no se envió nada y AUTO reintentará.', true, 5000); return; }
       // Wait briefly for React/ProseMirror to enable Send after input/change.
       let liveSend = null;
       for (let attempt = 0; attempt < 8; attempt += 1) {
@@ -637,7 +637,14 @@
       setStatus(`Ciclo ${state.cycles} enviado; comprobando respuesta…`);
       saveState();
     } catch {
-      pause('Error del editor: envío no acreditado. Verifica el borrador.', true);
+      if (state.inFlightTicket) {
+        phase = STATES.WAITING;
+        pending = null;
+        setStatus('Error posterior al intento: conservo el ticket y reconcilio sin reenvío.', true);
+        restoreOutstanding();
+      } else {
+        defer('Error recuperable del editor antes del envío; AUTO reintentará sin pedir otro clic.', true, 5000);
+      }
     } finally { busy = false; render(); }
   }
   async function tick() {
@@ -1152,7 +1159,7 @@
     if (label === conflictSummary) return competing.length > 0;
     conflictSummary = label;
     if (competing.length) {
-      if (phase === STATES.READY || phase === STATES.WAITING) pause('Conflicto: desactiva las macros antiguas en Tampermonkey antes de AVANZAR.', true);
+      if (phase === STATES.READY || phase === STATES.WAITING) defer('Conflicto de macro detectado: bloqueo envíos y reevalúo automáticamente cuando desaparezca.', true, 5000);
       setStatus('Detectadas macros simultáneas: ' + label + '. Desactívalas en Tampermonkey. No se enviará nada.', true);
     } else if (!stopReason) {
       setStatus('Lista. Versión local ' + INSTALLED_VERSION + '; versión remota no verificada.');
