@@ -832,10 +832,9 @@
     if (!continuityArmed || state.inFlightTicket) return false;
     if (state.retryAfter && now() < state.retryAfter) return false;
     if (state.parkFingerprint) {
-      const fresh=lastVisibleAssistantFingerprint();
-      if (!fresh || fresh===state.parkFingerprint) return false;
+      // v4.5 migration: legacy parked chats must not remain permanently frozen.
       state.parkFingerprint=''; state.parkSince=0;
-      state.stalled=0; state.missingReceipts=0; saveState();
+      state.stalled=Math.max(3,state.stalled||0); state.missingReceipts=0; saveState();
     }
     if(!moduleOn('engine')||!moduleOn('auto')||checkConflicts()||isGenerating()) return false;
     discoverVisibleProjects();
