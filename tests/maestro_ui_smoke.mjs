@@ -26,7 +26,7 @@ try {
     await host.locator('[data-action="collapse"]').click();
     assert.doesNotMatch(await dock.getAttribute('class'),/compact/);
     const localVersion = await host.locator('[data-value="health"]').innerText();
-    assert.match(localVersion,/4\.4\.[0-9]+-[a-z0-9-]+/);
+    assert.match(localVersion,/4\.5\.[0-9]+-[a-z0-9-]+/);
     assert.match(localVersion,/remota NO verificada/);
     assert.equal(await host.locator('[data-module]').count(),6);
     assert.match(await host.locator('[data-module="auto"]').innerText(),/AUTO ON/);
@@ -93,7 +93,11 @@ try {
       const h=document.getElementById('avanza-macro-maestro-v4')?.shadowRoot;
       return h?.querySelector('[data-value="health"]')?.dataset.warning === 'true';
     },{timeout:5000});
-    assert.equal(await host.locator('[data-action="avanzar"]').isDisabled(),true);
+    // Conflict keeps AVANZAR clickable so the UI can explain the block, but sending remains fail-closed.
+    assert.equal(await host.locator('[data-action="avanzar"]').isEnabled(),true);
+    await host.locator('[data-action="avanzar"]').click();
+    assert.equal(await page.locator('#prompt-textarea').inputValue(),'');
+    assert.match(await host.locator('[data-value="health"]').innerText(),/envíos bloqueados/);
     await page.evaluate(() => document.getElementById('diego-mision-autonomia-v1').remove());
     await page.waitForFunction(() => {
       const h=document.getElementById('avanza-macro-maestro-v4')?.shadowRoot;

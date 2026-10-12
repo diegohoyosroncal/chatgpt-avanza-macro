@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         AVANZA — Macro Maestro · Piloto Automático
 // @namespace    https://chatgpt.com/
-// @version      4.4.6
+// @version      4.5.0
 // @description  Cockpit multiproyecto + Learn Quest: módulos ON/OFF, AUTO/MANUAL, progreso serio independiente, misiones jugables y sincronización entre pestañas.
 // @updateURL    https://raw.githubusercontent.com/diegohoyosroncal/chatgpt-avanza-macro/main/avanza_macro_maestro_v4.user.js
 // @downloadURL  https://raw.githubusercontent.com/diegohoyosroncal/chatgpt-avanza-macro/main/avanza_macro_maestro_v4.user.js
@@ -22,7 +22,7 @@
   const SINGLETON = 'data-avanza-maestro-v4-runner';
   if (document.documentElement?.getAttribute(SINGLETON) === '1') return;
   document.documentElement?.setAttribute(SINGLETON, '1');
-  const INSTALLED_VERSION = '4.4.6-button-feedback';
+  const INSTALLED_VERSION = '4.5.0-continuity-first';
   const LEARN_KEY = 'avanza-v4-learn-quest-v1';
   const CONTROL_KEY = 'avanza-v4-control-center-v1';
   const PROJECTS_KEY = 'avanza-v4-project-registry-v1';
@@ -255,7 +255,7 @@
     saveProjects();
   }
   function freshState() {
-    return { cycles:0,totalSent:0,stalled:0,missingReceipts:0,lastPercent:null,lastDenominator:null,lastDelta:null,lastResponseFingerprint:'',repeatedResponses:0,lastStrategy:'',lastStatus:'',objective:'',nextAction:'',blocker:'',lastNumerator:null,lastProof:'',lastUpdated:'',lastTicket:'',processId:'',autoConsented:false,inFlightTicket:'',inFlightSentAt:0,parkFingerprint:'',parkSince:0 };
+    return { cycles:0,totalSent:0,stalled:0,missingReceipts:0,lastPercent:null,lastDenominator:null,lastDelta:null,lastResponseFingerprint:'',repeatedResponses:0,lastStrategy:'',lastStatus:'',objective:'',nextAction:'',blocker:'',lastNumerator:null,lastProof:'',lastUpdated:'',lastTicket:'',processId:'',autoConsented:false,inFlightTicket:'',inFlightSentAt:0,parkFingerprint:'',parkSince:0,retryAfter:0 };
   }
   function recoverState() {
     try {
@@ -424,11 +424,11 @@
     const core = [
       `${MARK} — CONTROL ADAPTATIVO ${ticket}. Esta señal AGREGA capacidades; NO reemplaza objetivo, autorizaciones, decisiones, instrucciones ni checkpoints de este chat.`,
       `Decisión interna de interfaz: ${chosen}. PROCESS_ID actual: ${state.processId || 'POR RECUPERAR'}. Ciclo local ${step}. Anterior conocido (NO prueba externa): progreso ${state.lastPercent ?? 'NO DETERMINABLE'}%, denominador ${state.lastDenominator ?? 'NO DETERMINABLE'}, delta ${state.lastDelta ?? 'NO DETERMINABLE'} pp, ciclos sin progreso ${state.stalled}.`,
-      'RECUPERA estado actual desde este chat y fuentes canónicas disponibles. Evalúa primero cuál es el verdadero objetivo pendiente, su dueño y qué cambió desde la respuesta anterior. No dependas de una cifra inferida de la interfaz para afirmar efectos.',
+      'RECUPERA estado actual desde este chat y fuentes canónicas disponibles. Si falta contexto transversal, usa primero el canon global compartido de Drive ID 1epHKEGs6SjTzrfDi5SeHNaxH7CHX09VTfmYNa7WxIcY y después el canon específico del PROCESS_ID. Evalúa cuál es el objetivo pendiente, su dueño y qué cambió desde la respuesta anterior. No dependas de una cifra inferida de la interfaz para afirmar efectos.',
       'DECIDE TÚ la mejor acción: ejecutar, verificar, conciliar, corregir, investigar globalmente, adoptar/reutilizar/integrar/fusionar/delegar legítimamente/sustituir/adaptar/construir una capacidad faltante, detener una estrategia de valor negativo o cambiar de rumbo. No conviertas AVANZAR en ejecutar por ejecutar, ni le pidas al usuario escoger entre alternativas.',
       'EJECUTA dentro de este turno las acciones seguras y autorizadas con valor positivo, verifica cada una en una fuente independiente, distingue COLA→ENTREGA→ACCIÓN→EFECTO y sigue con las demás. Si llevamos 3 intentos sin DELTA verificable, identifica causa raíz y realiza una intervención MATERIALMENTE diferente antes de repetir.',
       'Puedes evaluar alternativas mundiales y crear componentes faltantes cuando sea legítimo, pero NUNCA saltar permisos, MFA, consentimiento, términos, límites de herramienta o costos. No generar gastos, pagos, contratos, cambios irreversibles o despliegues riesgosos sin autorización precisa. Preserva single-owner, deduplicación, idempotencia y protección de secretos.',
-      'La continuidad fuera del chat requiere el ejecutor externo existente AUTORIZADO y sus recibos; no basta enviar mensajes con la macro ni crear más cron/tareas. No simules persistencia o cumplimiento universal en otros chats. Esta macro puede proponer una continuación del hilo web abierto, pero la ejecución real debe comprobarse en herramientas autorizadas.',
+      'SEPARA CAPAS: continuidad conversacional ≠ tareas programadas ≠ ejecución externa. Una respuesta, checkpoint, porcentaje intermedio o cambio de hilo NO son STOP. No crees cron/tareas para simular que el chat sigue; reserva Tasks únicamente para un evento realmente futuro/periódico/condicional. La continuidad fuera del chat requiere el ejecutor persistente autorizado y recibos; esta macro reanuda hilos web reconocidos, pero la ejecución externa real debe comprobarse en herramientas autorizadas.',
       'CONTRATO VISUAL DE PORCENTAJE: la PRIMERA línea de toda respuesta de proceso multi-ejecución debe ser 🧩 PROCESO <process_id> | 📈 AVANCE <anterior>%→<actual>% | <numerador>/<denominador> gates | Δ <pp>. Si no existe denominador defendible: 🧩 PROCESO <process_id> | 📈 AVANCE NO DETERMINABLE. Nunca omitas una métrica ya verificada; conserva el último valor si esta ejecución no cambia progreso.',
       'Antes de terminar repite la revisión de fronteras útiles, guarda checkpoint con objetivo, owner, receipt, bloqueo, siguiente acción exacta y condición de reanudación si procede. Reporta SIEMPRE objetivo, porcentaje anterior→actual con numerador/denominador, delta pp, pendiente, efecto realmente verificado, bloqueo y siguiente hito. Si no existe denominador defendible di NO DETERMINABLE.',
       'MULTIPROYECTO: identifica un PROCESS_ID estable para este objetivo y NO mezcles su porcentaje con otro proceso. Si el chat contiene varias fronteras, evalúa sus objetivos y restricciones individualmente, actúa solo en las autorizadas y conserva métricas independientes. Otros proyectos pueden avanzar en sus propios chats/tabs.',
@@ -518,11 +518,23 @@
   }
   function pause(reason, warn = false) {
     phase = STATES.PAUSED;
-    state.autoConsented=false; // A paused chat never silently restarts on tab reload.
+    state.autoConsented=false;
+    state.retryAfter=0;
     releaseLease();
     pending = null;
     replyCandidate = { fingerprint: '', firstSeen: 0 };
     stopReason = reason;
+    setStatus(reason, warn);
+    render();
+    saveState();
+  }
+  function defer(reason, warn = false, delayMs = 5000) {
+    phase = STATES.IDLE;
+    state.retryAfter = now() + Math.max(1000, delayMs);
+    releaseLease();
+    pending = null;
+    replyCandidate = { fingerprint: '', firstSeen: 0 };
+    stopReason = '';
     setStatus(reason, warn);
     render();
     saveState();
@@ -539,8 +551,8 @@
     phase = STATES.IDLE;
     stopReason = '';
     if (state.inFlightTicket) restoreOutstanding();
-    if (wasRunning) setStatus('Chat cambiado: pausé el ciclo anterior. AVANZAR funciona aquí.', true);
-    else setStatus('Lista en este chat. Se activa solo al pulsar AVANZAR.');
+    if (wasRunning) setStatus('Chat cambiado: liberé el lease anterior; este hilo reanuda AUTO si reconoce su PROCESS_ID.', true);
+    else setStatus('Lista en este chat. Los procesos reconocidos reanudan AUTO sin otro clic.');
     render();
   }
   // A Web Lock makes the final pre-send receipt check atomic between browser tabs
@@ -570,12 +582,12 @@
     try {
       syncRoute();
       if (phase !== STATES.READY) return;
-      if (!renewLease()) { pause('Otro panel tiene el control de este chat; no duplico envíos.', true); return; }
+      if (!renewLease()) { defer('Otro panel tiene el control de este chat; reintento cuando venza el lease.', true, 3000); return; }
       if (document.hidden && !control.backgroundAuto) { setStatus('Pestaña en segundo plano: AUTO-background está OFF.'); return; }
       if (isGenerating()) { setStatus('Respuesta en curso; no duplico mensajes.'); return; }
       const c = findComposer();
-      if (!c) { pause('No encuentro el cuadro de mensaje; no se envió nada.', true); return; }
-      if (draft(c)) { pause('Hay un borrador escrito. Se conservó intacto.', true); return; }
+      if (!c) { defer('No encuentro el cuadro de mensaje todavía; AUTO reintentará tras remount.', true, 3000); return; }
+      if (draft(c)) { defer('Hay un borrador escrito. Se conserva intacto y AUTO reanuda cuando quede libre.', true, 3000); return; }
       // ChatGPT normally disables Enviar when the composer is empty.
       // Never demand an enabled send control BEFORE filling it.
       const ticket = `AVZ4-${String(now())}-${state.totalSent + 1}`;
@@ -591,20 +603,20 @@
         if (liveSend) break;
       }
       if (!renewLease() || phase !== STATES.READY || isGenerating() || currentChatKey() !== chatKey) {
-        pause('El chat cambió antes del envío. No pulsé Enviar.', true); return;
+        defer('El chat cambió antes del envío. No pulsé Enviar; reevalúo la ruta activa.', true, 2500); return;
       }
       if (draft(c) !== message.trim()) {
-        pause('El contenido del editor cambió; conservé el borrador y no envié nada.',true); return;
+        defer('El contenido del editor cambió; conservé el borrador y reevalúo después.',true,3000); return;
       }
       if (!liveSend) {
         // We injected this draft ourselves; clear only if completely untouched.
         // No outgoing message or write-ahead ticket has occurred.
         clearOwnUnsentDraft(c, message);
-        pause('No se habilitó Enviar después de escribir; no envié nada. Puedes pulsar AVANZAR nuevamente.', true);
+        defer('No se habilitó Enviar después de escribir; limpié solo mi borrador y AUTO reintentará sin pedir otro clic.', true, 5000);
         return;
       }
       const delivered = await claimAndSend(liveSend,ticket);
-      if (!delivered) { pause('Otro panel o un mensaje pendiente tiene prioridad. No duplico el envío.',true); return; }
+      if (!delivered) { defer('Otro panel o un mensaje pendiente tiene prioridad; AUTO reintentará sin duplicar.',true,3000); return; }
       // Click is not proof of delivery. Wait for the unique user-message receipt in the DOM.
       pending = { ticket, sentAt: now(), lastCheckAt: 0, receiptSeen: false };
       state.lastTicket = ticket;
@@ -623,7 +635,7 @@
     if (busy) return;
     syncRoute();
     if (phase !== STATES.READY && phase !== STATES.WAITING) return;
-    if (!renewLease()) { pause('El control de este chat está activo en otra pestaña; no duplico mensajes.', true); return; }
+    if (!renewLease()) { defer('El control está en otra pestaña; espero el lease y reanudo.', true, 3000); return; }
     if (document.hidden && !control.backgroundAuto) return;
     if (phase === STATES.READY) {
       if (now() - lastAudit < MIN_SEND_GAP_MS) return;
@@ -633,20 +645,19 @@
     }
     if (!pending) return;
     if (pending.receiptSeen && now() - pending.sentAt > 20 * 60 * 1000) {
-      pause('Sin respuesta estable durante 20 minutos. No reenvío a ciegas.', true);
-      return;
+      setStatus('Sin respuesta estable todavía; mantengo vigilancia del mismo ticket sin reenviar.', true);
     }
     if (!pending.receiptSeen) {
       if (ownMessage(pending.ticket)) {
         pending.receiptSeen = true;
         setStatus(`Mensaje del ciclo ${state.cycles} visible. Esperando respuesta…`);
       } else if (now() - pending.sentAt > 9500) {
-        pause('Se pulsó Enviar, pero no apareció el mensaje. No reenvío.', true);
+        setStatus('Envío con resultado DOM incierto: sigo reconciliando el mismo ticket; no reenvío a ciegas.', true);
       }
       return;
     }
     const reply = assistantAfter(pending.ticket);
-    if (reply === '<<USER_INTERRUPTED>>') { pending=null; phase=STATES.IDLE; state.autoConsented=false; state.inFlightTicket=''; state.inFlightSentAt=0; replyCandidate={fingerprint:'',firstSeen:0}; state.lastUpdated=new Date().toISOString(); saveState(); setStatus('Intervención humana detectada: conservo el proyecto y re-evalúo tras la respuesta.'); return; }
+    if (reply === '<<USER_INTERRUPTED>>') { pending=null; phase=STATES.IDLE; state.inFlightTicket=''; state.inFlightSentAt=0; replyCandidate={fingerprint:'',firstSeen:0}; state.lastUpdated=new Date().toISOString(); saveState(); setStatus('Intervención humana detectada: conservo continuidad y reanudo tras la respuesta del chat.'); return; }
     if (!reply || isGenerating()) return;
     const key = fingerprint(reply);
     if (key !== replyCandidate.fingerprint) {
@@ -705,7 +716,10 @@
       return;
     }
     if (state.missingReceipts >= MAX_NO_RECEIPT_CYCLES) { state.stalled=Math.max(state.stalled,3); setStatus('Faltan metadatos: fuerzo recuperación de métrica/objetivo y continúo con ruta distinta.', true); }
-    if (state.stalled > MAX_STALLED_CYCLES && state.lastStrategy === 'AUDITORIA_PROFUNDA_CREAR_O_SUSTITUIR_CAPACIDAD') { parkUnproductiveLoop(); return; }
+    if (state.stalled > MAX_STALLED_CYCLES && state.lastStrategy === 'AUDITORIA_PROFUNDA_CREAR_O_SUSTITUIR_CAPACIDAD') {
+      state.lastStrategy='ROTAR_CAPACIDAD_Y_REABRIR_UNIVERSO';
+      setStatus('Estancamiento profundo: no aparco el proceso; roto a una clase de solución materialmente distinta.', true);
+    }
     if (draft(findComposer())) { setStatus('Hay un borrador nuevo: lo respeto y reanudo después.'); phase=STATES.IDLE; render(); return; }
     const id=projectKey(), mode=id?projectMode(id):{enabled:true,auto:true};
     phase = state.autoConsented===true && moduleOn('auto') && mode.enabled && mode.auto ? STATES.READY : STATES.IDLE;
@@ -719,15 +733,17 @@
     if (busy) return;
     const id=projectKey();
     if (phase === STATES.READY || phase === STATES.WAITING) {
-      state.autoConsented=false; // Per-chat stop; do not disable other chats sharing process ID.
-      pause('Pausada manualmente. El proyecto queda en MANUAL hasta reactivar AUTO.', false);
+      state.autoConsented=false;
+      if (id) setProjectMode(id,{auto:false});
+      pause('Pausada manualmente. Este proyecto queda en MANUAL hasta reactivar AUTO.', false);
       return;
     }
     if (!moduleOn('engine')) { setStatus('⚡ MOTOR está OFF. Enciéndelo desde MACROS.', true); return; }
     if (!moduleOn('auto')) { control.modules.auto=true; saveControl(); }
     if (!acquireLease()) { setStatus('Este chat ya está controlado por otra pestaña; no duplico acciones.', true); return; }
     if (id && !projectMode(id).enabled) setProjectMode(id,{enabled:true});
-    state.autoConsented=true; state.parkFingerprint=''; state.parkSince=0;
+    if (id && !projectMode(id).auto) setProjectMode(id,{auto:true});
+    state.autoConsented=true; state.parkFingerprint=''; state.parkSince=0; state.retryAfter=0;
     saveState();
     state.stalled=0; state.missingReceipts=0;
     if (state.inFlightTicket) { restoreOutstanding(); render(); return; }
@@ -810,16 +826,20 @@
     }
   }
   function shouldAutoStart() {
-    // Autonomy is scoped to an explicitly started CHAT; project-wide mode is not enough.
-    if (state.autoConsented !== true || state.inFlightTicket) return false;
+    // Recover a visible PROCESS_ID before deciding whether continuity is armed.
+    // This migrates existing chats whose project marker predates v4.5 local state.
+    discoverVisibleProjects();
+    // Continuity is automatic for a chat that identifies a durable PROCESS_ID.
+    // Untagged casual/new chats remain passive until an objective is recognized.
+    const continuityArmed = state.autoConsented === true || Boolean(state.processId);
+    if (!continuityArmed || state.inFlightTicket) return false;
+    if (state.retryAfter && now() < state.retryAfter) return false;
     if (state.parkFingerprint) {
-      const fresh=lastVisibleAssistantFingerprint();
-      if (!fresh || fresh===state.parkFingerprint) return false;
+      // v4.5 migration: legacy parked chats must not remain permanently frozen.
       state.parkFingerprint=''; state.parkSince=0;
-      state.stalled=0; state.missingReceipts=0; saveState();
+      state.stalled=Math.max(3,state.stalled||0); state.missingReceipts=0; saveState();
     }
     if(!moduleOn('engine')||!moduleOn('auto')||checkConflicts()||isGenerating()) return false;
-    discoverVisibleProjects();
     const id=projectKey();
     const mode=id?projectMode(id):{enabled:true,auto:true};
     if(!mode.enabled||!mode.auto) return false;
@@ -827,6 +847,7 @@
     if(draft(findComposer())) return false;
     if(state.lastStatus&&EXIT.has(state.lastStatus)) return false;
     if(typeof state.lastPercent==='number'&&state.lastPercent>=100) return false;
+    state.retryAfter=0;
     return true;
   }
   function maybeAutoStart() {

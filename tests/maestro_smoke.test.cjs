@@ -110,10 +110,10 @@ test('permanent health badge names the installed version without pretending the 
   assert.match(script, /function updateHealth\(\)/);
   assert.match(script, /updateHealth\(\)/);
 });
-test('registry matches stable and candidate versions and records native-app limitations', () => {
-  assert.equal(registry.channels.stable.version_verified_in_repository, '4.4.0');
-  assert.equal(registry.channels.candidate.version, '4.4.0');
-  assert.equal(registry.channels.candidate.status, 'promoted_to_stable');
+test('registry keeps stable separate from the continuity-first candidate', () => {
+  assert.equal(registry.channels.stable.version_verified_in_repository, '4.4.6');
+  assert.equal(registry.channels.candidate.version, '4.5.0');
+  assert.equal(registry.channels.candidate.status, 'candidate_not_installed');
   assert.ok(registry.limitations.some(text => text.includes('Native Android/iOS')));
   assert.ok(registry.release_gates.includes('authenticated_chatgpt_browser_smoke_pass'));
   assert.ok(registry.variants.some(v => v.name === 'AVANZA Neon Mission Control' && v.status === 'stable'));
@@ -138,13 +138,14 @@ test('cross-tab project registry uses BroadcastChannel without remote APIs', () 
   assert.match(script, /channel\.postMessage/);
   assert.doesNotMatch(script, /fetch\(|XMLHttpRequest|WebSocket\(/);
 });
-test('continuity has no fixed execution-count stop', () => {
+test('continuity has no fixed execution-count stop and legacy park no longer halts tick', () => {
   assert.doesNotMatch(script, /Límite de 12 continuaciones automáticas/);
   assert.doesNotMatch(script, /MAX_AUTOMATIC_FOLLOWUPS/);
   assert.match(script,/state\.stalled > MAX_STALLED_CYCLES/);
-  assert.match(script,/state\.lastStrategy === 'AUDITORIA_PROFUNDA_CREAR_O_SUSTITUIR_CAPACIDAD'/);
-  assert.match(script,/function parkUnproductiveLoop\(\)/);
-  assert.match(script,/fresh===state\.parkFingerprint/);
+  assert.match(script,/ROTAR_CAPACIDAD_Y_REABRIR_UNIVERSO/);
+  const tick=script.slice(script.indexOf('  async function tick() {'),script.indexOf('  function toggle() {'));
+  assert.doesNotMatch(tick,/parkUnproductiveLoop\(\)/);
+  assert.match(script,/legacy parked chats must not remain permanently frozen/);
 });
 test('game mode keeps XP explicitly separate from verified progress', () => {
   assert.match(script, /XP\/racha motivan/);
@@ -204,8 +205,8 @@ test('quest choices parser accepts multiple labeled options', () => {
 });
 
 
-test('v4.4 exposes a full-screen Mission Control visual mode', () => {
-  assert.match(script,/const INSTALLED_VERSION = '4\.4\.[0-9]+-[^']+'/);
+test('v4.5 exposes a full-screen Mission Control visual mode', () => {
+  assert.match(script,/const INSTALLED_VERSION = '4\.5\.[0-9]+-[^']+'/);
   assert.match(script,/data-action="cinema"/);
   assert.match(script,/function renderMissionControl\(\)/);
   assert.match(script,/function toggleMissionControl\(force\)/);

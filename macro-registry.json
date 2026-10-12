@@ -1,22 +1,23 @@
 {
   "schema_version": 2,
-  "updated_at": "2026-10-11T00:45:00-05:00",
+  "updated_at": "2026-10-11T19:55:00-05:00",
   "purpose": "Single macro source of truth; user projects, economic state and native app execution are independent",
   "primary_repository": "diegohoyosroncal/chatgpt-avanza-macro",
   "channels": {
     "stable": {
       "path": "avanza_macro_maestro_v4.user.js",
       "branch": "main",
-      "version_verified_in_repository": "4.4.0",
+      "version_verified_in_repository": "4.4.6",
       "installed_profiles": "not_verified",
-      "ci": "29/29 offline + Chromium Mission Control PASS; PR #13 merged as dd0340ebbdd04ac53e5c63878390b77e1412f770"
+      "ci": "main source verified at v4.4.6; authenticated Firefox installation still not verified"
     },
     "candidate": {
       "path": "avanza_macro_maestro_v4.user.js",
-      "branch": "feat/v4-4-neon-control-rebased-20261011",
-      "version": "4.4.0",
-      "status": "promoted_to_stable",
-      "installed_profiles": "not_verified"
+      "branch": "fix/v4-5-0-continuity-first-20261011",
+      "version": "4.5.0",
+      "status": "candidate_not_installed",
+      "installed_profiles": "not_verified",
+      "purpose": "continuity-first: recognized PROCESS_ID chats resume AUTO without per-chat click; legacy park migration; tasks reserved for true future/periodic/conditional work"
     }
   },
   "variants": [
@@ -109,7 +110,10 @@
     "persistent_progress_ribbon_pass",
     "hud_rescue_pass",
     "interactive_answer_controls_pass",
-    "quest_choices_pass"
+    "quest_choices_pass",
+    "recognized_process_auto_resume_pass",
+    "legacy_park_migration_pass",
+    "tasks_not_used_as_chat_continuity_pass"
   ],
   "rollback": "Restore avanza_macro_maestro_v4.user.js from commit ad812155a070654770508cfae6f677bd8d8fdecf (v4.0.3); never delete project state.",
   "release_evidence": {
@@ -119,6 +123,8 @@
     "chromium_hud": "PASS neon Mission Control + ribbon + interactive choices/free-text + rescue + fixed/drag/theme/compact",
     "authenticated_profile": "not_verified",
     "learn_quest": "PASS",
-    "cfi_quest_bank": "verified in Google Drive"
+    "cfi_quest_bank": "verified in Google Drive",
+    "candidate_branch": "fix/v4-5-0-continuity-first-20261011",
+    "candidate_version": "4.5.0"
   }
 }
