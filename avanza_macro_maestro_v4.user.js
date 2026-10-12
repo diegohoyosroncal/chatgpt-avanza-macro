@@ -826,7 +826,10 @@
     }
   }
   function shouldAutoStart() {
-    // Continuity is automatic for a chat that already identifies a durable PROCESS_ID.
+    // Recover a visible PROCESS_ID before deciding whether continuity is armed.
+    // This migrates existing chats whose project marker predates v4.5 local state.
+    discoverVisibleProjects();
+    // Continuity is automatic for a chat that identifies a durable PROCESS_ID.
     // Untagged casual/new chats remain passive until an objective is recognized.
     const continuityArmed = state.autoConsented === true || Boolean(state.processId);
     if (!continuityArmed || state.inFlightTicket) return false;
@@ -837,7 +840,6 @@
       state.stalled=Math.max(3,state.stalled||0); state.missingReceipts=0; saveState();
     }
     if(!moduleOn('engine')||!moduleOn('auto')||checkConflicts()||isGenerating()) return false;
-    discoverVisibleProjects();
     const id=projectKey();
     const mode=id?projectMode(id):{enabled:true,auto:true};
     if(!mode.enabled||!mode.auto) return false;
