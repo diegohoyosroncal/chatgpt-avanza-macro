@@ -7,9 +7,9 @@
     "stable": {
       "path": "avanza_macro_maestro_v4.user.js",
       "branch": "main",
-      "version_verified_in_repository": "4.6.0",
+      "version_verified_in_repository": "4.5.1",
       "installed_profiles": "not_verified",
-      "ci": "v4.6.0 candidate: universal one-turn bootstrap + self-proof; CI pending"
+      "ci": "PR #22 green: syntax PASS, 38/38 unit tests PASS, headless Chromium UI smoke PASS; merged as ce8086baa591124b381ad2f2100bab4ec30d903f"
     },
     "candidate": {
       "path": "avanza_macro_maestro_v4.user.js",
@@ -17,7 +17,7 @@
       "version": "4.6.0",
       "status": "candidate_universal_bootstrap",
       "installed_profiles": "not_verified",
-      "purpose": "continuity-first + universal bootstrap after a newly produced assistant response + self-verifying client proof; old untagged chats do not auto-run merely on open"
+      "purpose": "continuity-first + universal bootstrap after a newly produced assistant response + SPA route settle + recoverable defer + two-phase terminal challenge + self-verifying client proof"
     }
   },
   "variants": [
