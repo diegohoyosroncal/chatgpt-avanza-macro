@@ -1,23 +1,23 @@
 {
   "schema_version": 2,
-  "updated_at": "2026-10-11T19:55:00-05:00",
+  "updated_at": "2026-10-11T20:01:00-05:00",
   "purpose": "Single macro source of truth; user projects, economic state and native app execution are independent",
   "primary_repository": "diegohoyosroncal/chatgpt-avanza-macro",
   "channels": {
     "stable": {
       "path": "avanza_macro_maestro_v4.user.js",
       "branch": "main",
-      "version_verified_in_repository": "4.4.6",
+      "version_verified_in_repository": "4.5.0",
       "installed_profiles": "not_verified",
-      "ci": "main source verified at v4.4.6; authenticated Firefox installation still not verified"
+      "ci": "PR #21 green: syntax PASS, 37/37 unit tests PASS, headless Chromium UI smoke PASS; merged as 41ebff997617ade732bf1f9022b8322acea72a3b"
     },
     "candidate": {
       "path": "avanza_macro_maestro_v4.user.js",
-      "branch": "fix/v4-5-0-continuity-first-20261011",
+      "branch": "main",
       "version": "4.5.0",
-      "status": "candidate_not_installed",
+      "status": "promoted_to_stable",
       "installed_profiles": "not_verified",
-      "purpose": "continuity-first: recognized PROCESS_ID chats resume AUTO without per-chat click; legacy park migration; tasks reserved for true future/periodic/conditional work"
+      "purpose": "continuity-first stable: recognized PROCESS_ID chats resume AUTO without per-chat click; legacy park migration; tasks reserved for true future/periodic/conditional work"
     }
   },
   "variants": [
@@ -117,10 +117,10 @@
   ],
   "rollback": "Restore avanza_macro_maestro_v4.user.js from commit ad812155a070654770508cfae6f677bd8d8fdecf (v4.0.3); never delete project state.",
   "release_evidence": {
-    "pr": 13,
-    "merge_commit": "dd0340ebbdd04ac53e5c63878390b77e1412f770",
-    "offline_tests": "29/29 PASS",
-    "chromium_hud": "PASS neon Mission Control + ribbon + interactive choices/free-text + rescue + fixed/drag/theme/compact",
+    "pr": 21,
+    "merge_commit": "41ebff997617ade732bf1f9022b8322acea72a3b",
+    "offline_tests": "37/37 PASS",
+    "chromium_hud": "PASS continuity-first + Mission Control + conflict fail-closed",
     "authenticated_profile": "not_verified",
     "learn_quest": "PASS",
     "cfi_quest_bank": "verified in Google Drive",
