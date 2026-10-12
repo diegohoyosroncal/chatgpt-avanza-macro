@@ -110,13 +110,18 @@ test('permanent health badge names the installed version without pretending the 
   assert.match(script, /function updateHealth\(\)/);
   assert.match(script, /updateHealth\(\)/);
 });
-test('registry records continuity-first v4.5.0 as the promoted stable channel', () => {
-  assert.equal(registry.channels.stable.version_verified_in_repository, '4.5.0');
-  assert.equal(registry.channels.candidate.version, '4.5.0');
-  assert.equal(registry.channels.candidate.status, 'promoted_to_stable');
+test('registry records self-verifying v4.5.1 candidate channel', () => {
+  assert.equal(registry.channels.stable.version_verified_in_repository, '4.5.1');
+  assert.equal(registry.channels.candidate.version, '4.5.1');
+  assert.equal(registry.channels.candidate.status, 'candidate_client_proof');
   assert.ok(registry.limitations.some(text => text.includes('Native Android/iOS')));
   assert.ok(registry.release_gates.includes('authenticated_chatgpt_browser_smoke_pass'));
   assert.ok(registry.variants.some(v => v.name === 'AVANZA Neon Mission Control' && v.status === 'stable'));
+});
+
+test('real-browser canary has machine-readable DOM and conversation proof markers', () => {
+  assert.match(script, /data-avanza-client-version/);
+  assert.match(script, /AVANZA_CLIENT_PROOF: 4\\.5\\.1-client-proof/);
 });
 
 test('multiproject cockpit exposes six independent module switches', () => {
