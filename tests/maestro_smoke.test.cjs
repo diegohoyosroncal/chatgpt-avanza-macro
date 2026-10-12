@@ -111,7 +111,7 @@ test('permanent health badge names the installed version without pretending the 
   assert.match(script, /updateHealth\(\)/);
 });
 test('registry records universal-bootstrap v4.6.0 candidate channel', () => {
-  assert.equal(registry.channels.stable.version_verified_in_repository, '4.6.0');
+  assert.equal(registry.channels.stable.version_verified_in_repository, '4.5.1');
   assert.equal(registry.channels.candidate.version, '4.6.0');
   assert.equal(registry.channels.candidate.status, 'candidate_universal_bootstrap');
   assert.ok(registry.limitations.some(text => text.includes('Native Android/iOS')));
