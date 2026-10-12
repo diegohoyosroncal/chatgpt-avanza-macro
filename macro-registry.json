@@ -1,6 +1,6 @@
 {
   "schema_version": 2,
-  "updated_at": "2026-10-11T20:00:00-05:00",
+  "updated_at": "2026-10-11T20:20:00-05:00",
   "purpose": "Single macro source of truth; user projects, economic state and native app execution are independent",
   "primary_repository": "diegohoyosroncal/chatgpt-avanza-macro",
   "channels": {
@@ -9,13 +9,13 @@
       "branch": "main",
       "version_verified_in_repository": "4.5.1",
       "installed_profiles": "not_verified",
-      "ci": "v4.5.1 candidate: self-verifying DOM + conversation proof; CI pending on candidate branch"
+      "ci": "PR #22 green: syntax PASS, 38/38 unit tests PASS, headless Chromium UI smoke PASS; merged as ce8086baa591124b381ad2f2100bab4ec30d903f"
     },
     "candidate": {
       "path": "avanza_macro_maestro_v4.user.js",
       "branch": "main",
       "version": "4.5.1",
-      "status": "candidate_client_proof",
+      "status": "promoted_to_stable",
       "installed_profiles": "not_verified",
       "purpose": "continuity-first + self-verifying client proof: DOM data-avanza-client-version and AVANZA_CLIENT_PROOF receipt on real auto continuations"
     }
@@ -117,14 +117,14 @@
   ],
   "rollback": "Restore avanza_macro_maestro_v4.user.js from commit ad812155a070654770508cfae6f677bd8d8fdecf (v4.0.3); never delete project state.",
   "release_evidence": {
-    "pr": 21,
-    "merge_commit": "41ebff997617ade732bf1f9022b8322acea72a3b",
-    "offline_tests": "37/37 PASS",
-    "chromium_hud": "PASS continuity-first + Mission Control + conflict fail-closed",
+    "pr": 22,
+    "merge_commit": "ce8086baa591124b381ad2f2100bab4ec30d903f",
+    "offline_tests": "38/38 PASS",
+    "chromium_hud": "PASS continuity-first + client-proof + Mission Control + conflict fail-closed",
     "authenticated_profile": "not_verified",
     "learn_quest": "PASS",
     "cfi_quest_bank": "verified in Google Drive",
-    "candidate_branch": "fix/v4-5-0-continuity-first-20261011",
+    "candidate_branch": "fix/v4-5-1-client-proof-20261011",
     "candidate_version": "4.5.1"
   }
 }
