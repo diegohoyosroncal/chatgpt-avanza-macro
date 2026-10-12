@@ -121,7 +121,7 @@ test('registry records self-verifying v4.5.1 candidate channel', () => {
 
 test('real-browser canary has machine-readable DOM and conversation proof markers', () => {
   assert.match(script, /data-avanza-client-version/);
-  assert.match(script, /AVANZA_CLIENT_PROOF: 4\\.5\\.1-client-proof/);
+  assert.match(script, /AVANZA_CLIENT_PROOF: 4\.5\.1-client-proof/);
 });
 
 test('multiproject cockpit exposes six independent module switches', () => {
