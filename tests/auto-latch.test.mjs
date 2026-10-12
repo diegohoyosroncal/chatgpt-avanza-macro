@@ -14,36 +14,36 @@ test('complete user script parses without side effects',()=>{
 });
 
 function makeAuto(input={}){
-  const state={autoConsented:false,inFlightTicket:'',parkFingerprint:'',parkSince:0,stalled:4,missingReceipts:2,lastPercent:40,lastStatus:'',...input};
+  const state={autoConsented:false,inFlightTicket:'',parkFingerprint:'',parkSince:0,retryAfter:0,stalled:4,missingReceipts:2,lastPercent:40,lastStatus:'',processId:'',...input};
   let saves=0;
-  const fn=new Function('state','moduleOn','checkConflicts','isGenerating','discoverVisibleProjects','projectKey','projectMode','learningFor','draft','findComposer','EXIT','lastVisibleAssistantFingerprint','saveState',section('  function shouldAutoStart() {','  function maybeAutoStart() {')+'return shouldAutoStart;')(
-    state,()=>true,()=>false,()=>false,()=>{},()=>state.projectId||'',()=>({enabled:true,auto:true}),
-    ()=>null,()=>'',()=>null,new Set(['VERIFIED_COMPLETE','NO_SAFE_ACTION','HUMAN_GATE_PROVEN']),()=>state.newFingerprint||'old',()=>{saves++;});
+  const fn=new Function('state','moduleOn','checkConflicts','isGenerating','discoverVisibleProjects','projectKey','projectMode','learningFor','draft','findComposer','EXIT','lastVisibleAssistantFingerprint','saveState','now',section('  function shouldAutoStart() {','  function maybeAutoStart() {')+'return shouldAutoStart;')(
+    state,()=>true,()=>false,()=>false,()=>{},()=>state.projectId||state.processId||'',()=>({enabled:true,auto:true}),
+    ()=>null,()=>'',()=>null,new Set(['VERIFIED_COMPLETE','NO_SAFE_ACTION','HUMAN_GATE_PROVEN']),()=>state.newFingerprint||'old',()=>{saves++;},()=>Date.now());
   return {start:fn(),state,saves};
 }
-test('AUTO requires per-chat activation; no global unsolicited sending',()=>{
+test('AUTO resumes recognized processes without another click; untagged chats stay passive',()=>{
   assert.equal(makeAuto().start,false);
+  assert.equal(makeAuto({processId:'BUSINESS'}).start,true);
+  assert.equal(makeAuto({projectId:'BUSINESS'}).start,true);
   assert.equal(makeAuto({autoConsented:true}).start,true);
-  assert.equal(makeAuto({autoConsented:true,projectId:'BUSINESS'}).start,true);
 });
 test('pending unique ticket blocks duplicate action on reload',()=>{
   assert.equal(makeAuto({autoConsented:true,inFlightTicket:'AVZ4-unique'}).start,false);
   assert.ok(source.indexOf('state.inFlightTicket=ticket')<source.indexOf('liveSend.click();'));
   assert.match(source,/restoreOutstanding\(\)/);
 });
-test('deep review precedes idle park; changed evidence reopens the gate',()=>{
-  assert.equal(makeAuto({autoConsented:true,parkFingerprint:'old'}).start,false);
-  const woke=makeAuto({autoConsented:true,parkFingerprint:'old',newFingerprint:'changed'});
+test('legacy parked chats migrate back into continuity and deep review rotates strategy',()=>{
+  const woke=makeAuto({processId:'BUSINESS',parkFingerprint:'old'});
   assert.equal(woke.start,true);
   assert.equal(woke.state.parkFingerprint,'');
   assert.equal(woke.saves,1);
   assert.match(source,/state\.stalled > MAX_STALLED_CYCLES/);
-  assert.match(source,/state\.lastStrategy === 'AUDITORIA_PROFUNDA_CREAR_O_SUSTITUIR_CAPACIDAD'/);
-  assert.match(source,/parkUnproductiveLoop\(\)/);
+  assert.match(source,/ROTAR_CAPACIDAD_Y_REABRIR_UNIVERSO/);
+  assert.doesNotMatch(section('  async function tick() {','  function toggle() {'),/parkUnproductiveLoop\(\)/);
 });
-test('completion is terminal but a previously untagged chat may run',()=>{
+test('completion remains terminal while recognized unfinished processes resume',()=>{
   assert.equal(makeAuto({autoConsented:true,lastStatus:'VERIFIED_COMPLETE'}).start,false);
-  assert.equal(makeAuto({autoConsented:true,projectId:''}).start,true);
+  assert.equal(makeAuto({processId:'BUSINESS'}).start,true);
 });
 test('domain-specific learning instructions do not leak to business chats',()=>{
   const sourcePart=section('  function buildMessage(ticket, step) {','  function setStatus(');
@@ -54,6 +54,13 @@ test('domain-specific learning instructions do not leak to business chats',()=>{
   assert.match(message(false),/NO reemplaza objetivo/);
   assert.match(message(false),/AUDITORÍA DE ESTANCAMIENTO:/);
 });
+test('continuity separates chat resumption from scheduled tasks',()=>{
+  assert.match(source,/continuidad conversacional ≠ tareas programadas ≠ ejecución externa/);
+  assert.match(source,/Tasks únicamente para un evento realmente futuro\/periódico\/condicional/);
+  assert.doesNotMatch(section('  async function tick() {','  function toggle() {'),/parkUnproductiveLoop\(\)/);
+  assert.doesNotMatch(source,/USER_INTERRUPTED[^\n]*autoConsented=false/);
+});
+
 test('only one active chat writer and no shell/network API introduced',()=>{
   assert.match(source,/function acquireLease\(\)/);
   assert.match(source,/return SESSION_PREFIX \+ chatKey/);
