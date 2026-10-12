@@ -110,9 +110,9 @@ test('permanent health badge names the installed version without pretending the 
   assert.match(script, /function updateHealth\(\)/);
   assert.match(script, /updateHealth\(\)/);
 });
-test('registry records self-verifying v4.5.1 candidate channel', () => {
-  assert.equal(registry.channels.stable.version_verified_in_repository, '4.5.1');
-  assert.equal(registry.channels.candidate.version, '4.5.1');
+test('registry records universal-bootstrap v4.6.0 candidate channel', () => {
+  assert.equal(registry.channels.stable.version_verified_in_repository, '4.6.0');
+  assert.equal(registry.channels.candidate.version, '4.6.0');
   assert.equal(registry.channels.candidate.status, 'candidate_client_proof');
   assert.ok(registry.limitations.some(text => text.includes('Native Android/iOS')));
   assert.ok(registry.release_gates.includes('authenticated_chatgpt_browser_smoke_pass'));
@@ -121,7 +121,13 @@ test('registry records self-verifying v4.5.1 candidate channel', () => {
 
 test('real-browser canary has machine-readable DOM and conversation proof markers', () => {
   assert.match(script, /data-avanza-client-version/);
-  assert.match(script, /AVANZA_CLIENT_PROOF: 4\.5\.1-client-proof/);
+  assert.match(script, /AVANZA_CLIENT_PROOF: 4\.6\.0-universal-bootstrap/);
+});
+
+test('new chat bootstrap is change-triggered, not load-triggered', () => {
+  assert.match(script,/pageBaselineAssistantFingerprint/);
+  assert.match(script,/latestFingerprint !== pageBaselineAssistantFingerprint/);
+  assert.match(script,/fallbackProcessId\(\)/);
 });
 
 test('multiproject cockpit exposes six independent module switches', () => {
