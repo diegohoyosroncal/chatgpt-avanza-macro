@@ -70,6 +70,8 @@
   let learning = readLearning();
   let missionOverlay = null;
   let pageBaselineAssistantFingerprint = '';
+  let routeSettleUntil = 0;
+  let routeHadGeneration = false;
 
   function currentChatKey() {
     // Route is scoped to this web chat, not a global prompt or another chat.
@@ -550,6 +552,9 @@
     releaseLease(); // release the previous chat lease BEFORE switching keys
     chatKey = current;
     state = recoverState();
+    routeHadGeneration = isGenerating();
+    routeSettleUntil = now() + 1000;
+    pageBaselineAssistantFingerprint = lastVisibleAssistantFingerprint();
     pending = null;
     replyCandidate = { fingerprint: '', firstSeen: 0 };
     phase = STATES.IDLE;
@@ -836,6 +841,11 @@
     // Continuity is automatic for a chat that identifies a durable PROCESS_ID.
     // Untagged casual/new chats remain passive until an objective is recognized.
     let continuityArmed = state.autoConsented === true || Boolean(state.processId);
+    if (!continuityArmed && routeSettleUntil && now() < routeSettleUntil) {
+      routeHadGeneration = routeHadGeneration || isGenerating();
+      if (!routeHadGeneration) pageBaselineAssistantFingerprint = lastVisibleAssistantFingerprint();
+      return false;
+    }
     if (!continuityArmed) {
       const latestFingerprint = lastVisibleAssistantFingerprint();
       // Universal bootstrap: a newly produced assistant response arms this chat once.
