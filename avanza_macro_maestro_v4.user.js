@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         AVANZA — Macro Maestro · Piloto Automático
 // @namespace    https://chatgpt.com/
-// @version      4.7.1
+// @version      4.8.0
 // @description  Cockpit multiproyecto + Learn Quest: módulos ON/OFF, AUTO/MANUAL, progreso serio independiente, misiones jugables y sincronización entre pestañas.
 // @updateURL    https://raw.githubusercontent.com/diegohoyosroncal/chatgpt-avanza-macro/main/avanza_macro_maestro_v4.user.js
 // @downloadURL  https://raw.githubusercontent.com/diegohoyosroncal/chatgpt-avanza-macro/main/avanza_macro_maestro_v4.user.js
@@ -22,7 +22,7 @@
   const SINGLETON = 'data-avanza-maestro-v4-runner';
   if (document.documentElement?.getAttribute(SINGLETON) === '1') return;
   document.documentElement?.setAttribute(SINGLETON, '1');
-  const INSTALLED_VERSION = '4.7.1-full-spectrum-operator';
+  const INSTALLED_VERSION = '4.8.0-universal-fixed-point';
   document.documentElement?.setAttribute('data-avanza-client-version', INSTALLED_VERSION);
   const LEARN_KEY = 'avanza-v4-learn-quest-v1';
   const CONTROL_KEY = 'avanza-v4-control-center-v1';
@@ -45,6 +45,8 @@
   const TAB_OWNER = crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`;
   const STATES = Object.freeze({ IDLE: 'IDLE', READY: 'READY', WAITING: 'WAITING', PAUSED: 'PAUSED' });
   const EXIT = new Set(['VERIFIED_COMPLETE', 'HUMAN_GATE_PROVEN', 'NO_SAFE_ACTION']);
+  // Processes explicitly archived by verified canonical state must never be resurrected by stale browser seeds.
+  const LOCKED_PROCESS_IDS = new Set(['BTS-LIMA']);
   let phase = STATES.IDLE;
   let busy = false;
   let state = null;
@@ -124,6 +126,7 @@
   }
   function moduleOn(name) { return control.modules?.[name] !== false; }
   function projectMode(id) {
+    if (LOCKED_PROCESS_IDS.has(id)) return { enabled:false, auto:false };
     const row=control.projectModes?.[id]||{};
     return { enabled:row.enabled!==false, auto:row.auto!==false };
   }
@@ -137,7 +140,7 @@
       'COCKPIT-TOTAL-v1': {id:'COCKPIT-TOTAL-v1',objective:'Cockpit multiproyecto estable, instalado y verificado en perfil real',current_pct:87.5,previous_pct:75,delta_pp:12.5,numerator:7,denominator:8,next_action:'Verificar actualización/instalación real y canary autenticado',blocker:'Perfil real aún no verificado',updated_at:'2026-10-10T23:53:00-05:00',status:'CONTINUE',seeded:true},
       'CFI-E2-2026-10-16': {id:'CFI-E2-2026-10-16',objective:'Llegar a la E2 del 16/10 con dominio verificable de NIC 38/40/23/36',current_pct:15.8,previous_pct:15.8,delta_pp:0,numerator:3,denominator:19,next_action:'Cerrar NIC 40 modelo del costo + transferencias; luego NIC 23',blocker:'NIC 36 requiere puente de rúbrica antes de cambiar denominador',updated_at:'2026-10-10T23:53:00-05:00',status:'CONTINUE',seeded:true},
       'GLOBAL-VALUE-OS': {id:'GLOBAL-VALUE-OS',objective:'Convertir selección económica autónoma en ejecución autorizada con efecto real',current_pct:null,previous_pct:null,delta_pp:null,numerator:null,denominator:null,next_action:'Demostrar selección nueva → ejecución autorizada → efecto → nueva frontera',blocker:'Autonomía integral aún no demostrada',updated_at:'2026-10-10T23:53:00-05:00',status:'CONTINUE',seeded:true},
-      'BTS-LIMA': {id:'BTS-LIMA',objective:'Convertir stock BTS/GLOW en pedidos cobrados',current_pct:null,previous_pct:null,delta_pp:null,numerator:null,denominator:null,next_action:'Usar producción READY para capturar lead → pedido → cobro sin comprar más stock',blocker:'Producción Vercel verificada READY; 0 ventas cobradas siguen siendo el cuello de botella',updated_at:'2026-10-11T00:36:00-05:00',status:'CONTINUE',seeded:true},
+      'BTS-LIMA': {id:'BTS-LIMA',objective:'Proyecto BTS Lima archivado; no reactivar por semilla del navegador',current_pct:null,previous_pct:null,delta_pp:null,numerator:null,denominator:null,next_action:'Ninguna: requiere reactivación explícita y estado canónico nuevo',blocker:'ARCHIVED_LOCK',updated_at:'2026-10-13T16:06:00-05:00',status:'ARCHIVED',seeded:true},
       'VELVETBOX': {id:'VELVETBOX',objective:'Validar flujo E2E actual de producción y pagos sin regresiones',current_pct:null,previous_pct:null,delta_pp:null,numerator:null,denominator:null,next_action:'Corregir CI de correlación exacta de payment-status; luego validar y promover solo con verde',blocker:'Producción main READY; rama fix/payment-status-require-orderid-20261009 mantiene CI typecheck en rojo',updated_at:'2026-10-11T00:36:00-05:00',status:'CONTINUE',seeded:true},
       'KASA-VIVA': {id:'KASA-VIVA',objective:'Validar demanda real antes de inventario adicional',current_pct:null,previous_pct:null,delta_pp:null,numerator:null,denominator:null,next_action:'Recuperar E-DEMAND-01 y ejecutar test verificable',blocker:'Publicación/demanda verificable pendiente',updated_at:'2026-10-10T23:53:00-05:00',status:'CONTINUE',seeded:true},
       'YERABELL': {id:'YERABELL',objective:'Convertir piloto de reel IA en anticipo/cobro',current_pct:null,previous_pct:null,delta_pp:null,numerator:null,denominator:null,next_action:'Recuperar material existente y cerrar flujo hacia anticipo',blocker:'Material parcial; cash S/0',updated_at:'2026-10-10T23:53:00-05:00',status:'CONTINUE',seeded:true},
@@ -241,10 +244,15 @@
   }
   function readProjects() {
     const seeds=seedProjects();
+    let merged=seeds;
     try {
       const raw=JSON.parse(localStorage.getItem(PROJECTS_KEY)||'{}');
-      return raw&&typeof raw==='object'?{...seeds,...raw}:seeds;
-    } catch { return seeds; }
+      merged=raw&&typeof raw==='object'?{...seeds,...raw}:seeds;
+    } catch { merged=seeds; }
+    for (const id of LOCKED_PROCESS_IDS) {
+      if (merged[id]) merged[id]={...merged[id],status:'ARCHIVED',blocker:'ARCHIVED_LOCK'};
+    }
+    return merged;
   }
   function saveProjects() {
     try { localStorage.setItem(PROJECTS_KEY,JSON.stringify(projects)); } catch {}
@@ -428,7 +436,7 @@
     const chosen = strategy();
     const core = [
       `${MARK} — CONTROL ADAPTATIVO ${ticket}. Esta señal AGREGA capacidades; NO reemplaza objetivo, autorizaciones, decisiones, instrucciones ni checkpoints de este chat.`,
-      `AVANZA_CLIENT_PROOF: 4.7.1-full-spectrum-operator | ${ticket}`,
+      `AVANZA_CLIENT_PROOF: ${INSTALLED_VERSION} | ${ticket}`,
       `Decisión interna de interfaz: ${chosen}. PROCESS_ID actual: ${state.processId || 'POR RECUPERAR'}. Ciclo local ${step}. Anterior conocido (NO prueba externa): progreso ${state.lastPercent ?? 'NO DETERMINABLE'}%, denominador ${state.lastDenominator ?? 'NO DETERMINABLE'}, delta ${state.lastDelta ?? 'NO DETERMINABLE'} pp, ciclos sin progreso ${state.stalled}.`,
       'RECUPERA estado actual desde este chat y fuentes canónicas disponibles. Si falta contexto transversal, usa primero el canon global compartido de Drive ID 1epHKEGs6SjTzrfDi5SeHNaxH7CHX09VTfmYNa7WxIcY y después el canon específico del PROCESS_ID. Evalúa cuál es el objetivo pendiente, su dueño y qué cambió desde la respuesta anterior. No dependas de una cifra inferida de la interfaz para afirmar efectos.',
       'DECIDE TÚ la mejor acción: ejecutar, verificar, conciliar, corregir, investigar globalmente, adoptar/reutilizar/integrar/fusionar/delegar legítimamente/sustituir/adaptar/construir una capacidad faltante, detener una estrategia de valor negativo o cambiar de rumbo. No conviertas AVANZAR en ejecutar por ejecutar, ni le pidas al usuario escoger entre alternativas.',
@@ -857,39 +865,58 @@
       hydrateVisibleReportedProgress();
     }
   }
+  function latestVisibleReceipt() {
+    const nodes=[...document.querySelectorAll('[data-message-author-role="assistant"]')].slice(-12);
+    for(let i=nodes.length-1;i>=0;i--){
+      const text=nodes[i].innerText||nodes[i].textContent||'';
+      const receipt=parseReceipt(text);
+      if(receipt) return receipt;
+    }
+    return null;
+  }
   function shouldAutoStart() {
-    // Recover a visible PROCESS_ID before deciding whether continuity is armed.
-    // This migrates existing chats whose project marker predates v4.5 local state.
+    // Rehydrate any visible PROCESS_ID first. This covers historical tagged chats.
     discoverVisibleProjects();
-    // Continuity is automatic for a chat that identifies a durable PROCESS_ID.
-    // Untagged casual/new chats remain passive until an objective is recognized.
+    const visibleReceipt=latestVisibleReceipt();
+    if (visibleReceipt && EXIT.has(visibleReceipt.status)) return false;
+    if (visibleReceipt?.percent !== null && visibleReceipt?.percent >= 100) return false;
+
     let continuityArmed = state.autoConsented === true || Boolean(state.processId);
     if (!continuityArmed && routeSettleUntil && now() < routeSettleUntil) {
       routeHadGeneration = routeHadGeneration || isGenerating();
       if (!routeHadGeneration) pageBaselineAssistantFingerprint = lastVisibleAssistantFingerprint();
       return false;
     }
+
     if (!continuityArmed) {
       const latestFingerprint = lastVisibleAssistantFingerprint();
-      // Universal bootstrap: a newly produced assistant response arms this chat once.
-      // Merely opening an old untagged chat does not trigger a continuation.
-      if (latestFingerprint && latestFingerprint !== pageBaselineAssistantFingerprint) {
-        state.processId = fallbackProcessId();
-        state.objective = state.objective || 'Objetivo actual de este chat';
+      const hasConversation = Boolean(
+        document.querySelector('[data-message-author-role="user"]')
+        && document.querySelector('[data-message-author-role="assistant"]')
+      );
+      // Universal fixed-point bootstrap: opening an existing unfinished web chat
+      // is sufficient to recover a durable fallback process. New chats arm after
+      // their first assistant response. Explicit MANUAL/OFF and terminal states
+      // still win below.
+      if (latestFingerprint && hasConversation) {
+        state.processId = visibleReceipt?.processId || fallbackProcessId();
+        state.objective = visibleReceipt?.objective || state.objective || 'Objetivo actual de este chat';
         state.autoConsented = true;
         saveState();
         continuityArmed = true;
       }
     }
+
     if (!continuityArmed || state.inFlightTicket) return false;
     if (state.retryAfter && now() < state.retryAfter) return false;
     if (state.parkFingerprint) {
-      // v4.5 migration: legacy parked chats must not remain permanently frozen.
+      // legacy parked chats must not remain permanently frozen: reopen with a challenger strategy.
       state.parkFingerprint=''; state.parkSince=0;
       state.stalled=Math.max(3,state.stalled||0); state.missingReceipts=0; saveState();
     }
     if(!moduleOn('engine')||!moduleOn('auto')||checkConflicts()||isGenerating()) return false;
     const id=projectKey();
+    if(id && LOCKED_PROCESS_IDS.has(id)) return false;
     const mode=id?projectMode(id):{enabled:true,auto:true};
     if(!mode.enabled||!mode.auto) return false;
     const L=id?learningFor(id):null; if(moduleOn('game')&&L?.status==='AWAITING_USER') return false;
@@ -1309,7 +1336,7 @@
       const en=event.target.closest('[data-project-enabled]');
       if(en){ const id=en.dataset.projectEnabled; setProjectMode(id,{enabled:!projectMode(id).enabled}); return; }
       const au=event.target.closest('[data-project-auto]');
-      if(au){ const id=au.dataset.projectAuto; setProjectMode(id,{auto:!projectMode(id).auto,enabled:true}); return; }
+      if(au){ const id=au.dataset.projectAuto; if(LOCKED_PROCESS_IDS.has(id)){setStatus('Proyecto archivado: AUTO bloqueado hasta una reactivación canónica explícita.',true);return;} setProjectMode(id,{auto:!projectMode(id).auto,enabled:true}); return; }
       const learn=event.target.closest('[data-learn-action]');
       if(learn){ sendLearningAction(learn.dataset.learnAction); return; }
       const choice=event.target.closest('[data-quest-choice]');

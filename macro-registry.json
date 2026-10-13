@@ -1,6 +1,6 @@
 {
   "schema_version": 2,
-  "updated_at": "2026-10-11T22:25:00-05:00",
+  "updated_at": "2026-10-13T16:12:00-05:00",
   "purpose": "Single macro source of truth; user projects, economic state and native app execution are independent",
   "primary_repository": "diegohoyosroncal/chatgpt-avanza-macro",
   "channels": {
@@ -13,11 +13,11 @@
     },
     "candidate": {
       "path": "avanza_macro_maestro_v4.user.js",
-      "branch": "main",
-      "version": "4.7.1",
-      "status": "promoted_to_stable",
+      "branch": "fix/universal-fixed-point-continuity-20261013",
+      "version": "4.8.0",
+      "status": "candidate",
       "installed_profiles": "not_verified",
-      "purpose": "full-spectrum operator with requirements scoped to concrete actions; route-specific blockers never become global objective blockers"
+      "purpose": "universal fixed-point bootstrap for existing/new ChatGPT web chats; terminal/manual/archived states still stop; no task scheduler continuity"
     }
   },
   "variants": [
@@ -113,7 +113,13 @@
     "quest_choices_pass",
     "recognized_process_auto_resume_pass",
     "legacy_park_migration_pass",
-    "tasks_not_used_as_chat_continuity_pass"
+    "tasks_not_used_as_chat_continuity_pass",
+    "existing_untagged_chat_auto_rehydrate_pass",
+    "new_chat_first_response_auto_rehydrate_pass",
+    "manual_off_preserved_pass",
+    "terminal_state_preserved_pass",
+    "archived_process_lock_pass",
+    "no_hard_followup_count_stop_pass"
   ],
   "rollback": "Restore avanza_macro_maestro_v4.user.js from commit ad812155a070654770508cfae6f677bd8d8fdecf (v4.0.3); never delete project state.",
   "release_evidence": {
@@ -124,8 +130,9 @@
     "authenticated_profile": "not_verified",
     "learn_quest": "PASS",
     "cfi_quest_bank": "verified in Google Drive",
-    "candidate_branch": "fix/v4-7-1-wording-20261011",
-    "candidate_version": "4.7.1",
-    "workflow_run": 38198371620
+    "candidate_branch": "fix/universal-fixed-point-continuity-20261013",
+    "candidate_version": "4.8.0",
+    "workflow_run": 38198371620,
+    "candidate_static_checks": "8/8 PASS in connector-side source transform"
   }
 }

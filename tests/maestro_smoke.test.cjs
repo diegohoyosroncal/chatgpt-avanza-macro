@@ -110,10 +110,10 @@ test('permanent health badge names the installed version without pretending the 
   assert.match(script, /function updateHealth\(\)/);
   assert.match(script, /updateHealth\(\)/);
 });
-test('registry records promoted stable v4.7.1 operator channel', () => {
+test('registry preserves stable v4.7.1 and records v4.8.0 candidate', () => {
   assert.equal(registry.channels.stable.version_verified_in_repository, '4.7.1');
-  assert.equal(registry.channels.candidate.version, '4.7.1');
-  assert.equal(registry.channels.candidate.status, 'promoted_to_stable');
+  assert.equal(registry.channels.candidate.version, '4.8.0');
+  assert.equal(registry.channels.candidate.status, 'candidate');
   assert.ok(registry.limitations.some(text => text.includes('Native Android/iOS')));
   assert.ok(registry.release_gates.includes('authenticated_chatgpt_browser_smoke_pass'));
   assert.ok(registry.variants.some(v => v.name === 'AVANZA Neon Mission Control' && v.status === 'stable'));
@@ -121,13 +121,15 @@ test('registry records promoted stable v4.7.1 operator channel', () => {
 
 test('real-browser canary has machine-readable DOM and conversation proof markers', () => {
   assert.match(script, /data-avanza-client-version/);
-  assert.match(script, /AVANZA_CLIENT_PROOF: 4\.7\.1-full-spectrum-operator/);
+  assert.match(script, /AVANZA_CLIENT_PROOF: \$\{INSTALLED_VERSION\}/);
 });
 
-test('new chat bootstrap is change-triggered, not load-triggered', () => {
+test('existing and new unfinished web chats bootstrap after route settle', () => {
   assert.match(script,/pageBaselineAssistantFingerprint/);
-  assert.match(script,/latestFingerprint !== pageBaselineAssistantFingerprint/);
+  assert.match(script,/Universal fixed-point bootstrap/);
+  assert.match(script,/hasConversation/);
   assert.match(script,/fallbackProcessId\(\)/);
+  assert.doesNotMatch(script,/latestFingerprint !== pageBaselineAssistantFingerprint/);
 });
 
 test('full-spectrum operator contract rejects passive status-only behavior', () => {
@@ -238,8 +240,8 @@ test('recoverable editor and macro-conflict failures defer instead of clearing A
   assert.match(script,/Conflicto de macro detectado: bloqueo envíos y reevalúo automáticamente/);
 });
 
-test('v4.7 exposes a full-screen Mission Control visual mode', () => {
-  assert.match(script,/const INSTALLED_VERSION = '4\.7\.[0-9]+-[^']+'/);
+test('v4.8 preserves the full-screen Mission Control visual mode', () => {
+  assert.match(script,/const INSTALLED_VERSION = '4\.8\.[0-9]+-[^']+'/);
   assert.match(script,/data-action="cinema"/);
   assert.match(script,/function renderMissionControl\(\)/);
   assert.match(script,/function toggleMissionControl\(force\)/);
