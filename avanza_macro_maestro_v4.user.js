@@ -910,7 +910,7 @@
     if (!continuityArmed || state.inFlightTicket) return false;
     if (state.retryAfter && now() < state.retryAfter) return false;
     if (state.parkFingerprint) {
-      // Legacy parked chats must not remain permanently frozen: reopen with a challenger strategy.
+      // legacy parked chats must not remain permanently frozen: reopen with a challenger strategy.
       state.parkFingerprint=''; state.parkSince=0;
       state.stalled=Math.max(3,state.stalled||0); state.missingReceipts=0; saveState();
     }
