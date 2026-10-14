@@ -1013,7 +1013,7 @@
         }
       }
       if(state.blocker==='PROCESS_ID_UNRESOLVED') state.blocker='';
-      state.autoConsented=true;
+      // Identity recovery must not change AUTO/MANUAL consent or project mode.
       state.lastUpdated=new Date().toISOString();
       saveState();
     }
