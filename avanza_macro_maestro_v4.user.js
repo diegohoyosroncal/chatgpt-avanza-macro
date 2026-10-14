@@ -303,6 +303,8 @@
     return (x >>> 0).toString(36) + ':' + s.length;
   }
   function fallbackProcessId() { return 'CHAT-' + fingerprint(chatKey).split(':')[0].toUpperCase(); }
+  // CHAT-* is a provisional browser key, never the business/process owner.
+  function isProvisionalProcessId(id=projectKey()) { return /^CHAT-[A-Z0-9]+$/.test(String(id||'')); }
   function now() { return Date.now(); }
   function visible(e) {
     if (!e || !e.isConnected) return false;
@@ -435,6 +437,17 @@
     return 'AVANZAR_Y_VERIFICAR';
   }
   function buildMessage(ticket, step) {
+    if (isProvisionalProcessId()) {
+      return [
+        `${MARK} — IDENTIFICACIÓN DE OBJETIVO ${ticket}.`,
+        `AVANZA_CLIENT_PROOF: ${INSTALLED_VERSION} | ${ticket}`,
+        'Esta es exclusivamente una fase de identificación de este chat. Recupera el objetivo original, propietario y estado vigente; NO ejecutes acciones externas, publicaciones, envíos, compras, cambios de permisos, reactivaciones ni ediciones. No crees tareas ni alteres los proyectos.',
+        'Consulta primero el contexto visible y el canon global compartido de Google Drive ID 1epHKEGs6SjTzrfDi5SeHNaxH7CHX09VTfmYNa7WxIcY. Consulta después el checkpoint canónico específico del objetivo. Si este chat tiene varios objetivos, identifica el conductor sin activar las demás fronteras. Conserva ARCHIVED_READ_ONLY, FROZEN y DISABLED.',
+        'Devuelve un PROCESS_ID canónico ESTABLE, distinto del provisional CHAT-*, solo si está sustentado por este chat/canon. Si no es identificable, devuelve process_id vacío y bloqueo PROCESS_ID_UNRESOLVED; nunca inventes progreso o autorización.',
+        'Responde con una línea final AVANZA_CONTROL: {"status":"CONTINUE","process_id":"","objective":"","previous_pct":null,"current_pct":null,"delta_pp":null,"numerator":null,"denominator":null,"evidence":"","blocker":"","next_action":""}. Sus valores son declaraciones del asistente, no recibos externos. No ejecutes el siguiente hito todavía: esta vuelta solo recupera identidad y estado.',
+        `${RECEIPT} ${ticket}`
+      ].join('\n\n');
+    }
     const chosen = strategy();
     const core = [
       `${MARK} — CONTROL ADAPTATIVO ${ticket}. Esta señal AGREGA capacidades; NO reemplaza objetivo, autorizaciones, decisiones, instrucciones ni checkpoints de este chat.`,
@@ -719,12 +732,27 @@
     } else {
       state.missingReceipts = 0;
       state.lastStatus = receipt.status;
-      if (receipt.processId) { if (!state.processId) state.processId=receipt.processId; else if (state.processId!==receipt.processId) state.blocker='PROCESS_ID cambió: conservar '+state.processId+' sin mezclar métricas'; }
+      const wasProvisional = isProvisionalProcessId();
+      const canonicalReceipt = Boolean(receipt.processId && !isProvisionalProcessId(receipt.processId));
+      if (wasProvisional && canonicalReceipt) {
+        const provisionalId=state.processId;
+        state.processId=receipt.processId;
+        state.objective='';
+        state.lastPercent=null; state.lastDenominator=null; state.lastNumerator=null; state.lastDelta=null;
+        delete projects[provisionalId]; // Avoid duplicate CHAT-* cards after canonical adoption.
+      } else if (receipt.processId) {
+        if (!state.processId) state.processId=receipt.processId;
+        else if (state.processId!==receipt.processId) state.blocker='PROCESS_ID cambió: conservar '+state.processId+' sin mezclar métricas';
+      }
+      if (wasProvisional && !canonicalReceipt) {
+        state.blocker='PROCESS_ID_UNRESOLVED';
+        state.autoConsented=false;
+      }
       const previousObjective = state.objective;
       const changedObjective = Boolean(receipt.objective && previousObjective && receipt.objective.trim().toLocaleLowerCase() !== previousObjective.trim().toLocaleLowerCase());
       if (receipt.objective && !changedObjective) state.objective = receipt.objective;
       state.nextAction = receipt.nextAction || state.nextAction;
-      state.blocker = receipt.blocker || '';
+      state.blocker = (wasProvisional && !canonicalReceipt) ? 'PROCESS_ID_UNRESOLVED' : (receipt.blocker || '');
       const numbersPlausible = receipt.percent === null || (receipt.percent >= 0 && receipt.percent <= 100);
       const sameCohort = state.lastDenominator === null || receipt.denominator === state.lastDenominator;
       const mathematicallyConsistent = receipt.previous === null || receipt.delta === null || receipt.percent === null || Math.abs((receipt.percent - receipt.previous) - receipt.delta) <= 0.11;
@@ -749,6 +777,10 @@
     pending = null; state.inFlightTicket=''; state.inFlightSentAt=0;
     if (state.repeatedResponses >= 4) { state.stalled=Math.max(state.stalled,3); state.lastStrategy='FORZAR_RUTA_MATERIALMENTE_DISTINTA'; setStatus('Respuesta repetida: cambio material de estrategia obligatorio; continúo.', true); }
     saveState();
+    if (isProvisionalProcessId() && state.blocker==='PROCESS_ID_UNRESOLVED') {
+      pause('Identificación de objetivo pendiente; no enviaré más ciclos sin PROCESS_ID canónico.',true);
+      return;
+    }
     if (receipt && EXIT.has(receipt.status)) {
       const candidateKey = receipt.status + '|' + (receipt.evidence || '').trim();
       if (state.terminalCandidate === candidateKey && state.terminalConfirmations >= 1) {
@@ -924,6 +956,7 @@
       }
     }
 
+    if (state.blocker==='PROCESS_ID_UNRESOLVED') return false;
     if (!continuityArmed || state.inFlightTicket) return false;
     if (state.retryAfter && now() < state.retryAfter) return false;
     if (state.parkFingerprint) {
