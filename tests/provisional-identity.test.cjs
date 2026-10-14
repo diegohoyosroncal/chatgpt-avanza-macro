@@ -101,7 +101,8 @@ test('assistant reply before a user follow-up is not discarded as interruption',
 
 test('visible canonical receipt rehydrates identity before auto or manual cycle',()=>{
   assert.match(source,/function rehydrateCanonicalIdentityFromVisibleReceipt\(\)/);
-  assert.match(source,/if\(needsIdentityBootstrap\(\)\) \{[\s\S]*?state\.processId=receipt\.processId;[\s\S]*?state\.autoConsented=true;[\s\S]*?saveState\(\);/);
+  assert.match(source,/if\(needsIdentityBootstrap\(\)\) \{[\s\S]*?state\.processId=receipt\.processId;[\s\S]*?saveState\(\);/);
+  assert.doesNotMatch(source,/function rehydrateCanonicalIdentityFromVisibleReceipt\(\)[\s\S]*?state\.autoConsented\s*=\s*true;/);
   assert.match(source,/const visibleReceipt=rehydrateCanonicalIdentityFromVisibleReceipt\(\);/);
   assert.match(source,/function toggle\(\) \{[\s\S]*?rehydrateCanonicalIdentityFromVisibleReceipt\(\);[\s\S]*?const id=projectKey\(\);/);
 });
@@ -129,7 +130,7 @@ test('functional: visible canonical receipt rehydrates empty owner',()=>{
   const state=p.getState();
   assert.equal(receipt.processId,'CROSS-CHAT-LEARNING');
   assert.equal(state.processId,'CROSS-CHAT-LEARNING');
-  assert.equal(state.autoConsented,true);
+  assert.equal(state.autoConsented,false);
   assert.equal(state.blocker,'');
   assert.equal(state.lastPercent,40);
   assert.equal(state.lastDenominator,5);
@@ -140,4 +141,16 @@ test('branch build identity is distinguishable from main 4.8.0',()=>{
   assert.match(source,/\/\/ @version\s+4\.8\.1/);
   assert.match(source,/const INSTALLED_VERSION = '4\.8\.1-cross-chat-rehydrate-pr28';/);
   assert.doesNotMatch(source,/const INSTALLED_VERSION = '4\.8\.0-universal-fixed-point';/);
+});
+
+
+test('rehydration preserves explicit manual consent state',()=>{
+  const p=harness();
+  p.setState({processId:'',blocker:'PROCESS_ID_UNRESOLVED',autoConsented:false});
+  p.setMessages([
+    {role:'assistant',text:'AVANZA_CONTROL: {"status":"CONTINUE","process_id":"CROSS-CHAT-LEARNING","objective":"Persist identity","previous_pct":40,"current_pct":40,"delta_pp":0,"numerator":2,"denominator":5,"evidence":"receipt","blocker":"","next_action":"canary"}'}
+  ]);
+  p.rehydrateCanonicalIdentityFromVisibleReceipt();
+  assert.equal(p.getState().processId,'CROSS-CHAT-LEARNING');
+  assert.equal(p.getState().autoConsented,false);
 });
