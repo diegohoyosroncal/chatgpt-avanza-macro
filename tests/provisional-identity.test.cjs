@@ -9,11 +9,29 @@ const boot="  if (document.readyState === 'loading') document.addEventListener('
 assert.ok(source.includes(boot));
 function harness(){
   const mem={};
-  const document={readyState:'loading',addEventListener(){}};
+  const nodes=[];
+  const node=(role,text)=>({
+    getAttribute:key=>key==='data-message-author-role'?role:null,
+    textContent:text,
+    innerText:text,
+    isConnected:true,
+    getBoundingClientRect:()=>({width:10,height:10}),
+  });
+  const document={
+    readyState:'loading',
+    addEventListener(){},
+    querySelectorAll(sel){
+      if(sel==='[data-message-author-role]') return nodes;
+      if(sel==='[data-message-author-role="assistant"]') return nodes.filter(x=>x.getAttribute('data-message-author-role')==='assistant');
+      if(sel==='[data-message-author-role="user"]') return nodes.filter(x=>x.getAttribute('data-message-author-role')==='user');
+      return [];
+    },
+    querySelector(sel){ return this.querySelectorAll(sel)[0]||null; },
+  };
   const window={addEventListener(){},removeEventListener(){},innerWidth:400,innerHeight:750};
   const localStorage={getItem:k=>mem[k]||null,setItem:(k,v)=>{mem[k]=v},removeItem:k=>{delete mem[k]}};
   const snippet=source.slice(0,source.indexOf(boot))+
-    "  window.__PROBE={isProvisionalProcessId,buildMessage,parseReceipt,setState:(x)=>{state={...freshState(),...x}},getState:()=>state};\n})();";
+    "  window.__PROBE={isProvisionalProcessId,buildMessage,parseReceipt,assistantAfter,rehydrateCanonicalIdentityFromVisibleReceipt,setMessages:(xs)=>{nodes.splice(0,nodes.length,...xs.map(x=>node(x.role,x.text)))},setState:(x)=>{state={...freshState(),...x}},getState:()=>state};\n})();";
   vm.runInNewContext(snippet,{document,window,localStorage,sessionStorage:localStorage,location:{hostname:'chatgpt.com',pathname:'/c/example',search:''},console,JSON,Math,Number,String,Date,RegExp,Set,Object,crypto:{randomUUID:()=>'test'}},{timeout:2000});
   return window.__PROBE;
 }
@@ -86,4 +104,33 @@ test('visible canonical receipt rehydrates identity before auto or manual cycle'
   assert.match(source,/if\(needsIdentityBootstrap\(\)\) \{[\s\S]*?state\.processId=receipt\.processId;[\s\S]*?state\.autoConsented=true;[\s\S]*?saveState\(\);/);
   assert.match(source,/const visibleReceipt=rehydrateCanonicalIdentityFromVisibleReceipt\(\);/);
   assert.match(source,/function toggle\(\) \{[\s\S]*?rehydrateCanonicalIdentityFromVisibleReceipt\(\);[\s\S]*?const id=projectKey\(\);/);
+});
+
+
+test('functional: receipt reply survives a later user follow-up',()=>{
+  const p=harness();
+  p.setMessages([
+    {role:'user',text:'MACRO ticket T-RACE'},
+    {role:'assistant',text:'ok\nAVANZA_CONTROL: {"status":"CONTINUE","process_id":"CROSS-CHAT-LEARNING","objective":"Persist identity","previous_pct":40,"current_pct":40,"delta_pp":0,"numerator":2,"denominator":5,"evidence":"receipt","blocker":"","next_action":"canary"}'},
+    {role:'user',text:'another macro arrived before poller consumed reply'}
+  ]);
+  const reply=p.assistantAfter('T-RACE');
+  assert.match(reply,/process_id":"CROSS-CHAT-LEARNING"/);
+  assert.notEqual(reply,'<<USER_INTERRUPTED>>');
+});
+
+test('functional: visible canonical receipt rehydrates empty owner',()=>{
+  const p=harness();
+  p.setState({processId:'',blocker:'PROCESS_ID_UNRESOLVED',autoConsented:false});
+  p.setMessages([
+    {role:'assistant',text:'AVANZA_CONTROL: {"status":"CONTINUE","process_id":"CROSS-CHAT-LEARNING","objective":"Persist identity","previous_pct":40,"current_pct":40,"delta_pp":0,"numerator":2,"denominator":5,"evidence":"receipt","blocker":"","next_action":"canary"}'}
+  ]);
+  const receipt=p.rehydrateCanonicalIdentityFromVisibleReceipt();
+  const state=p.getState();
+  assert.equal(receipt.processId,'CROSS-CHAT-LEARNING');
+  assert.equal(state.processId,'CROSS-CHAT-LEARNING');
+  assert.equal(state.autoConsented,true);
+  assert.equal(state.blocker,'');
+  assert.equal(state.lastPercent,40);
+  assert.equal(state.lastDenominator,5);
 });
