@@ -47,7 +47,7 @@ test('metadata parser can return canonical owner identity from bootstrap reply',
   assert.equal(m.percent,null);
 });
 test('canonical adoption clears provisional objective and denominator before progress',()=>{
-  assert.match(source,/const wasProvisional = isProvisionalProcessId\(\);/);
+  assert.match(source,/const wasProvisional = needsIdentityBootstrap\(\);/);
   assert.match(source,/if \(wasProvisional && canonicalReceipt\) \{[\s\S]*?state.processId=receipt.processId;[\s\S]*?state.objective='';[\s\S]*?state.lastDenominator=null;/);
   assert.match(source,/delete projects\[provisionalId\]/);
 });
@@ -175,4 +175,35 @@ test('without canonical evidence, do not guess a PROCESS_ID',()=>{
   const r=visibleRecovery(['Conversación sin meta ni identificador']);
   assert.equal(r.state.processId,'');
   assert.equal(r.persisted,0);
+});
+
+
+test('empty-owner manual cycle requests identity only and cannot execute the full macro',()=>{
+  const p=harness();
+  p.setState({processId:''});
+  const msg=p.buildMessage('T-EMPTY',1);
+  assert.match(msg,/IDENTIFICACIÓN DE OBJETIVO/);
+  assert.match(msg,/NO ejecutes acciones externas/);
+  assert.doesNotMatch(msg,/CONTRATO OPERADOR TOTAL/);
+  assert.doesNotMatch(msg,/CONTROL ADAPTATIVO/);
+});
+
+
+test('unknown owner without a parseable receipt cannot cause a blind retry',()=>{
+  assert.match(source,/function needsIdentityBootstrap\(\) \{ return !projectKey\(\) \|\| isProvisionalProcessId\(\); \}/);
+  assert.match(source,/if \(!receipt && needsIdentityBootstrap\(\)\) \{[\s\S]*?state.blocker='PROCESS_ID_UNRESOLVED';[\s\S]*?pause\('Identificación de objetivo sin recibo:/);
+});
+
+
+test('assistant reply before a user follow-up is not discarded as interruption',()=>{
+  assert.match(source,/const nextUser = after\.findIndex\([\s\S]*?const bounded = nextUser >= 0 \? after\.slice\(0, nextUser\) : after;[\s\S]*?if \(assistants\.length\)/);
+  assert.match(source,/return nextUser >= 0 \? '<<USER_INTERRUPTED>>' : '';/);
+});
+
+
+test('visible canonical receipt rehydrates identity before auto or manual cycle',()=>{
+  assert.match(source,/function rehydrateCanonicalIdentityFromVisibleReceipt\(\)/);
+  assert.match(source,/if\(needsIdentityBootstrap\(\)\) \{[\s\S]*?state\.processId=receipt\.processId;[\s\S]*?state\.autoConsented=true;[\s\S]*?saveState\(\);/);
+  assert.match(source,/const visibleReceipt=rehydrateCanonicalIdentityFromVisibleReceipt\(\);/);
+  assert.match(source,/function toggle\(\) \{[\s\S]*?rehydrateCanonicalIdentityFromVisibleReceipt\(\);[\s\S]*?const id=projectKey\(\);/);
 });
