@@ -420,10 +420,17 @@
     const idx = nodes.findIndex(x => x.getAttribute('data-message-author-role') === 'user' && (x.textContent || '').includes(ticket));
     if (idx < 0) return '';
     const after = nodes.slice(idx + 1);
-    // If a user interrupts or sends an ordinary message, autonomous replies stop.
-    if (after.some(x => x.getAttribute('data-message-author-role') === 'user')) return '<<USER_INTERRUPTED>>';
-    const assistants = after.filter(x => x.getAttribute('data-message-author-role') === 'assistant');
-    return assistants.length ? (assistants[assistants.length - 1].innerText || assistants[assistants.length - 1].textContent || '').trim() : '';
+    // Preserve a completed assistant reply even if the user sends a follow-up
+    // before the polling loop consumes it. Only treat interruption as terminal
+    // for this ticket when no assistant reply exists before the next user turn.
+    const nextUser = after.findIndex(x => x.getAttribute('data-message-author-role') === 'user');
+    const bounded = nextUser >= 0 ? after.slice(0, nextUser) : after;
+    const assistants = bounded.filter(x => x.getAttribute('data-message-author-role') === 'assistant');
+    if (assistants.length) {
+      const node=assistants[assistants.length - 1];
+      return (node.innerText || node.textContent || '').trim();
+    }
+    return nextUser >= 0 ? '<<USER_INTERRUPTED>>' : '';
   }
   function parseReceipt(s) {
     const lines = s.match(/AVANZA_CONTROL\s*:\s*\{[^\n]*\}/ig) || [];
@@ -873,6 +880,9 @@
     syncRoute();
     if (checkConflicts()) return;
     if (busy) return;
+    // Manual AVANZAR must reuse an already visible canonical receipt before
+    // deciding that this chat has no owner.
+    rehydrateCanonicalIdentityFromVisibleReceipt();
     const id=projectKey();
     if (isInactiveProcess(id)) {
       state.autoConsented=false;
@@ -987,10 +997,33 @@
     }
     return null;
   }
+  function rehydrateCanonicalIdentityFromVisibleReceipt() {
+    const receipt=latestVisibleReceipt();
+    if(!receipt?.processId || isProvisionalProcessId(receipt.processId)) return receipt;
+    if(needsIdentityBootstrap()) {
+      state.processId=receipt.processId;
+      if(receipt.objective) state.objective=receipt.objective;
+      if(receipt.denominator!==null && receipt.percent!==null) {
+        const numeratorOk=receipt.numerator===null || (receipt.numerator<=receipt.denominator && Math.abs(100*receipt.numerator/receipt.denominator-receipt.percent)<=0.3);
+        if(numeratorOk) {
+          state.lastPercent=receipt.percent;
+          state.lastDenominator=receipt.denominator;
+          state.lastNumerator=receipt.numerator;
+          state.lastDelta=receipt.delta;
+        }
+      }
+      if(state.blocker==='PROCESS_ID_UNRESOLVED') state.blocker='';
+      state.autoConsented=true;
+      state.lastUpdated=new Date().toISOString();
+      saveState();
+    }
+    return receipt;
+  }
   function shouldAutoStart() {
-    // Rehydrate any visible PROCESS_ID first. This covers historical tagged chats.
+    // Rehydrate any visible PROCESS_ID first. This covers historical tagged chats
+    // and survives a user follow-up that arrived before the poller consumed the reply.
     discoverVisibleProjects();
-    const visibleReceipt=latestVisibleReceipt();
+    const visibleReceipt=rehydrateCanonicalIdentityFromVisibleReceipt();
     if (visibleReceipt && EXIT.has(visibleReceipt.status)) return false;
     if (visibleReceipt?.percent !== null && visibleReceipt?.percent >= 100) return false;
 
