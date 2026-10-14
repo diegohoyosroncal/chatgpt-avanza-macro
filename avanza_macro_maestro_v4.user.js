@@ -1023,8 +1023,27 @@
     }
     return null;
   }
+  function visibleCanonicalReceiptConsensus() {
+    const nodes=[...document.querySelectorAll('[data-message-author-role="assistant"]')].slice(-12);
+    const receipts=nodes
+      .map(node=>parseReceipt(node.innerText||node.textContent||''))
+      .filter(r=>r?.processId && !isProvisionalProcessId(r.processId));
+    const ids=new Set(receipts.map(r=>r.processId));
+    return {
+      receipt: ids.size===1 ? receipts[receipts.length-1] : null,
+      conflict: ids.size>1,
+    };
+  }
   function rehydrateCanonicalIdentityFromVisibleReceipt() {
-    const receipt=latestVisibleReceipt();
+    const {receipt,conflict}=visibleCanonicalReceiptConsensus();
+    if(conflict) {
+      if(needsIdentityBootstrap()) {
+        state.blocker='PROCESS_ID_CONFLICT';
+        state.lastUpdated=new Date().toISOString();
+        saveState();
+      }
+      return null;
+    }
     if(!receipt?.processId || isProvisionalProcessId(receipt.processId)) return receipt;
     if(needsIdentityBootstrap()) {
       state.processId=receipt.processId;
@@ -1038,7 +1057,7 @@
           state.lastDelta=receipt.delta;
         }
       }
-      if(state.blocker==='PROCESS_ID_UNRESOLVED') state.blocker='';
+      if(state.blocker==='PROCESS_ID_UNRESOLVED' || state.blocker==='PROCESS_ID_CONFLICT') state.blocker='';
       // Identity recovery must not change AUTO/MANUAL consent or project mode.
       state.lastUpdated=new Date().toISOString();
       saveState();
@@ -1052,6 +1071,7 @@
     const visibleReceipt=rehydrateCanonicalIdentityFromVisibleReceipt();
     if (visibleReceipt && EXIT.has(visibleReceipt.status)) return false;
     if (visibleReceipt?.percent !== null && visibleReceipt?.percent >= 100) return false;
+    if (state.blocker==='PROCESS_ID_UNRESOLVED' || state.blocker==='PROCESS_ID_CONFLICT') return false;
 
     let continuityArmed = state.autoConsented === true || Boolean(state.processId);
     if (!continuityArmed && routeSettleUntil && now() < routeSettleUntil) {
@@ -1079,7 +1099,7 @@
       }
     }
 
-    if (state.blocker==='PROCESS_ID_UNRESOLVED') return false;
+    if (state.blocker==='PROCESS_ID_UNRESOLVED' || state.blocker==='PROCESS_ID_CONFLICT') return false;
     if (unansweredMacroCycle()) return false;
     if (!continuityArmed || state.inFlightTicket) return false;
     if (state.retryAfter && now() < state.retryAfter) return false;
