@@ -158,7 +158,9 @@ test('project cards keep ON-OFF and AUTO-MANUAL state independently', () => {
 });
 test('project state persists beyond a single tab session', () => {
   assert.match(script, /localStorage\.setItem\(storageKey\(\),JSON\.stringify\(state\)\)/);
-  assert.match(script, /localStorage\.getItem\(storageKey\(\)\)\|\|sessionStorage\.getItem/);
+  assert.match(script, /localStorage\\.getItem\\(current\\)\\|\\|sessionStorage\\.getItem\\(current\\)/);
+  assert.match(script, /oldKey!==current/);
+  assert.match(script, /localStorage\\.getItem\\(oldKey\\)\\|\\|sessionStorage\\.getItem\\(oldKey\\)/);
 });
 test('cross-tab project registry uses BroadcastChannel without remote APIs', () => {
   assert.match(script, /new BroadcastChannel\(CHANNEL_NAME\)/);
