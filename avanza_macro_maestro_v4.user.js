@@ -289,7 +289,12 @@
   }
   function recoverState() {
     try {
-      const raw=localStorage.getItem(storageKey())||sessionStorage.getItem(storageKey());
+      // One-time compatibility with the exact old query-scoped key for this chat.
+      const oldKey=SESSION_PREFIX+location.hostname+location.pathname
+        +location.search.replace(/([?&])utm_[^&]*/g, '');
+      const current=storageKey();
+      const raw=localStorage.getItem(current)||sessionStorage.getItem(current)
+        ||(oldKey!==current ? (localStorage.getItem(oldKey)||sessionStorage.getItem(oldKey)) : null);
       const parsed=raw&&JSON.parse(raw);
       return parsed&&typeof parsed==='object'?{...freshState(),...parsed}:freshState();
     } catch { return freshState(); }
