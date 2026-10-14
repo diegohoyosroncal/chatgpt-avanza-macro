@@ -38,7 +38,7 @@ jobs:
       - name: Check JavaScript syntax
         run: node --check avanza_macro_maestro_v4.user.js
       - name: Run offline non-network unit tests
-        run: node --test tests/maestro_smoke.test.cjs tests/auto-latch.test.mjs tests/process-locks.test.cjs tests/provisional-identity.test.cjs tests/retired-owner-gates.test.cjs
+        run: node --test tests/maestro_smoke.test.cjs tests/auto-latch.test.mjs tests/process-locks.test.cjs tests/provisional-identity.test.cjs tests/retired-owner-gates.test.cjs tests/persisted-process-recovery.test.cjs
       - name: Install small browser test harness
         run: |
           npm install --no-save --ignore-scripts playwright-core@1.56.1
