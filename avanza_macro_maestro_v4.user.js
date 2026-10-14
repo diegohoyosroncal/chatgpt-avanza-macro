@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         AVANZA — Macro Maestro · Piloto Automático
 // @namespace    https://chatgpt.com/
-// @version      4.8.0
+// @version      4.8.1
 // @description  Cockpit multiproyecto + Learn Quest: módulos ON/OFF, AUTO/MANUAL, progreso serio independiente, misiones jugables y sincronización entre pestañas.
 // @updateURL    https://raw.githubusercontent.com/diegohoyosroncal/chatgpt-avanza-macro/main/avanza_macro_maestro_v4.user.js
 // @downloadURL  https://raw.githubusercontent.com/diegohoyosroncal/chatgpt-avanza-macro/main/avanza_macro_maestro_v4.user.js
@@ -22,7 +22,7 @@
   const SINGLETON = 'data-avanza-maestro-v4-runner';
   if (document.documentElement?.getAttribute(SINGLETON) === '1') return;
   document.documentElement?.setAttribute(SINGLETON, '1');
-  const INSTALLED_VERSION = '4.8.0-universal-fixed-point';
+  const INSTALLED_VERSION = '4.8.1-cross-chat-rehydrate-pr28';
   document.documentElement?.setAttribute('data-avanza-client-version', INSTALLED_VERSION);
   const LEARN_KEY = 'avanza-v4-learn-quest-v1';
   const CONTROL_KEY = 'avanza-v4-control-center-v1';
@@ -77,8 +77,13 @@
   let routeHadGeneration = false;
 
   function currentChatKey() {
-    // Route is scoped to this web chat, not a global prompt or another chat.
-    return location.hostname + location.pathname + location.search.replace(/([?&])utm_[^&]*/g, '');
+    // An established /c/<conversation-id> is identified by its pathname.
+    // Query flags (model, referrer, temporary UI state) must not reset cycles,
+    // tickets or owner identity in the same conversation.
+    const pathKey = location.hostname + location.pathname;
+    if (/(?:^|\/)c\/[A-Za-z0-9_-]{12,}(?:\/|$)/.test(location.pathname)) return pathKey;
+    // Preserve existing query-scoping for new/unnamed chats to avoid collisions.
+    return pathKey + location.search.replace(/([?&])utm_[^&]*/g, '');
   }
   function storageKey() { return SESSION_PREFIX + chatKey; }
   function leaseKey() { return LEASE_PREFIX + chatKey; }
@@ -126,13 +131,22 @@
     renderModules(); renderProjects(); applyAura(); broadcast({type:'control',control});
   }
   function moduleOn(name) { return control.modules?.[name] !== false; }
+  // Canonical inactive statuses apply to ALL owners, not just historical IDs.
+  const INACTIVE_PROCESS_STATUSES = new Set(['ARCHIVED','ARCHIVED_READ_ONLY','FROZEN','DISABLED']);
+  function isInactiveProcess(id) {
+    if (!id) return false;
+    const status=String(projects?.[id]?.status||'').trim().toUpperCase();
+    return INACTIVE_PROCESS_STATUSES.has(status);
+  }
   function projectMode(id) {
     if (LOCKED_PROCESS_IDS.has(id)) return { enabled:false, auto:false };
+    if (isInactiveProcess(id)) return { enabled:false, auto:false };
     const row=control.projectModes?.[id]||{};
     return { enabled:row.enabled!==false, auto:row.auto!==false };
   }
   function setProjectMode(id,patch) {
     if (!id || LOCKED_PROCESS_IDS.has(id)) return;
+    if (isInactiveProcess(id)) return;
     control.projectModes[id]={...projectMode(id),...patch};
     saveControl();
   }
@@ -264,6 +278,8 @@
   function projectKey() { return safeId(state.processId)||''; }
   function upsertProjectSnapshot() {
     const id=projectKey(); if(!id) return;
+    // Older assistant receipts must not revive retired canonical owners.
+    if (isInactiveProcess(id)) return;
     const prev=projects[id]||{};
     projects[id]={...prev,id,chatKey,objective:state.objective||prev.objective||id,current_pct:state.lastPercent,previous_pct:state.lastDelta!==null&&state.lastPercent!==null?state.lastPercent-state.lastDelta:(prev.previous_pct??null),delta_pp:state.lastDelta,numerator:state.lastNumerator,denominator:state.lastDenominator,next_action:state.nextAction||prev.next_action||'',blocker:state.blocker||'',updated_at:state.lastUpdated||new Date().toISOString(),status:state.lastStatus||prev.status||'CONTINUE'};
     saveProjects();
@@ -273,7 +289,12 @@
   }
   function recoverState() {
     try {
-      const raw=localStorage.getItem(storageKey())||sessionStorage.getItem(storageKey());
+      // One-time compatibility with the exact old query-scoped key for this chat.
+      const oldKey=SESSION_PREFIX+location.hostname+location.pathname
+        +location.search.replace(/([?&])utm_[^&]*/g, '');
+      const current=storageKey();
+      const raw=localStorage.getItem(current)||sessionStorage.getItem(current)
+        ||(oldKey!==current ? (localStorage.getItem(oldKey)||sessionStorage.getItem(oldKey)) : null);
       const parsed=raw&&JSON.parse(raw);
       return parsed&&typeof parsed==='object'?{...freshState(),...parsed}:freshState();
     } catch { return freshState(); }
@@ -290,7 +311,15 @@
       channel?.close?.(); channel=new BroadcastChannel(CHANNEL_NAME);
       channel.onmessage=event=>{
         const msg=event.data||{}; if(msg.source===TAB_OWNER) return;
-        if(msg.type==='projects'&&msg.projects&&typeof msg.projects==='object'){ projects={...projects,...msg.projects}; try{localStorage.setItem(PROJECTS_KEY,JSON.stringify(projects));}catch{} renderProjects(); }
+        if(msg.type==='projects'&&msg.projects&&typeof msg.projects==='object'){
+          // A stale BroadcastChannel snapshot must not reactivate an inactive owner.
+          const inactive=Object.entries(projects).filter(([id])=>isInactiveProcess(id));
+          projects={...projects,...msg.projects};
+          for(const [id,old] of inactive) projects[id]={...(projects[id]||old),status:old.status,blocker:old.blocker};
+          for(const id of LOCKED_PROCESS_IDS) if(projects[id]) projects[id]={...projects[id],status:lockedStatus(id),blocker:'ARCHIVED_LOCK'};
+          try{localStorage.setItem(PROJECTS_KEY,JSON.stringify(projects));}catch{}
+          renderProjects();
+        }
         if(msg.type==='control'&&msg.control&&typeof msg.control==='object'){ control={...control,...msg.control,modules:{...control.modules,...(msg.control.modules||{})},projectModes:{...control.projectModes,...(msg.control.projectModes||{})}}; try{localStorage.setItem(CONTROL_KEY,JSON.stringify(control));}catch{} renderModules();renderProjects();applyAura(); }
         if(msg.type==='learning'&&msg.learning&&typeof msg.learning==='object'){ learning={...learning,...msg.learning}; try{localStorage.setItem(LEARN_KEY,JSON.stringify(learning));}catch{} renderGame(); }
       };
@@ -305,6 +334,9 @@
   function fallbackProcessId() { return 'CHAT-' + fingerprint(chatKey).split(':')[0].toUpperCase(); }
   // CHAT-* is a provisional browser key, never the business/process owner.
   function isProvisionalProcessId(id=projectKey()) { return /^CHAT-[A-Z0-9]+$/.test(String(id||'')); }
+  // A manual AVANZAR click can precede AUTO rehydration; an empty owner must
+  // receive the same identity-only bootstrap as a provisional CHAT-* owner.
+  function needsIdentityBootstrap() { return !projectKey() || isProvisionalProcessId(); }
   function now() { return Date.now(); }
   function visible(e) {
     if (!e || !e.isConnected) return false;
@@ -398,10 +430,17 @@
     const idx = nodes.findIndex(x => x.getAttribute('data-message-author-role') === 'user' && (x.textContent || '').includes(ticket));
     if (idx < 0) return '';
     const after = nodes.slice(idx + 1);
-    // If a user interrupts or sends an ordinary message, autonomous replies stop.
-    if (after.some(x => x.getAttribute('data-message-author-role') === 'user')) return '<<USER_INTERRUPTED>>';
-    const assistants = after.filter(x => x.getAttribute('data-message-author-role') === 'assistant');
-    return assistants.length ? (assistants[assistants.length - 1].innerText || assistants[assistants.length - 1].textContent || '').trim() : '';
+    // Preserve a completed assistant reply even if the user sends a follow-up
+    // before the polling loop consumes it. Only treat interruption as terminal
+    // for this ticket when no assistant reply exists before the next user turn.
+    const nextUser = after.findIndex(x => x.getAttribute('data-message-author-role') === 'user');
+    const bounded = nextUser >= 0 ? after.slice(0, nextUser) : after;
+    const assistants = bounded.filter(x => x.getAttribute('data-message-author-role') === 'assistant');
+    if (assistants.length) {
+      const node=assistants[assistants.length - 1];
+      return (node.innerText || node.textContent || '').trim();
+    }
+    return nextUser >= 0 ? '<<USER_INTERRUPTED>>' : '';
   }
   function parseReceipt(s) {
     const lines = s.match(/AVANZA_CONTROL\s*:\s*\{[^\n]*\}/ig) || [];
@@ -437,7 +476,7 @@
     return 'AVANZAR_Y_VERIFICAR';
   }
   function buildMessage(ticket, step) {
-    if (isProvisionalProcessId()) {
+    if (needsIdentityBootstrap()) {
       return [
         `${MARK} — IDENTIFICACIÓN DE OBJETIVO ${ticket}.`,
         `AVANZA_CLIENT_PROOF: ${INSTALLED_VERSION} | ${ticket}`,
@@ -633,6 +672,11 @@
   async function deliver(step) {
     if (checkConflicts() || !moduleOn('engine')) return;
     if (unansweredMacroCycle()) { defer('Ya hay un AVANZA sin respuesta en este chat; no duplico envíos.',true,3000); return; }
+    if (isInactiveProcess(projectKey())) {
+      state.autoConsented=false;
+      pause('Proceso archivado, congelado o deshabilitado: envío bloqueado.',true);
+      return;
+    }
     if (LOCKED_PROCESS_IDS.has(projectKey())) {
       state.autoConsented=false;
       pause('Proceso archivado o congelado: envío bloqueado.',true);
@@ -702,6 +746,11 @@
   async function tick() {
     if (busy) return;
     syncRoute();
+    if (isInactiveProcess(projectKey())) {
+      state.autoConsented=false;
+      pause('Proceso archivado, congelado o deshabilitado: ciclo detenido.',true);
+      return;
+    }
     if (LOCKED_PROCESS_IDS.has(projectKey())) {
       state.autoConsented=false;
       pause('Proceso archivado o congelado: el ciclo no puede continuar.',true);
@@ -752,7 +801,7 @@
     } else {
       state.missingReceipts = 0;
       state.lastStatus = receipt.status;
-      const wasProvisional = isProvisionalProcessId();
+      const wasProvisional = needsIdentityBootstrap();
       const canonicalReceipt = Boolean(receipt.processId && !isProvisionalProcessId(receipt.processId));
       if (wasProvisional && canonicalReceipt) {
         const provisionalId=state.processId;
@@ -797,7 +846,13 @@
     pending = null; state.inFlightTicket=''; state.inFlightSentAt=0;
     if (state.repeatedResponses >= 4) { state.stalled=Math.max(state.stalled,3); state.lastStrategy='FORZAR_RUTA_MATERIALMENTE_DISTINTA'; setStatus('Respuesta repetida: cambio material de estrategia obligatorio; continúo.', true); }
     saveState();
-    if (isProvisionalProcessId() && state.blocker==='PROCESS_ID_UNRESOLVED') {
+    if (!receipt && needsIdentityBootstrap()) {
+      state.blocker='PROCESS_ID_UNRESOLVED';
+      state.autoConsented=false;
+      pause('Identificación de objetivo sin recibo: mantengo el chat en revisión sin envíos repetidos.',true);
+      return;
+    }
+    if (needsIdentityBootstrap() && state.blocker==='PROCESS_ID_UNRESOLVED') {
       pause('Identificación de objetivo pendiente; no enviaré más ciclos sin PROCESS_ID canónico.',true);
       return;
     }
@@ -835,7 +890,15 @@
     syncRoute();
     if (checkConflicts()) return;
     if (busy) return;
+    // Manual AVANZAR must reuse an already visible canonical receipt before
+    // deciding that this chat has no owner.
+    rehydrateCanonicalIdentityFromVisibleReceipt();
     const id=projectKey();
+    if (isInactiveProcess(id)) {
+      state.autoConsented=false;
+      pause('Proceso archivado, congelado o deshabilitado: reactivación bloqueada.',true);
+      return;
+    }
     if (LOCKED_PROCESS_IDS.has(id)) {
       state.autoConsented=false;
       pause('Proceso archivado o congelado: no se inicia ningún ciclo AUTO.',true);
@@ -909,9 +972,16 @@
   }
   function discoverVisibleProjects() {
     const nodes=[...document.querySelectorAll('[data-message-author-role="assistant"]')].slice(-30);
-    const detected = new Set(); // Avoid binding the first of multiple unrelated objectives.
+    const detected = new Set(); // Numeric, denominated headers only.
+    const identityHeaders = new Set(); // Identity does not require an invented percentage.
     for (const node of nodes) {
       const text=(node.innerText||node.textContent||'');
+      // Recognize an explicit canonical process header even when advancement is
+      // "NO DETERMINABLE". Never turn that identity-only header into a metric.
+      for (const hit of text.matchAll(/^[ \t]*🧩\s*PROCESO\s+([A-Za-z0-9._:-]+)\s*\|\s*📈\s*AVANCE\b/gmi)) {
+        const id=safeId(hit[1]);
+        if (id && !isProvisionalProcessId(id)) identityHeaders.add(id);
+      }
       const re=/🧩\s*PROCESO\s+([A-Za-z0-9._:-]+)[^\n]*?📈\s*(?:AVANCE\s*)?([0-9]+(?:[.,][0-9]+)?)%\s*→\s*([0-9]+(?:[.,][0-9]+)?)%[^\n]*?(\d+)\s*\/\s*(\d+)/gi;
       let m;
       while((m=re.exec(text))) {
@@ -931,11 +1001,12 @@
       .map(node=>parseReceipt(node.innerText||node.textContent||''))
       .filter(r=>r?.processId && !isProvisionalProcessId(r.processId));
     const receiptIds=new Set(canonicalReceipts.map(r=>r.processId));
-    const headerId=detected.size===1?[...detected][0]:'';
+    const headerId=identityHeaders.size===1?[...identityHeaders][0]:(detected.size===1?[...detected][0]:'');
     const receipt=receiptIds.size===1?canonicalReceipts[canonicalReceipts.length-1]:null;
     const candidate=receipt?.processId||headerId;
-    const consistent=detected.size<=1 && receiptIds.size<=1
-      && (!headerId || !receipt || headerId===receipt.processId);
+    const consistent=identityHeaders.size<=1 && detected.size<=1 && receiptIds.size<=1
+      && (!headerId || !receipt || headerId===receipt.processId)
+      && (!detected.size || !headerId || detected.has(headerId));
     if (candidate && consistent && (!state.processId || isProvisionalProcessId())) {
       const previousId=state.processId, p=projects[candidate]||{};
       state.processId=candidate;
@@ -970,12 +1041,55 @@
     }
     return null;
   }
+  function visibleCanonicalReceiptConsensus() {
+    const nodes=[...document.querySelectorAll('[data-message-author-role="assistant"]')].slice(-12);
+    const receipts=nodes
+      .map(node=>parseReceipt(node.innerText||node.textContent||''))
+      .filter(r=>r?.processId && !isProvisionalProcessId(r.processId));
+    const ids=new Set(receipts.map(r=>r.processId));
+    return {
+      receipt: ids.size===1 ? receipts[receipts.length-1] : null,
+      conflict: ids.size>1,
+    };
+  }
+  function rehydrateCanonicalIdentityFromVisibleReceipt() {
+    const {receipt,conflict}=visibleCanonicalReceiptConsensus();
+    if(conflict) {
+      if(needsIdentityBootstrap()) {
+        state.blocker='PROCESS_ID_CONFLICT';
+        state.lastUpdated=new Date().toISOString();
+        saveState();
+      }
+      return null;
+    }
+    if(!receipt?.processId || isProvisionalProcessId(receipt.processId)) return receipt;
+    if(needsIdentityBootstrap()) {
+      state.processId=receipt.processId;
+      if(receipt.objective) state.objective=receipt.objective;
+      if(receipt.denominator!==null && receipt.percent!==null) {
+        const numeratorOk=receipt.numerator===null || (receipt.numerator<=receipt.denominator && Math.abs(100*receipt.numerator/receipt.denominator-receipt.percent)<=0.3);
+        if(numeratorOk) {
+          state.lastPercent=receipt.percent;
+          state.lastDenominator=receipt.denominator;
+          state.lastNumerator=receipt.numerator;
+          state.lastDelta=receipt.delta;
+        }
+      }
+      if(state.blocker==='PROCESS_ID_UNRESOLVED' || state.blocker==='PROCESS_ID_CONFLICT') state.blocker='';
+      // Identity recovery must not change AUTO/MANUAL consent or project mode.
+      state.lastUpdated=new Date().toISOString();
+      saveState();
+    }
+    return receipt;
+  }
   function shouldAutoStart() {
-    // Rehydrate any visible PROCESS_ID first. This covers historical tagged chats.
+    // Rehydrate any visible PROCESS_ID first. This covers historical tagged chats
+    // and survives a user follow-up that arrived before the poller consumed the reply.
     discoverVisibleProjects();
-    const visibleReceipt=latestVisibleReceipt();
+    const visibleReceipt=rehydrateCanonicalIdentityFromVisibleReceipt();
     if (visibleReceipt && EXIT.has(visibleReceipt.status)) return false;
     if (visibleReceipt?.percent !== null && visibleReceipt?.percent >= 100) return false;
+    if (state.blocker==='PROCESS_ID_UNRESOLVED' || state.blocker==='PROCESS_ID_CONFLICT') return false;
 
     let continuityArmed = state.autoConsented === true || Boolean(state.processId);
     if (!continuityArmed && routeSettleUntil && now() < routeSettleUntil) {
@@ -1003,7 +1117,7 @@
       }
     }
 
-    if (state.blocker==='PROCESS_ID_UNRESOLVED') return false;
+    if (state.blocker==='PROCESS_ID_UNRESOLVED' || state.blocker==='PROCESS_ID_CONFLICT') return false;
     if (unansweredMacroCycle()) return false;
     if (!continuityArmed || state.inFlightTicket) return false;
     if (state.retryAfter && now() < state.retryAfter) return false;
@@ -1015,6 +1129,7 @@
     if(!moduleOn('engine')||!moduleOn('auto')||checkConflicts()||isGenerating()) return false;
     const id=projectKey();
     if(id && LOCKED_PROCESS_IDS.has(id)) return false;
+    if(id && isInactiveProcess(id)) return false;
     const mode=id?projectMode(id):{enabled:true,auto:true};
     if(!mode.enabled||!mode.auto) return false;
     const L=id?learningFor(id):null; if(moduleOn('game')&&L?.status==='AWAITING_USER') return false;

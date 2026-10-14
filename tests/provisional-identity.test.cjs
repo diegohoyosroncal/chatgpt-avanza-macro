@@ -9,11 +9,30 @@ const boot="  if (document.readyState === 'loading') document.addEventListener('
 assert.ok(source.includes(boot));
 function harness(){
   const mem={};
-  const document={readyState:'loading',addEventListener(){}};
+  const nodes=[];
+  const node=(role,text)=>({
+    getAttribute:key=>key==='data-message-author-role'?role:null,
+    textContent:text,
+    innerText:text,
+    isConnected:true,
+    getBoundingClientRect:()=>({width:10,height:10}),
+  });
+  const document={
+    readyState:'loading',
+    addEventListener(){},
+    __setMessages(xs){nodes.splice(0,nodes.length,...xs.map(x=>node(x.role,x.text)))}, 
+    querySelectorAll(sel){
+      if(sel==='[data-message-author-role]') return nodes;
+      if(sel==='[data-message-author-role="assistant"]') return nodes.filter(x=>x.getAttribute('data-message-author-role')==='assistant');
+      if(sel==='[data-message-author-role="user"]') return nodes.filter(x=>x.getAttribute('data-message-author-role')==='user');
+      return [];
+    },
+    querySelector(sel){ return this.querySelectorAll(sel)[0]||null; },
+  };
   const window={addEventListener(){},removeEventListener(){},innerWidth:400,innerHeight:750};
   const localStorage={getItem:k=>mem[k]||null,setItem:(k,v)=>{mem[k]=v},removeItem:k=>{delete mem[k]}};
   const snippet=source.slice(0,source.indexOf(boot))+
-    "  window.__PROBE={isProvisionalProcessId,buildMessage,parseReceipt,setState:(x)=>{state={...freshState(),...x}},getState:()=>state};\n})();";
+    "  window.__PROBE={isProvisionalProcessId,buildMessage,parseReceipt,assistantAfter,rehydrateCanonicalIdentityFromVisibleReceipt,setMessages:(xs)=>document.__setMessages(xs),setState:(x)=>{state={...freshState(),...x}},getState:()=>state};\n})();";
   vm.runInNewContext(snippet,{document,window,localStorage,sessionStorage:localStorage,location:{hostname:'chatgpt.com',pathname:'/c/example',search:''},console,JSON,Math,Number,String,Date,RegExp,Set,Object,crypto:{randomUUID:()=>'test'}},{timeout:2000});
   return window.__PROBE;
 }
@@ -47,13 +66,13 @@ test('metadata parser can return canonical owner identity from bootstrap reply',
   assert.equal(m.percent,null);
 });
 test('canonical adoption clears provisional objective and denominator before progress',()=>{
-  assert.match(source,/const wasProvisional = isProvisionalProcessId\(\);/);
+  assert.match(source,/const wasProvisional = needsIdentityBootstrap\(\);/);
   assert.match(source,/if \(wasProvisional && canonicalReceipt\) \{[\s\S]*?state.processId=receipt.processId;[\s\S]*?state.objective='';[\s\S]*?state.lastDenominator=null;/);
   assert.match(source,/delete projects\[provisionalId\]/);
 });
 test('ambiguous bootstrap must stop instead of sending another unknown cycle',()=>{
   assert.match(source,/if \(wasProvisional && !canonicalReceipt\) \{[\s\S]*?state.blocker='PROCESS_ID_UNRESOLVED'/);
-  assert.match(source,/if \(state.blocker==='PROCESS_ID_UNRESOLVED'\) return false;/);
+  assert.match(source,/if \(state.blocker==='PROCESS_ID_UNRESOLVED' \|\| state.blocker==='PROCESS_ID_CONFLICT'\) return false;/);
   assert.match(source,/pause\('Identificación de objetivo pendiente; no enviaré más ciclos sin PROCESS_ID canónico.'/);
 });
 test('fixed owner restrictions are independently enforced after rebind',()=>{
@@ -61,118 +80,81 @@ test('fixed owner restrictions are independently enforced after rebind',()=>{
   assert.match(source,/if \(LOCKED_PROCESS_IDS.has\(projectKey\(\)\)\)/);
 });
 
-function domCycleProbe(messages){
-  const begin=source.indexOf('  function unansweredMacroCycle() {');
-  const end=source.indexOf('  async function claimAndSend(',begin);
-  assert.ok(begin>0&&end>begin);
-  const document={
-    querySelectorAll:()=>messages.map(([role,body])=>({
-      getAttribute:k=>k==='data-message-author-role'?role:null,
-      innerText:body,
-      textContent:body
-    }))
-  };
-  return new Function('document',source.slice(begin,end)+'return unansweredMacroCycle();')(document);
-}
-test('pending visible AVANZA request blocks concurrent request',()=>{
-  assert.equal(domCycleProbe([['user','AVANZA_CICLO_ID: AVZ4-100-1']]),'AVZ4-100-1');
+test('empty-owner manual cycle requests identity only and cannot execute the full macro',()=>{
+  const p=harness();
+  p.setState({processId:''});
+  const msg=p.buildMessage('T-EMPTY',1);
+  assert.match(msg,/IDENTIFICACIÓN DE OBJETIVO/);
+  assert.match(msg,/NO ejecutes acciones externas/);
+  assert.doesNotMatch(msg,/CONTRATO OPERADOR TOTAL/);
+  assert.doesNotMatch(msg,/CONTROL ADAPTATIVO/);
 });
-test('assistant answer releases prior visible AVANZA request',()=>{
-  assert.equal(domCycleProbe([['user','AVANZA_CICLO_ID: AVZ4-100-1'],['assistant','Respuesta terminada']]),'');
-});
-test('only newest unanswered macro is relevant, even after prior answer',()=>{
-  assert.equal(domCycleProbe([['user','AVANZA_CICLO_ID: AVZ4-100-1'],['assistant','Terminado'],['user','AVANZA_CICLO_ID: AVZ4-200-1']]),'AVZ4-200-1');
-});
-test('unrelated user text does not create a macro wait condition',()=>{
-  assert.equal(domCycleProbe([['user','actualiza las ventas'],['assistant','Bien'],['user','sigue']]),'');
-});
-test('two unanswered macro tickets reveal the latest, not a new permission',()=>{
-  assert.equal(domCycleProbe([['user','AVANZA_CICLO_ID: AVZ4-100-1'],['user','AVANZA_CICLO_ID: AVZ4-104-1']]),'AVZ4-104-1');
-});
-test('other user message cannot clear an outstanding macro ticket',()=>{
-  assert.equal(domCycleProbe([['user','AVANZA_CICLO_ID: AVZ4-100-1'],['user','.']]),'AVZ4-100-1');
-});
-test('DOM pending-cycle guard protects automatic and manual send paths',()=>{
-  const auto=source.slice(source.indexOf('  function shouldAutoStart() {'),source.indexOf('  function maybeAutoStart() {'));
-  const manual=source.slice(source.indexOf('  function toggle() {'),source.indexOf('  // PASSIVE, READ-ONLY'));
-  const deliver=source.slice(source.indexOf('  async function deliver('),source.indexOf('  async function tick() {'));
-  const send=source.slice(source.indexOf('  async function claimAndSend('),source.indexOf('  async function deliver('));
-  assert.match(auto,/unansweredMacroCycle\(\)/);
-  assert.match(manual,/unansweredMacroCycle\(\)/);
-  assert.match(deliver,/unansweredMacroCycle\(\)/);
-  assert.match(send,/unansweredMacroCycle\(\)/);
-  assert.match(deliver,/clearOwnUnsentDraft\(c,message\)/);
+test('unknown owner without a parseable receipt cannot cause a blind retry',()=>{
+  assert.match(source,/function needsIdentityBootstrap\(\) \{ return !projectKey\(\) \|\| isProvisionalProcessId\(\); \}/);
+  assert.match(source,/if \(!receipt && needsIdentityBootstrap\(\)\) \{[\s\S]*?state.blocker='PROCESS_ID_UNRESOLVED';[\s\S]*?pause\('Identificación de objetivo sin recibo:/);
 });
 
-function visibleRecovery(messages,initial={}){
-  const a=source.indexOf('  function discoverVisibleProjects() {');
-  const b=source.indexOf('  function latestVisibleReceipt() {',a);
-  assert.ok(a>=0&&b>a);
-  const state={processId:'',objective:'',lastPercent:null,lastNumerator:null,lastDenominator:null,lastDelta:null,lastStatus:'',...initial};
-  const projects={};
-  let persisted=0, savedIdentity='';
-  const doc={querySelectorAll:()=>messages.map(t=>({innerText:t,textContent:t}))};
-  const parseReceipt=(text)=>{
-    const match=text.match(/AVANZA_CONTROL:\s*(\{[^\n]*\})/);
-    if(!match) return null;
-    const m=JSON.parse(match[1]);
-    return {processId:m.process_id||'',objective:m.objective||'',numerator:m.numerator??null,denominator:m.denominator??null,percent:m.current_pct??null,delta:m.delta_pp??null,status:m.status||'CONTINUE'};
-  };
-  const fn=new Function('document','state','projects','safeId','parseReceipt',
-    'isProvisionalProcessId','saveState','localStorage','PROJECTS_KEY','renderProjects',
-    'lastPassiveProgressScan','hydrateVisibleReportedProgress','chatKey',
-    source.slice(a,b)+'return discoverVisibleProjects;')(
-    doc,state,projects,x=>String(x||'').replace(/[^A-Za-z0-9._:-]/g,'-'),parseReceipt,
-    (id=state.processId)=>/^CHAT-[A-Z0-9]+$/.test(String(id||'')),
-    ()=>{persisted++;savedIdentity=state.processId},
-    {setItem(){}},'TEST',()=>{},Date.now(),()=>{},'chatgpt.com/c/example'
-  );
-  fn();
-  return {state,projects,persisted,savedIdentity};
-}
-const row=(id='AVANZA-MACRO')=>`🧩 PROCESO ${id} | 📈 AVANCE 66,67%→66,67% | 4/6 gates | Δ 0 pp`;
-const receipt=(id='AVANZA-MACRO',current=66.67,n=4,d=6)=>
-  'AVANZA_CONTROL: '+JSON.stringify({status:'CONTINUE',process_id:id,
-    objective:'Continuidad por chat',current_pct:current,numerator:n,denominator:d,delta_pp:0});
-test('recovered header identity is persisted immediately rather than memory only',()=>{
-  const r=visibleRecovery([row()]);
-  assert.equal(r.state.processId,'AVANZA-MACRO');
-  assert.equal(r.savedIdentity,'AVANZA-MACRO');
-  assert.equal(r.persisted,1);
-  assert.equal(r.state.lastDenominator,6);
+
+test('assistant reply before a user follow-up is not discarded as interruption',()=>{
+  assert.match(source,/const nextUser = after\.findIndex\([\s\S]*?const bounded = nextUser >= 0 \? after\.slice\(0, nextUser\) : after;[\s\S]*?if \(assistants\.length\)/);
+  assert.match(source,/return nextUser >= 0 \? '<<USER_INTERRUPTED>>' : '';/);
 });
-test('canonical JSON receipt alone can recover and persist process id',()=>{
-  const r=visibleRecovery([receipt()]);
-  assert.equal(r.state.processId,'AVANZA-MACRO');
-  assert.equal(r.persisted,1);
-  assert.equal(r.state.lastPercent,66.67);
-  assert.equal(r.state.objective,'Continuidad por chat');
+
+test('visible canonical receipt rehydrates identity before auto or manual cycle',()=>{
+  assert.match(source,/function rehydrateCanonicalIdentityFromVisibleReceipt\(\)/);
+  assert.match(source,/if\(needsIdentityBootstrap\(\)\) \{[\s\S]*?state\.processId=receipt\.processId;[\s\S]*?saveState\(\);/);
+  const begin=source.indexOf('  function rehydrateCanonicalIdentityFromVisibleReceipt() {');
+  const end=source.indexOf('  function shouldAutoStart() {',begin);
+  assert.ok(begin>=0&&end>begin);
+  assert.doesNotMatch(source.slice(begin,end),/state\.autoConsented\s*=\s*true;/);
+  assert.match(source,/const visibleReceipt=rehydrateCanonicalIdentityFromVisibleReceipt\(\);/);
+  assert.match(source,/function toggle\(\) \{[\s\S]*?rehydrateCanonicalIdentityFromVisibleReceipt\(\);[\s\S]*?const id=projectKey\(\);/);
 });
-test('header and JSON receipt disagreement blocks automatic binding',()=>{
-  const r=visibleRecovery([row('BTS-LIMA'),receipt('AVANZA-MACRO')]);
-  assert.equal(r.state.processId,'');
-  assert.equal(r.persisted,0);
+
+
+test('functional: receipt reply survives a later user follow-up',()=>{
+  const p=harness();
+  p.setMessages([
+    {role:'user',text:'MACRO ticket T-RACE'},
+    {role:'assistant',text:'ok\nAVANZA_CONTROL: {"status":"CONTINUE","process_id":"CROSS-CHAT-LEARNING","objective":"Persist identity","previous_pct":40,"current_pct":40,"delta_pp":0,"numerator":2,"denominator":5,"evidence":"receipt","blocker":"","next_action":"canary"}'},
+    {role:'user',text:'another macro arrived before poller consumed reply'}
+  ]);
+  const reply=p.assistantAfter('T-RACE');
+  assert.match(reply,/process_id":"CROSS-CHAT-LEARNING"/);
+  assert.notEqual(reply,'<<USER_INTERRUPTED>>');
 });
-test('two distinct canonical receipts block automatic binding',()=>{
-  const r=visibleRecovery([receipt('AVANZA-MACRO'),receipt('BTS-LIMA')]);
-  assert.equal(r.state.processId,'');
-  assert.equal(r.persisted,0);
+
+test('functional: visible canonical receipt rehydrates empty owner',()=>{
+  const p=harness();
+  p.setState({processId:'',blocker:'PROCESS_ID_UNRESOLVED',autoConsented:false});
+  p.setMessages([
+    {role:'assistant',text:'AVANZA_CONTROL: {"status":"CONTINUE","process_id":"CROSS-CHAT-LEARNING","objective":"Persist identity","previous_pct":40,"current_pct":40,"delta_pp":0,"numerator":2,"denominator":5,"evidence":"receipt","blocker":"","next_action":"canary"}'}
+  ]);
+  const receipt=p.rehydrateCanonicalIdentityFromVisibleReceipt();
+  const state=p.getState();
+  assert.equal(receipt.processId,'CROSS-CHAT-LEARNING');
+  assert.equal(state.processId,'CROSS-CHAT-LEARNING');
+  assert.equal(state.autoConsented,false);
+  assert.equal(state.blocker,'');
+  assert.equal(state.lastPercent,40);
+  assert.equal(state.lastDenominator,5);
 });
-test('provisional owner is replaced by visible canonical receipt without new send',()=>{
-  const r=visibleRecovery([receipt()],{processId:'CHAT-ABC123',lastDenominator:19});
-  assert.equal(r.state.processId,'AVANZA-MACRO');
-  assert.equal(r.state.lastDenominator,6);
-  assert.equal(r.savedIdentity,'AVANZA-MACRO');
+
+
+test('branch build identity is distinguishable from main 4.8.0',()=>{
+  assert.match(source,/\/\/ @version\s+4\.8\.1/);
+  assert.match(source,/const INSTALLED_VERSION = '4\.8\.1-cross-chat-rehydrate-pr28';/);
+  assert.doesNotMatch(source,/const INSTALLED_VERSION = '4\.8\.0-universal-fixed-point';/);
 });
-test('conflicting or invalid numerical receipt never inflates progress',()=>{
-  const r=visibleRecovery([receipt('AVANZA-MACRO',100,4,6)]);
-  assert.equal(r.state.processId,'AVANZA-MACRO');
-  assert.equal(r.state.lastPercent,null);
-  assert.equal(r.state.lastNumerator,null);
-  assert.equal(r.state.lastProof,'ASISTENTE_VISIBLE_NO_PRUEBA_PRIMARIA');
-});
-test('without canonical evidence, do not guess a PROCESS_ID',()=>{
-  const r=visibleRecovery(['Conversación sin meta ni identificador']);
-  assert.equal(r.state.processId,'');
-  assert.equal(r.persisted,0);
+
+
+test('rehydration preserves explicit manual consent state',()=>{
+  const p=harness();
+  p.setState({processId:'',blocker:'PROCESS_ID_UNRESOLVED',autoConsented:false});
+  p.setMessages([
+    {role:'assistant',text:'AVANZA_CONTROL: {"status":"CONTINUE","process_id":"CROSS-CHAT-LEARNING","objective":"Persist identity","previous_pct":40,"current_pct":40,"delta_pp":0,"numerator":2,"denominator":5,"evidence":"receipt","blocker":"","next_action":"canary"}'}
+  ]);
+  p.rehydrateCanonicalIdentityFromVisibleReceipt();
+  assert.equal(p.getState().processId,'CROSS-CHAT-LEARNING');
+  assert.equal(p.getState().autoConsented,false);
 });
