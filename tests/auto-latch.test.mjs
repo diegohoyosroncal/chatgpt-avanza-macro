@@ -16,9 +16,9 @@ test('complete user script parses without side effects',()=>{
 function makeAuto(input={},env={}){
   const state={autoConsented:false,inFlightTicket:'',parkFingerprint:'',parkSince:0,retryAfter:0,stalled:4,missingReceipts:2,lastPercent:40,lastStatus:'',processId:'',...input};
   let saves=0;
-  const fn=new Function('state','moduleOn','checkConflicts','isGenerating','discoverVisibleProjects','projectKey','projectMode','learningFor','draft','findComposer','EXIT','lastVisibleAssistantFingerprint','pageBaselineAssistantFingerprint','fallbackProcessId','routeSettleUntil','routeHadGeneration','saveState','now','latestVisibleReceipt','document','LOCKED_PROCESS_IDS','isInactiveProcess',section('  function shouldAutoStart() {','  function maybeAutoStart() {')+'return shouldAutoStart;')(
+  const fn=new Function('state','moduleOn','checkConflicts','isGenerating','discoverVisibleProjects','projectKey','projectMode','learningFor','draft','findComposer','EXIT','lastVisibleAssistantFingerprint','pageBaselineAssistantFingerprint','fallbackProcessId','routeSettleUntil','routeHadGeneration','saveState','now','latestVisibleReceipt','document','LOCKED_PROCESS_IDS','isInactiveProcess','unansweredMacroCycle',section('  function shouldAutoStart() {','  function maybeAutoStart() {')+'return shouldAutoStart;')(
     state,()=>true,()=>false,()=>false,()=>{ if(state.projectId&&!state.processId) state.processId=state.projectId; },()=>state.projectId||state.processId||'',()=>({enabled:true,auto:true}),
-    ()=>null,()=>'',()=>null,new Set(['VERIFIED_COMPLETE','NO_SAFE_ACTION','HUMAN_GATE_PROVEN']),()=>state.newFingerprint||'old',env.pageBaseline??'old',()=> 'CHAT-TEST',env.routeSettleUntil??0,false,()=>{saves++;},()=>Date.now(),()=>env.visibleReceipt||null,{querySelector:()=>env.hasConversation===false?null:{}},new Set(['BTS-LIMA']),()=>false);
+    ()=>null,()=>'',()=>null,new Set(['VERIFIED_COMPLETE','NO_SAFE_ACTION','HUMAN_GATE_PROVEN']),()=>state.newFingerprint||'old',env.pageBaseline??'old',()=> 'CHAT-TEST',env.routeSettleUntil??0,false,()=>{saves++;},()=>Date.now(),()=>env.visibleReceipt||null,{querySelector:()=>env.hasConversation===false?null:{}},new Set(['BTS-LIMA']),()=>false,()=>env.pendingTicket||'');
   return {start:fn(),state,saves};
 }
 test('AUTO resumes recognized processes and bootstraps existing/new unfinished web chats',()=>{
@@ -33,6 +33,13 @@ test('AUTO resumes recognized processes and bootstraps existing/new unfinished w
   assert.equal(makeAuto({projectId:'BUSINESS'}).start,true);
   assert.equal(makeAuto({autoConsented:true}).start,true);
   assert.equal(makeAuto({}, {hasConversation:false}).start,false);
+});
+test('cross-profile outstanding macro ticket prevents AUTO before a second send',()=>{
+  assert.equal(makeAuto({processId:'BUSINESS'},{pendingTicket:'AVZ4-PREVIOUS'}).start,false);
+  assert.equal(makeAuto({processId:'BUSINESS'},{pendingTicket:''}).start,true);
+  assert.match(source,/function unansweredMacroCycle\(\)/);
+  assert.match(source,/if \(unansweredMacroCycle\(\)\) return false;/);
+  assert.match(source,/if \(!delivered\) \{ clearOwnUnsentDraft\(c,message\);/);
 });
 test('pending unique ticket blocks duplicate action on reload',()=>{
   assert.equal(makeAuto({autoConsented:true,inFlightTicket:'AVZ4-unique'}).start,false);
