@@ -324,6 +324,9 @@
   function fallbackProcessId() { return 'CHAT-' + fingerprint(chatKey).split(':')[0].toUpperCase(); }
   // CHAT-* is a provisional browser key, never the business/process owner.
   function isProvisionalProcessId(id=projectKey()) { return /^CHAT-[A-Z0-9]+$/.test(String(id||'')); }
+  // A manual AVANZAR click can precede AUTO rehydration; an empty owner must
+  // receive the same identity-only bootstrap as a provisional CHAT-* owner.
+  function needsIdentityBootstrap() { return !projectKey() || isProvisionalProcessId(); }
   function now() { return Date.now(); }
   function visible(e) {
     if (!e || !e.isConnected) return false;
@@ -456,7 +459,7 @@
     return 'AVANZAR_Y_VERIFICAR';
   }
   function buildMessage(ticket, step) {
-    if (isProvisionalProcessId()) {
+    if (needsIdentityBootstrap()) {
       return [
         `${MARK} — IDENTIFICACIÓN DE OBJETIVO ${ticket}.`,
         `AVANZA_CLIENT_PROOF: ${INSTALLED_VERSION} | ${ticket}`,
@@ -761,7 +764,7 @@
     } else {
       state.missingReceipts = 0;
       state.lastStatus = receipt.status;
-      const wasProvisional = isProvisionalProcessId();
+      const wasProvisional = needsIdentityBootstrap();
       const canonicalReceipt = Boolean(receipt.processId && !isProvisionalProcessId(receipt.processId));
       if (wasProvisional && canonicalReceipt) {
         const provisionalId=state.processId;
@@ -806,7 +809,13 @@
     pending = null; state.inFlightTicket=''; state.inFlightSentAt=0;
     if (state.repeatedResponses >= 4) { state.stalled=Math.max(state.stalled,3); state.lastStrategy='FORZAR_RUTA_MATERIALMENTE_DISTINTA'; setStatus('Respuesta repetida: cambio material de estrategia obligatorio; continúo.', true); }
     saveState();
-    if (isProvisionalProcessId() && state.blocker==='PROCESS_ID_UNRESOLVED') {
+    if (!receipt && needsIdentityBootstrap()) {
+      state.blocker='PROCESS_ID_UNRESOLVED';
+      state.autoConsented=false;
+      pause('Identificación de objetivo sin recibo: mantengo el chat en revisión sin envíos repetidos.',true);
+      return;
+    }
+    if (needsIdentityBootstrap() && state.blocker==='PROCESS_ID_UNRESOLVED') {
       pause('Identificación de objetivo pendiente; no enviaré más ciclos sin PROCESS_ID canónico.',true);
       return;
     }
