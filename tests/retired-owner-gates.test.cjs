@@ -56,7 +56,7 @@ test('AUTO, button, tick and delivery all enforce persisted inactive status',()=
     ['function toggle()','// PASSIVE, READ-ONLY'],
     ['async function tick()','function toggle()'],
     ['async function deliver(step)','async function tick()'],
-    ['function setProjectMode(','function seedProjects()')
+    ['function setProjectMode(','function seedProjects()']
   ]) {
     assert.match(part(a,b),/isInactiveProcess\(/,a);
   }
