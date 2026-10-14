@@ -74,3 +74,16 @@ test('unknown owner without a parseable receipt cannot cause a blind retry',()=>
   assert.match(source,/function needsIdentityBootstrap\(\) \{ return !projectKey\(\) \|\| isProvisionalProcessId\(\); \}/);
   assert.match(source,/if \(!receipt && needsIdentityBootstrap\(\)\) \{[\s\S]*?state.blocker='PROCESS_ID_UNRESOLVED';[\s\S]*?pause\('Identificación de objetivo sin recibo:/);
 });
+
+
+test('assistant reply before a user follow-up is not discarded as interruption',()=>{
+  assert.match(source,/const nextUser = after\.findIndex\([\s\S]*?const bounded = nextUser >= 0 \? after\.slice\(0, nextUser\) : after;[\s\S]*?if \(assistants\.length\)/);
+  assert.match(source,/return nextUser >= 0 \? '<<USER_INTERRUPTED>>' : '';/);
+});
+
+test('visible canonical receipt rehydrates identity before auto or manual cycle',()=>{
+  assert.match(source,/function rehydrateCanonicalIdentityFromVisibleReceipt\(\)/);
+  assert.match(source,/if\(needsIdentityBootstrap\(\)\) \{[\s\S]*?state\.processId=receipt\.processId;[\s\S]*?state\.autoConsented=true;[\s\S]*?saveState\(\);/);
+  assert.match(source,/const visibleReceipt=rehydrateCanonicalIdentityFromVisibleReceipt\(\);/);
+  assert.match(source,/function toggle\(\) \{[\s\S]*?rehydrateCanonicalIdentityFromVisibleReceipt\(\);[\s\S]*?const id=projectKey\(\);/);
+});
