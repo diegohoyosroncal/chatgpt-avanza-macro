@@ -126,13 +126,22 @@
     renderModules(); renderProjects(); applyAura(); broadcast({type:'control',control});
   }
   function moduleOn(name) { return control.modules?.[name] !== false; }
+  // Canonical inactive statuses apply to ALL owners, not just historical IDs.
+  const INACTIVE_PROCESS_STATUSES = new Set(['ARCHIVED','ARCHIVED_READ_ONLY','FROZEN','DISABLED']);
+  function isInactiveProcess(id) {
+    if (!id) return false;
+    const status=String(projects?.[id]?.status||'').trim().toUpperCase();
+    return INACTIVE_PROCESS_STATUSES.has(status);
+  }
   function projectMode(id) {
     if (LOCKED_PROCESS_IDS.has(id)) return { enabled:false, auto:false };
+    if (isInactiveProcess(id)) return { enabled:false, auto:false };
     const row=control.projectModes?.[id]||{};
     return { enabled:row.enabled!==false, auto:row.auto!==false };
   }
   function setProjectMode(id,patch) {
     if (!id || LOCKED_PROCESS_IDS.has(id)) return;
+    if (isInactiveProcess(id)) return;
     control.projectModes[id]={...projectMode(id),...patch};
     saveControl();
   }
@@ -264,6 +273,8 @@
   function projectKey() { return safeId(state.processId)||''; }
   function upsertProjectSnapshot() {
     const id=projectKey(); if(!id) return;
+    // Older assistant receipts must not revive retired canonical owners.
+    if (isInactiveProcess(id)) return;
     const prev=projects[id]||{};
     projects[id]={...prev,id,chatKey,objective:state.objective||prev.objective||id,current_pct:state.lastPercent,previous_pct:state.lastDelta!==null&&state.lastPercent!==null?state.lastPercent-state.lastDelta:(prev.previous_pct??null),delta_pp:state.lastDelta,numerator:state.lastNumerator,denominator:state.lastDenominator,next_action:state.nextAction||prev.next_action||'',blocker:state.blocker||'',updated_at:state.lastUpdated||new Date().toISOString(),status:state.lastStatus||prev.status||'CONTINUE'};
     saveProjects();
@@ -613,6 +624,11 @@
   }
   async function deliver(step) {
     if (checkConflicts() || !moduleOn('engine')) return;
+    if (isInactiveProcess(projectKey())) {
+      state.autoConsented=false;
+      pause('Proceso archivado, congelado o deshabilitado: envío bloqueado.',true);
+      return;
+    }
     if (LOCKED_PROCESS_IDS.has(projectKey())) {
       state.autoConsented=false;
       pause('Proceso archivado o congelado: envío bloqueado.',true);
@@ -682,6 +698,11 @@
   async function tick() {
     if (busy) return;
     syncRoute();
+    if (isInactiveProcess(projectKey())) {
+      state.autoConsented=false;
+      pause('Proceso archivado, congelado o deshabilitado: ciclo detenido.',true);
+      return;
+    }
     if (LOCKED_PROCESS_IDS.has(projectKey())) {
       state.autoConsented=false;
       pause('Proceso archivado o congelado: el ciclo no puede continuar.',true);
@@ -816,6 +837,11 @@
     if (checkConflicts()) return;
     if (busy) return;
     const id=projectKey();
+    if (isInactiveProcess(id)) {
+      state.autoConsented=false;
+      pause('Proceso archivado, congelado o deshabilitado: reactivación bloqueada.',true);
+      return;
+    }
     if (LOCKED_PROCESS_IDS.has(id)) {
       state.autoConsented=false;
       pause('Proceso archivado o congelado: no se inicia ningún ciclo AUTO.',true);
@@ -967,6 +993,7 @@
     if(!moduleOn('engine')||!moduleOn('auto')||checkConflicts()||isGenerating()) return false;
     const id=projectKey();
     if(id && LOCKED_PROCESS_IDS.has(id)) return false;
+    if(id && isInactiveProcess(id)) return false;
     const mode=id?projectMode(id):{enabled:true,auto:true};
     if(!mode.enabled||!mode.auto) return false;
     const L=id?learningFor(id):null; if(moduleOn('game')&&L?.status==='AWAITING_USER') return false;
