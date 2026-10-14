@@ -77,8 +77,13 @@
   let routeHadGeneration = false;
 
   function currentChatKey() {
-    // Route is scoped to this web chat, not a global prompt or another chat.
-    return location.hostname + location.pathname + location.search.replace(/([?&])utm_[^&]*/g, '');
+    // An established /c/<conversation-id> is identified by its pathname.
+    // Query flags (model, referrer, temporary UI state) must not reset cycles,
+    // tickets or owner identity in the same conversation.
+    const pathKey = location.hostname + location.pathname;
+    if (/(?:^|\/)c\/[A-Za-z0-9_-]{12,}(?:\/|$)/.test(location.pathname)) return pathKey;
+    // Preserve existing query-scoping for new/unnamed chats to avoid collisions.
+    return pathKey + location.search.replace(/([?&])utm_[^&]*/g, '');
   }
   function storageKey() { return SESSION_PREFIX + chatKey; }
   function leaseKey() { return LEASE_PREFIX + chatKey; }
