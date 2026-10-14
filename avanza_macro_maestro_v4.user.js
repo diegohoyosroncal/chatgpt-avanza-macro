@@ -593,12 +593,31 @@
   }
   // A Web Lock makes the final pre-send receipt check atomic between browser tabs
   // when supported. No profile-crossing or server-side lock is claimed.
+  // DOM-side second barrier: localStorage leases cover one browser profile, but
+  // two independent profiles may target the same conversation. If a previous
+  // AVANZA request is already visible without an assistant answer, do not
+  // synthesize or click another. This cannot prove global exactly-once delivery.
+  function unansweredMacroCycle() {
+    const nodes=[...document.querySelectorAll('[data-message-author-role="user"],[data-message-author-role="assistant"]')].slice(-80);
+    let outstanding='';
+    for (const node of nodes) {
+      const role=node.getAttribute('data-message-author-role');
+      if (role==='user') {
+        const match=(node.innerText||node.textContent||'').match(/AVANZA_CICLO_ID:\s*(AVZ4-[A-Za-z0-9._:-]+)/i);
+        if (match) outstanding=match[1];
+      } else if (role==='assistant' && outstanding) {
+        outstanding='';
+      }
+    }
+    return outstanding;
+  }
   async function claimAndSend(liveSend,ticket) {
     const commit=async()=>{
       let shared={};
       try { shared=JSON.parse(localStorage.getItem(storageKey())||'{}')||{}; }
       catch { return false; }
       if (shared.inFlightTicket && shared.inFlightTicket!==ticket) return false;
+      if (unansweredMacroCycle()) return false;
       if (!renewLease()) return false;
       state.inFlightTicket=ticket; state.inFlightSentAt=now();
       saveState(); // Write-ahead receipt: never retry a click of unknown outcome.
@@ -613,6 +632,7 @@
   }
   async function deliver(step) {
     if (checkConflicts() || !moduleOn('engine')) return;
+    if (unansweredMacroCycle()) { defer('Ya hay un AVANZA sin respuesta en este chat; no duplico envíos.',true,3000); return; }
     if (LOCKED_PROCESS_IDS.has(projectKey())) {
       state.autoConsented=false;
       pause('Proceso archivado o congelado: envío bloqueado.',true);
@@ -657,7 +677,7 @@
         return;
       }
       const delivered = await claimAndSend(liveSend,ticket);
-      if (!delivered) { defer('Otro panel o un mensaje pendiente tiene prioridad; AUTO reintentará sin duplicar.',true,3000); return; }
+      if (!delivered) { clearOwnUnsentDraft(c,message); defer('Otro panel o un mensaje pendiente tiene prioridad; AUTO reintentará sin duplicar.',true,3000); return; }
       // Click is not proof of delivery. Wait for the unique user-message receipt in the DOM.
       pending = { ticket, sentAt: now(), lastCheckAt: 0, receiptSeen: false };
       state.lastTicket = ticket;
@@ -827,6 +847,7 @@
       pause('Pausada manualmente. Este proyecto queda en MANUAL hasta reactivar AUTO.', false);
       return;
     }
+    if (unansweredMacroCycle()) { setStatus('Otro ciclo AVANZA aguarda respuesta: no iniciaré un segundo envío.',true); return; }
     if (!moduleOn('engine')) { setStatus('⚡ MOTOR está OFF. Enciéndelo desde MACROS.', true); return; }
     if (!moduleOn('auto')) { control.modules.auto=true; saveControl(); }
     if (!acquireLease()) { setStatus('Este chat ya está controlado por otra pestaña; no duplico acciones.', true); return; }
@@ -957,6 +978,7 @@
     }
 
     if (state.blocker==='PROCESS_ID_UNRESOLVED') return false;
+    if (unansweredMacroCycle()) return false;
     if (!continuityArmed || state.inFlightTicket) return false;
     if (state.retryAfter && now() < state.retryAfter) return false;
     if (state.parkFingerprint) {
