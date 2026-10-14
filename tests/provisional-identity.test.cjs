@@ -120,12 +120,12 @@ function visibleRecovery(messages,initial={}){
   };
   const fn=new Function('document','state','projects','safeId','parseReceipt',
     'isProvisionalProcessId','saveState','localStorage','PROJECTS_KEY','renderProjects',
-    'lastPassiveProgressScan','hydrateVisibleReportedProgress',
+    'lastPassiveProgressScan','hydrateVisibleReportedProgress','chatKey',
     source.slice(a,b)+'return discoverVisibleProjects;')(
     doc,state,projects,x=>String(x||'').replace(/[^A-Za-z0-9._:-]/g,'-'),parseReceipt,
-    id=>/^CHAT-[A-Z0-9]+$/.test(String(id||'')),
+    (id=state.processId)=>/^CHAT-[A-Z0-9]+$/.test(String(id||'')),
     ()=>{persisted++;savedIdentity=state.processId},
-    {setItem(){}},'TEST',()=>{},Date.now(),()=>{}
+    {setItem(){}},'TEST',()=>{},Date.now(),()=>{},'chatgpt.com/c/example'
   );
   fn();
   return {state,projects,persisted,savedIdentity};
