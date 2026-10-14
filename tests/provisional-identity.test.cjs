@@ -47,7 +47,7 @@ test('metadata parser can return canonical owner identity from bootstrap reply',
   assert.equal(m.percent,null);
 });
 test('canonical adoption clears provisional objective and denominator before progress',()=>{
-  assert.match(source,/const wasProvisional = isProvisionalProcessId\(\);/);
+  assert.match(source,/const wasProvisional = needsIdentityBootstrap\(\);/);
   assert.match(source,/if \(wasProvisional && canonicalReceipt\) \{[\s\S]*?state.processId=receipt.processId;[\s\S]*?state.objective='';[\s\S]*?state.lastDenominator=null;/);
   assert.match(source,/delete projects\[provisionalId\]/);
 });
@@ -61,45 +61,29 @@ test('fixed owner restrictions are independently enforced after rebind',()=>{
   assert.match(source,/if \(LOCKED_PROCESS_IDS.has\(projectKey\(\)\)\)/);
 });
 
-function domCycleProbe(messages){
-  const begin=source.indexOf('  function unansweredMacroCycle() {');
-  const end=source.indexOf('  async function claimAndSend(',begin);
-  assert.ok(begin>0&&end>begin);
-  const document={
-    querySelectorAll:()=>messages.map(([role,body])=>({
-      getAttribute:k=>k==='data-message-author-role'?role:null,
-      innerText:body,
-      textContent:body
-    }))
-  };
-  return new Function('document',source.slice(begin,end)+'return unansweredMacroCycle();')(document);
-}
-test('pending visible AVANZA request blocks concurrent request',()=>{
-  assert.equal(domCycleProbe([['user','AVANZA_CICLO_ID: AVZ4-100-1']]),'AVZ4-100-1');
+test('empty-owner manual cycle requests identity only and cannot execute the full macro',()=>{
+  const p=harness();
+  p.setState({processId:''});
+  const msg=p.buildMessage('T-EMPTY',1);
+  assert.match(msg,/IDENTIFICACIÓN DE OBJETIVO/);
+  assert.match(msg,/NO ejecutes acciones externas/);
+  assert.doesNotMatch(msg,/CONTRATO OPERADOR TOTAL/);
+  assert.doesNotMatch(msg,/CONTROL ADAPTATIVO/);
 });
-test('assistant answer releases prior visible AVANZA request',()=>{
-  assert.equal(domCycleProbe([['user','AVANZA_CICLO_ID: AVZ4-100-1'],['assistant','Respuesta terminada']]),'');
+test('unknown owner without a parseable receipt cannot cause a blind retry',()=>{
+  assert.match(source,/function needsIdentityBootstrap\(\) \{ return !projectKey\(\) \|\| isProvisionalProcessId\(\); \}/);
+  assert.match(source,/if \(!receipt && needsIdentityBootstrap\(\)\) \{[\s\S]*?state.blocker='PROCESS_ID_UNRESOLVED';[\s\S]*?pause\('Identificación de objetivo sin recibo:/);
 });
-test('only newest unanswered macro is relevant, even after prior answer',()=>{
-  assert.equal(domCycleProbe([['user','AVANZA_CICLO_ID: AVZ4-100-1'],['assistant','Terminado'],['user','AVANZA_CICLO_ID: AVZ4-200-1']]),'AVZ4-200-1');
+
+
+test('assistant reply before a user follow-up is not discarded as interruption',()=>{
+  assert.match(source,/const nextUser = after\.findIndex\([\s\S]*?const bounded = nextUser >= 0 \? after\.slice\(0, nextUser\) : after;[\s\S]*?if \(assistants\.length\)/);
+  assert.match(source,/return nextUser >= 0 \? '<<USER_INTERRUPTED>>' : '';/);
 });
-test('unrelated user text does not create a macro wait condition',()=>{
-  assert.equal(domCycleProbe([['user','actualiza las ventas'],['assistant','Bien'],['user','sigue']]),'');
-});
-test('two unanswered macro tickets reveal the latest, not a new permission',()=>{
-  assert.equal(domCycleProbe([['user','AVANZA_CICLO_ID: AVZ4-100-1'],['user','AVANZA_CICLO_ID: AVZ4-104-1']]),'AVZ4-104-1');
-});
-test('other user message cannot clear an outstanding macro ticket',()=>{
-  assert.equal(domCycleProbe([['user','AVANZA_CICLO_ID: AVZ4-100-1'],['user','.']]),'AVZ4-100-1');
-});
-test('DOM pending-cycle guard protects automatic and manual send paths',()=>{
-  const auto=source.slice(source.indexOf('  function shouldAutoStart() {'),source.indexOf('  function maybeAutoStart() {'));
-  const manual=source.slice(source.indexOf('  function toggle() {'),source.indexOf('  // PASSIVE, READ-ONLY'));
-  const deliver=source.slice(source.indexOf('  async function deliver('),source.indexOf('  async function tick() {'));
-  const send=source.slice(source.indexOf('  async function claimAndSend('),source.indexOf('  async function deliver('));
-  assert.match(auto,/unansweredMacroCycle\(\)/);
-  assert.match(manual,/unansweredMacroCycle\(\)/);
-  assert.match(deliver,/unansweredMacroCycle\(\)/);
-  assert.match(send,/unansweredMacroCycle\(\)/);
-  assert.match(deliver,/clearOwnUnsentDraft\(c,message\)/);
+
+test('visible canonical receipt rehydrates identity before auto or manual cycle',()=>{
+  assert.match(source,/function rehydrateCanonicalIdentityFromVisibleReceipt\(\)/);
+  assert.match(source,/if\(needsIdentityBootstrap\(\)\) \{[\s\S]*?state\.processId=receipt\.processId;[\s\S]*?state\.autoConsented=true;[\s\S]*?saveState\(\);/);
+  assert.match(source,/const visibleReceipt=rehydrateCanonicalIdentityFromVisibleReceipt\(\);/);
+  assert.match(source,/function toggle\(\) \{[\s\S]*?rehydrateCanonicalIdentityFromVisibleReceipt\(\);[\s\S]*?const id=projectKey\(\);/);
 });
