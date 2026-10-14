@@ -968,7 +968,7 @@
       const text=(node.innerText||node.textContent||'');
       // Recognize an explicit canonical process header even when advancement is
       // "NO DETERMINABLE". Never turn that identity-only header into a metric.
-      for (const hit of text.matchAll(/^[ \\t]*🧩\\s*PROCESO\\s+([A-Za-z0-9._:-]+)\\s*\\|\\s*📈\\s*AVANCE\\b/gmi)) {
+      for (const hit of text.matchAll(/^[ \t]*🧩\s*PROCESO\s+([A-Za-z0-9._:-]+)\s*\|\s*📈\s*AVANCE\b/gmi)) {
         const id=safeId(hit[1]);
         if (id && !isProvisionalProcessId(id)) identityHeaders.add(id);
       }
