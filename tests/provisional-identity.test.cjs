@@ -134,3 +134,10 @@ test('functional: visible canonical receipt rehydrates empty owner',()=>{
   assert.equal(state.lastPercent,40);
   assert.equal(state.lastDenominator,5);
 });
+
+
+test('branch build identity is distinguishable from main 4.8.0',()=>{
+  assert.match(source,/\/\/ @version\s+4\.8\.1/);
+  assert.match(source,/const INSTALLED_VERSION = '4\.8\.1-cross-chat-rehydrate-pr28';/);
+  assert.doesNotMatch(source,/const INSTALLED_VERSION = '4\.8\.0-universal-fixed-point';/);
+});
