@@ -301,7 +301,15 @@
       channel?.close?.(); channel=new BroadcastChannel(CHANNEL_NAME);
       channel.onmessage=event=>{
         const msg=event.data||{}; if(msg.source===TAB_OWNER) return;
-        if(msg.type==='projects'&&msg.projects&&typeof msg.projects==='object'){ projects={...projects,...msg.projects}; try{localStorage.setItem(PROJECTS_KEY,JSON.stringify(projects));}catch{} renderProjects(); }
+        if(msg.type==='projects'&&msg.projects&&typeof msg.projects==='object'){
+          // A stale BroadcastChannel snapshot must not reactivate an inactive owner.
+          const inactive=Object.entries(projects).filter(([id])=>isInactiveProcess(id));
+          projects={...projects,...msg.projects};
+          for(const [id,old] of inactive) projects[id]={...(projects[id]||old),status:old.status,blocker:old.blocker};
+          for(const id of LOCKED_PROCESS_IDS) if(projects[id]) projects[id]={...projects[id],status:lockedStatus(id),blocker:'ARCHIVED_LOCK'};
+          try{localStorage.setItem(PROJECTS_KEY,JSON.stringify(projects));}catch{}
+          renderProjects();
+        }
         if(msg.type==='control'&&msg.control&&typeof msg.control==='object'){ control={...control,...msg.control,modules:{...control.modules,...(msg.control.modules||{})},projectModes:{...control.projectModes,...(msg.control.projectModes||{})}}; try{localStorage.setItem(CONTROL_KEY,JSON.stringify(control));}catch{} renderModules();renderProjects();applyAura(); }
         if(msg.type==='learning'&&msg.learning&&typeof msg.learning==='object'){ learning={...learning,...msg.learning}; try{localStorage.setItem(LEARN_KEY,JSON.stringify(learning));}catch{} renderGame(); }
       };
