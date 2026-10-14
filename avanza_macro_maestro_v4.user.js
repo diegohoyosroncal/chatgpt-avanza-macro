@@ -46,7 +46,8 @@
   const STATES = Object.freeze({ IDLE: 'IDLE', READY: 'READY', WAITING: 'WAITING', PAUSED: 'PAUSED' });
   const EXIT = new Set(['VERIFIED_COMPLETE', 'HUMAN_GATE_PROVEN', 'NO_SAFE_ACTION']);
   // Processes explicitly archived by verified canonical state must never be resurrected by stale browser seeds.
-  const LOCKED_PROCESS_IDS = new Set(['BTS-LIMA']);
+  const LOCKED_PROCESS_IDS = new Set(['BTS-LIMA','AUGMENTED-LEARNING']);
+  const lockedStatus = id => id === 'AUGMENTED-LEARNING' ? 'FROZEN' : 'ARCHIVED';
   let phase = STATES.IDLE;
   let busy = false;
   let state = null;
@@ -131,7 +132,7 @@
     return { enabled:row.enabled!==false, auto:row.auto!==false };
   }
   function setProjectMode(id,patch) {
-    if(!id) return;
+    if (!id || LOCKED_PROCESS_IDS.has(id)) return;
     control.projectModes[id]={...projectMode(id),...patch};
     saveControl();
   }
@@ -250,11 +251,12 @@
       merged=raw&&typeof raw==='object'?{...seeds,...raw}:seeds;
     } catch { merged=seeds; }
     for (const id of LOCKED_PROCESS_IDS) {
-      if (merged[id]) merged[id]={...merged[id],status:'ARCHIVED',blocker:'ARCHIVED_LOCK'};
+      if (merged[id]) merged[id]={...merged[id],status:lockedStatus(id),blocker:'ARCHIVED_LOCK'};
     }
     return merged;
   }
   function saveProjects() {
+    for (const id of LOCKED_PROCESS_IDS) if (projects[id]) projects[id]={...projects[id],status:lockedStatus(id),blocker:'ARCHIVED_LOCK'};
     try { localStorage.setItem(PROJECTS_KEY,JSON.stringify(projects)); } catch {}
     renderProjects(); broadcast({type:'projects',projects});
   }
@@ -598,6 +600,11 @@
   }
   async function deliver(step) {
     if (checkConflicts() || !moduleOn('engine')) return;
+    if (LOCKED_PROCESS_IDS.has(projectKey())) {
+      state.autoConsented=false;
+      pause('Proceso archivado o congelado: envío bloqueado.',true);
+      return;
+    }
     if (busy || phase !== STATES.READY || pending) return;
     busy = true; render();
     try {
@@ -662,6 +669,11 @@
   async function tick() {
     if (busy) return;
     syncRoute();
+    if (LOCKED_PROCESS_IDS.has(projectKey())) {
+      state.autoConsented=false;
+      pause('Proceso archivado o congelado: el ciclo no puede continuar.',true);
+      return;
+    }
     if (phase !== STATES.READY && phase !== STATES.WAITING) return;
     if (!renewLease()) { defer('El control está en otra pestaña; espero el lease y reanudo.', true, 3000); return; }
     if (document.hidden && !control.backgroundAuto) return;
@@ -772,6 +784,11 @@
     if (checkConflicts()) return;
     if (busy) return;
     const id=projectKey();
+    if (LOCKED_PROCESS_IDS.has(id)) {
+      state.autoConsented=false;
+      pause('Proceso archivado o congelado: no se inicia ningún ciclo AUTO.',true);
+      return;
+    }
     if (phase === STATES.READY || phase === STATES.WAITING) {
       state.autoConsented=false;
       if (id) setProjectMode(id,{auto:false});
