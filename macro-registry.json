@@ -1,6 +1,6 @@
 {
   "schema_version": 2,
-  "updated_at": "2026-10-14T00:48:00-05:00",
+  "updated_at": "2026-10-14T00:42:00-05:00",
   "purpose": "Single macro source of truth; user projects, economic state and native app execution are independent",
   "primary_repository": "diegohoyosroncal/chatgpt-avanza-macro",
   "channels": {
@@ -9,14 +9,14 @@
       "branch": "main",
       "version_verified_in_repository": "4.8.0",
       "installed_profiles": "not_verified",
-      "ci": "4.7.1 PR #25: 45/45 unit PASS, headless Chromium PASS. Main 4.8.0 commit b703df2185ad349c9dd9bdc4905e7644b67a63ab claims smoke PASS; independent 4.8 CI and authenticated Firefox/Tampermonkey installation NOT VERIFIED here.",
+      "ci": "4.8.0 merged via PR #26; source readback verified, authenticated browser/install smoke not verified. Prior 4.7.1 PR #25 suite is historical.",
       "production_commit": "b703df2185ad349c9dd9bdc4905e7644b67a63ab"
     },
     "candidate": {
       "path": "avanza_macro_maestro_v4.user.js",
       "branch": "fix/universal-fixed-point-continuity-20261013",
       "version": "4.8.0",
-      "status": "promoted_source_already_in_main",
+      "status": "merged_into_main",
       "installed_profiles": "not_verified",
       "purpose": "universal fixed-point bootstrap for existing/new ChatGPT web chats; terminal/manual/archived states still stop; no task scheduler continuity",
       "note": "Branch retained for history; v4.8.0 exact source SHA matches main; PR #26 metadata may not reflect direct promotion. Authenticated canary pending."
@@ -125,7 +125,7 @@
   ],
   "rollback": "Restore avanza_macro_maestro_v4.user.js from commit ad812155a070654770508cfae6f677bd8d8fdecf (v4.0.3); never delete project state.",
   "release_evidence": {
-    "pr": 25,
+    "pr": 26,
     "merge_commit": "c0863638601bc8d033630cde36f7762645a24592",
     "offline_tests": "45/45 PASS",
     "chromium_hud": "PASS 1280x800 + 390x844",
@@ -133,7 +133,7 @@
     "learn_quest": "PASS",
     "cfi_quest_bank": "verified in Google Drive",
     "candidate_branch": "fix/universal-fixed-point-continuity-20261013",
-    "candidate_version": "4.8.0",
+    "candidate_version": "4.8.0 merged (PR #26); authenticated client unverified",
     "workflow_run": 38198371620,
     "candidate_static_checks": "8/8 PASS in connector-side source transform",
     "main_4_8_0_commit": "b703df2185ad349c9dd9bdc4905e7644b67a63ab",
