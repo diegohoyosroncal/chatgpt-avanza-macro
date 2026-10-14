@@ -975,12 +975,38 @@
         projects[id]={...old,id,current_pct:current,previous_pct:previous,delta_pp:current-previous,numerator,denominator,chatKey,updated_at:new Date().toISOString(),objective:old.objective||id,status:old.status||'CONTINUE'};
       }
     }
-    // Bind automatically only when precisely one process is visible in this chat.
-    // Multiple processes remain visible as separate cards; the assistant recovers the correct active objective.
-    if(!state.processId && detected.size===1) {
-      const id=[...detected][0], p=projects[id];
-      state.processId=id; state.lastPercent=p.current_pct; state.lastDelta=p.delta_pp;
-      state.lastNumerator=p.numerator; state.lastDenominator=p.denominator;
+    // Reconcile on-page evidence BEFORE constructing a new request. Earlier
+    // sessions could recognise a header only in memory; that identity was not
+    // durably persisted, so every new injection could restart at cycle 1.
+    // Use the single canonical receipt as fallback when headers are absent.
+    // Never bind a chat that visibly mixes different process identities.
+    const canonicalReceipts=nodes.slice(-12)
+      .map(node=>parseReceipt(node.innerText||node.textContent||''))
+      .filter(r=>r?.processId && !isProvisionalProcessId(r.processId));
+    const receiptIds=new Set(canonicalReceipts.map(r=>r.processId));
+    const headerId=detected.size===1?[...detected][0]:'';
+    const receipt=receiptIds.size===1?canonicalReceipts[canonicalReceipts.length-1]:null;
+    const candidate=receipt?.processId||headerId;
+    const consistent=detected.size<=1 && receiptIds.size<=1
+      && (!headerId || !receipt || headerId===receipt.processId);
+    if (candidate && consistent && (!state.processId || isProvisionalProcessId())) {
+      const previousId=state.processId, p=projects[candidate]||{};
+      state.processId=candidate;
+      state.objective=receipt?.objective||p.objective||state.objective;
+      // Reported metrics are UI hints; they are not primary-source evidence.
+      const n=receipt?.numerator, d=receipt?.denominator, pct=receipt?.percent;
+      const valid=Number.isInteger(n)&&Number.isInteger(d)&&d>0&&n>=0&&n<=d
+        &&typeof pct==='number'&&pct>=0&&pct<=100
+        &&Math.abs(100*n/d-pct)<0.31;
+      state.lastPercent=valid?pct:(Number.isFinite(p.current_pct)?p.current_pct:null);
+      state.lastNumerator=valid?n:(Number.isInteger(p.numerator)?p.numerator:null);
+      state.lastDenominator=valid?d:(Number.isInteger(p.denominator)?p.denominator:null);
+      state.lastDelta=valid?receipt.delta:(Number.isFinite(p.delta_pp)?p.delta_pp:null);
+      state.lastStatus=receipt?.status||p.status||state.lastStatus;
+      state.lastProof='ASISTENTE_VISIBLE_NO_PRUEBA_PRIMARIA';
+      state.blocker='';
+      if (previousId && isProvisionalProcessId(previousId)) delete projects[previousId];
+      saveState(); // Persist the canonical id across reloads and route changes.
     }
     if(Object.keys(projects).length){ try{localStorage.setItem(PROJECTS_KEY,JSON.stringify(projects));}catch{} renderProjects(); }
     if (Date.now() - lastPassiveProgressScan > 3500) {
