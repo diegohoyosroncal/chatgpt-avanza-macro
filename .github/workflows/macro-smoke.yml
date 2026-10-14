@@ -11,7 +11,8 @@ on:
       - 'macro-registry.json'
       - '.github/workflows/macro-smoke.yml'
   push:
-    branches: [main]
+    # Temporary head validation for stacked draft PR #28; remove before release.
+    branches: [main, fix/avanza-retired-status-gate-20261014]
     paths:
       - 'avanza_macro_maestro_v4.user.js'
       - 'tests/**/*.test.*'
@@ -38,7 +39,7 @@ jobs:
       - name: Check JavaScript syntax
         run: node --check avanza_macro_maestro_v4.user.js
       - name: Run offline non-network unit tests
-        run: node --test tests/maestro_smoke.test.cjs tests/auto-latch.test.mjs tests/process-locks.test.cjs tests/provisional-identity.test.cjs tests/retired-owner-gates.test.cjs tests/persisted-process-recovery.test.cjs
+        run: node --test tests/maestro_smoke.test.cjs tests/auto-latch.test.mjs tests/process-locks.test.cjs tests/provisional-identity.test.cjs tests/retired-owner-gates.test.cjs tests/persisted-process-recovery.test.cjs tests/visible-cycle-dedup.test.cjs
       - name: Install small browser test harness
         run: |
           npm install --no-save --ignore-scripts playwright-core@1.56.1
