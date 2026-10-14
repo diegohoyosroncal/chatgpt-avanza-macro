@@ -72,7 +72,7 @@ test('canonical adoption clears provisional objective and denominator before pro
 });
 test('ambiguous bootstrap must stop instead of sending another unknown cycle',()=>{
   assert.match(source,/if \(wasProvisional && !canonicalReceipt\) \{[\s\S]*?state.blocker='PROCESS_ID_UNRESOLVED'/);
-  assert.match(source,/if \(state.blocker==='PROCESS_ID_UNRESOLVED'\) return false;/);
+  assert.match(source,/if \(state.blocker==='PROCESS_ID_UNRESOLVED' \|\| state.blocker==='PROCESS_ID_CONFLICT'\) return false;/);
   assert.match(source,/pause\('Identificación de objetivo pendiente; no enviaré más ciclos sin PROCESS_ID canónico.'/);
 });
 test('fixed owner restrictions are independently enforced after rebind',()=>{
