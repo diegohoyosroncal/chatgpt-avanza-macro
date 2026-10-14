@@ -20,6 +20,7 @@ function harness(){
   const document={
     readyState:'loading',
     addEventListener(){},
+    __setMessages(xs){nodes.splice(0,nodes.length,...xs.map(x=>node(x.role,x.text)))}, 
     querySelectorAll(sel){
       if(sel==='[data-message-author-role]') return nodes;
       if(sel==='[data-message-author-role="assistant"]') return nodes.filter(x=>x.getAttribute('data-message-author-role')==='assistant');
@@ -31,7 +32,7 @@ function harness(){
   const window={addEventListener(){},removeEventListener(){},innerWidth:400,innerHeight:750};
   const localStorage={getItem:k=>mem[k]||null,setItem:(k,v)=>{mem[k]=v},removeItem:k=>{delete mem[k]}};
   const snippet=source.slice(0,source.indexOf(boot))+
-    "  window.__PROBE={isProvisionalProcessId,buildMessage,parseReceipt,assistantAfter,rehydrateCanonicalIdentityFromVisibleReceipt,setMessages:(xs)=>{nodes.splice(0,nodes.length,...xs.map(x=>node(x.role,x.text)))},setState:(x)=>{state={...freshState(),...x}},getState:()=>state};\n})();";
+    "  window.__PROBE={isProvisionalProcessId,buildMessage,parseReceipt,assistantAfter,rehydrateCanonicalIdentityFromVisibleReceipt,setMessages:(xs)=>document.__setMessages(xs),setState:(x)=>{state={...freshState(),...x}},getState:()=>state};\n})();";
   vm.runInNewContext(snippet,{document,window,localStorage,sessionStorage:localStorage,location:{hostname:'chatgpt.com',pathname:'/c/example',search:''},console,JSON,Math,Number,String,Date,RegExp,Set,Object,crypto:{randomUUID:()=>'test'}},{timeout:2000});
   return window.__PROBE;
 }
@@ -102,7 +103,10 @@ test('assistant reply before a user follow-up is not discarded as interruption',
 test('visible canonical receipt rehydrates identity before auto or manual cycle',()=>{
   assert.match(source,/function rehydrateCanonicalIdentityFromVisibleReceipt\(\)/);
   assert.match(source,/if\(needsIdentityBootstrap\(\)\) \{[\s\S]*?state\.processId=receipt\.processId;[\s\S]*?saveState\(\);/);
-  assert.doesNotMatch(source,/function rehydrateCanonicalIdentityFromVisibleReceipt\(\)[\s\S]*?state\.autoConsented\s*=\s*true;/);
+  const begin=source.indexOf('  function rehydrateCanonicalIdentityFromVisibleReceipt() {');
+  const end=source.indexOf('  function shouldAutoStart() {',begin);
+  assert.ok(begin>=0&&end>begin);
+  assert.doesNotMatch(source.slice(begin,end),/state\.autoConsented\s*=\s*true;/);
   assert.match(source,/const visibleReceipt=rehydrateCanonicalIdentityFromVisibleReceipt\(\);/);
   assert.match(source,/function toggle\(\) \{[\s\S]*?rehydrateCanonicalIdentityFromVisibleReceipt\(\);[\s\S]*?const id=projectKey\(\);/);
 });
