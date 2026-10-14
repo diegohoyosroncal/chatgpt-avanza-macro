@@ -962,9 +962,16 @@
   }
   function discoverVisibleProjects() {
     const nodes=[...document.querySelectorAll('[data-message-author-role="assistant"]')].slice(-30);
-    const detected = new Set(); // Avoid binding the first of multiple unrelated objectives.
+    const detected = new Set(); // Numeric, denominated headers only.
+    const identityHeaders = new Set(); // Identity does not require an invented percentage.
     for (const node of nodes) {
       const text=(node.innerText||node.textContent||'');
+      // Recognize an explicit canonical process header even when advancement is
+      // "NO DETERMINABLE". Never turn that identity-only header into a metric.
+      for (const hit of text.matchAll(/^[ \\t]*🧩\\s*PROCESO\\s+([A-Za-z0-9._:-]+)\\s*\\|\\s*📈\\s*AVANCE\\b/gmi)) {
+        const id=safeId(hit[1]);
+        if (id && !isProvisionalProcessId(id)) identityHeaders.add(id);
+      }
       const re=/🧩\s*PROCESO\s+([A-Za-z0-9._:-]+)[^\n]*?📈\s*(?:AVANCE\s*)?([0-9]+(?:[.,][0-9]+)?)%\s*→\s*([0-9]+(?:[.,][0-9]+)?)%[^\n]*?(\d+)\s*\/\s*(\d+)/gi;
       let m;
       while((m=re.exec(text))) {
@@ -984,11 +991,12 @@
       .map(node=>parseReceipt(node.innerText||node.textContent||''))
       .filter(r=>r?.processId && !isProvisionalProcessId(r.processId));
     const receiptIds=new Set(canonicalReceipts.map(r=>r.processId));
-    const headerId=detected.size===1?[...detected][0]:'';
+    const headerId=identityHeaders.size===1?[...identityHeaders][0]:(detected.size===1?[...detected][0]:'');
     const receipt=receiptIds.size===1?canonicalReceipts[canonicalReceipts.length-1]:null;
     const candidate=receipt?.processId||headerId;
-    const consistent=detected.size<=1 && receiptIds.size<=1
-      && (!headerId || !receipt || headerId===receipt.processId);
+    const consistent=identityHeaders.size<=1 && detected.size<=1 && receiptIds.size<=1
+      && (!headerId || !receipt || headerId===receipt.processId)
+      && (!detected.size || !headerId || detected.has(headerId));
     if (candidate && consistent && (!state.processId || isProvisionalProcessId())) {
       const previousId=state.processId, p=projects[candidate]||{};
       state.processId=candidate;
