@@ -47,7 +47,7 @@ test('metadata parser can return canonical owner identity from bootstrap reply',
   assert.equal(m.percent,null);
 });
 test('canonical adoption clears provisional objective and denominator before progress',()=>{
-  assert.match(source,/const wasProvisional = isProvisionalProcessId\(\);/);
+  assert.match(source,/const wasProvisional = needsIdentityBootstrap\(\);/);
   assert.match(source,/if \(wasProvisional && canonicalReceipt\) \{[\s\S]*?state.processId=receipt.processId;[\s\S]*?state.objective='';[\s\S]*?state.lastDenominator=null;/);
   assert.match(source,/delete projects\[provisionalId\]/);
 });
@@ -59,4 +59,18 @@ test('ambiguous bootstrap must stop instead of sending another unknown cycle',()
 test('fixed owner restrictions are independently enforced after rebind',()=>{
   assert.match(source,/LOCKED_PROCESS_IDS = new Set\(\['BTS-LIMA','AUGMENTED-LEARNING'\]\)/);
   assert.match(source,/if \(LOCKED_PROCESS_IDS.has\(projectKey\(\)\)\)/);
+});
+
+test('empty-owner manual cycle requests identity only and cannot execute the full macro',()=>{
+  const p=harness();
+  p.setState({processId:''});
+  const msg=p.buildMessage('T-EMPTY',1);
+  assert.match(msg,/IDENTIFICACIÓN DE OBJETIVO/);
+  assert.match(msg,/NO ejecutes acciones externas/);
+  assert.doesNotMatch(msg,/CONTRATO OPERADOR TOTAL/);
+  assert.doesNotMatch(msg,/CONTROL ADAPTATIVO/);
+});
+test('unknown owner without a parseable receipt cannot cause a blind retry',()=>{
+  assert.match(source,/function needsIdentityBootstrap\(\) \{ return !projectKey\(\) \|\| isProvisionalProcessId\(\); \}/);
+  assert.match(source,/if \(!receipt && needsIdentityBootstrap\(\)\) \{[\s\S]*?state.blocker='PROCESS_ID_UNRESOLVED';[\s\S]*?pause\('Identificación de objetivo sin recibo:/);
 });
