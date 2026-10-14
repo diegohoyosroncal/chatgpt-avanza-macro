@@ -1,23 +1,25 @@
 {
   "schema_version": 2,
-  "updated_at": "2026-10-13T16:12:00-05:00",
+  "updated_at": "2026-10-14T00:48:00-05:00",
   "purpose": "Single macro source of truth; user projects, economic state and native app execution are independent",
   "primary_repository": "diegohoyosroncal/chatgpt-avanza-macro",
   "channels": {
     "stable": {
       "path": "avanza_macro_maestro_v4.user.js",
       "branch": "main",
-      "version_verified_in_repository": "4.7.1",
+      "version_verified_in_repository": "4.8.0",
       "installed_profiles": "not_verified",
-      "ci": "PR #25 green: syntax PASS, 45/45 unit tests PASS, headless Chromium UI smoke PASS at 1280x800 and 390x844; merged as c0863638601bc8d033630cde36f7762645a24592"
+      "ci": "4.7.1 PR #25: 45/45 unit PASS, headless Chromium PASS. Main 4.8.0 commit b703df2185ad349c9dd9bdc4905e7644b67a63ab claims smoke PASS; independent 4.8 CI and authenticated Firefox/Tampermonkey installation NOT VERIFIED here.",
+      "production_commit": "b703df2185ad349c9dd9bdc4905e7644b67a63ab"
     },
     "candidate": {
       "path": "avanza_macro_maestro_v4.user.js",
       "branch": "fix/universal-fixed-point-continuity-20261013",
       "version": "4.8.0",
-      "status": "candidate",
+      "status": "promoted_source_already_in_main",
       "installed_profiles": "not_verified",
-      "purpose": "universal fixed-point bootstrap for existing/new ChatGPT web chats; terminal/manual/archived states still stop; no task scheduler continuity"
+      "purpose": "universal fixed-point bootstrap for existing/new ChatGPT web chats; terminal/manual/archived states still stop; no task scheduler continuity",
+      "note": "Branch retained for history; v4.8.0 exact source SHA matches main; PR #26 metadata may not reflect direct promotion. Authenticated canary pending."
     }
   },
   "variants": [
@@ -133,6 +135,10 @@
     "candidate_branch": "fix/universal-fixed-point-continuity-20261013",
     "candidate_version": "4.8.0",
     "workflow_run": 38198371620,
-    "candidate_static_checks": "8/8 PASS in connector-side source transform"
+    "candidate_static_checks": "8/8 PASS in connector-side source transform",
+    "main_4_8_0_commit": "b703df2185ad349c9dd9bdc4905e7644b67a63ab",
+    "main_4_8_0_source_sha": "7dfcefef41d77ff20cf86cd8f2b7738d1926414e",
+    "main_4_8_0_browser_canary": "not_verified",
+    "registry_reconciliation": "2026-10-14: main source v4.8.0 readback differs from registry stable v4.7.1; this commit corrects metadata only."
   }
 }
