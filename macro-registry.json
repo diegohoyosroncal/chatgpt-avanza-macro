@@ -7,10 +7,10 @@
     "stable": {
       "path": "avanza_macro_maestro_v4.user.js",
       "branch": "main",
-      "version_verified_in_repository": "4.8.0",
+      "version_verified_in_repository": "4.9.0",
       "installed_profiles": "not_verified",
-      "ci": "4.7.1 PR #25: 45/45 unit PASS, headless Chromium PASS. Main 4.8.0 commit b703df2185ad349c9dd9bdc4905e7644b67a63ab claims smoke PASS; independent 4.8 CI and authenticated Firefox/Tampermonkey installation NOT VERIFIED here.",
-      "production_commit": "b703df2185ad349c9dd9bdc4905e7644b67a63ab"
+      "ci": "Source main @version 4.9.0, INSTALLED_VERSION 4.9.0-terminal-proof-continuity observed by GitHub readback 14-Oct-2026. Browser authentication/install and real-client canary remain NOT VERIFIED; CI for PR30 is tracked separately.",
+      "production_commit": "49c68ac3f51e391227aabcead5956fb280cf6803"
     },
     "candidate": {
       "path": "avanza_macro_maestro_v4.user.js",
