@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         AVANZA — Macro Maestro · Piloto Automático
 // @namespace    https://chatgpt.com/
-// @version      4.8.0
+// @version      4.9.0
 // @description  Cockpit multiproyecto + Learn Quest: módulos ON/OFF, AUTO/MANUAL, progreso serio independiente, misiones jugables y sincronización entre pestañas.
 // @updateURL    https://raw.githubusercontent.com/diegohoyosroncal/chatgpt-avanza-macro/main/avanza_macro_maestro_v4.user.js
 // @downloadURL  https://raw.githubusercontent.com/diegohoyosroncal/chatgpt-avanza-macro/main/avanza_macro_maestro_v4.user.js
@@ -22,7 +22,7 @@
   const SINGLETON = 'data-avanza-maestro-v4-runner';
   if (document.documentElement?.getAttribute(SINGLETON) === '1') return;
   document.documentElement?.setAttribute(SINGLETON, '1');
-  const INSTALLED_VERSION = '4.8.0-universal-fixed-point';
+  const INSTALLED_VERSION = '4.9.0-terminal-proof-continuity';
   document.documentElement?.setAttribute('data-avanza-client-version', INSTALLED_VERSION);
   const LEARN_KEY = 'avanza-v4-learn-quest-v1';
   const CONTROL_KEY = 'avanza-v4-control-center-v1';
@@ -45,6 +45,7 @@
   const TAB_OWNER = crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`;
   const STATES = Object.freeze({ IDLE: 'IDLE', READY: 'READY', WAITING: 'WAITING', PAUSED: 'PAUSED' });
   const EXIT = new Set(['VERIFIED_COMPLETE', 'HUMAN_GATE_PROVEN', 'NO_SAFE_ACTION']);
+  const SOFT_TERMINAL = new Set(['HUMAN_GATE_PROVEN', 'NO_SAFE_ACTION']);
   // Processes explicitly archived by verified canonical state must never be resurrected by stale browser seeds.
   const LOCKED_PROCESS_IDS = new Set(['BTS-LIMA']);
   let phase = STATES.IDLE;
@@ -418,11 +419,30 @@
             numerator: Number.isInteger(Number(p.numerator)) && p.numerator !== null && Number(p.numerator) >= 0 ? Number(p.numerator) : null,
             previous: typeof p.previous_pct === 'number' && p.previous_pct >= 0 && p.previous_pct <= 100 ? p.previous_pct : null,
             processId: safeId(typeof p.process_id === 'string' ? p.process_id : ''),
+            terminalScope: typeof p.terminal_scope === 'string' ? p.terminal_scope.toUpperCase().replace(/[^A-Z_]/g,'') : '',
+            routeClassesTried: Array.isArray(p.route_classes_tried) ? p.route_classes_tried.map(x=>String(x).slice(0,48)).slice(0,12) : [],
+            independentFrontiersExhausted: p.independent_frontiers_exhausted === true,
+            buildGapAssessed: p.build_gap_assessed === true,
+            completionVerified: p.completion_verified === true,
           };
         }
       } catch { /* text not valid JSON; no false receipt */ }
     }
     return null;
+  }
+  function terminalEligible(receipt) {
+    if (!receipt || !EXIT.has(receipt.status)) return false;
+    if (receipt.status === 'VERIFIED_COMPLETE') {
+      return Boolean(receipt.evidence?.trim()) && (receipt.completionVerified === true || (receipt.percent !== null && receipt.percent >= 100));
+    }
+    if (SOFT_TERMINAL.has(receipt.status)) {
+      return receipt.terminalScope === 'OBJECTIVE'
+        && receipt.independentFrontiersExhausted === true
+        && receipt.buildGapAssessed === true
+        && receipt.routeClassesTried.length >= 4
+        && Boolean(receipt.evidence?.trim());
+    }
+    return false;
   }
   function strategy() {
     if (state.stalled >= 6) return 'OPERADOR_TOTAL_EXPANDIR_UNIVERSO_CREAR_O_SUSTITUIR';
@@ -454,7 +474,7 @@
       'LEARN QUEST: si el proceso es de aprendizaje, NO entregues una pared de teoría. Presenta una micro-misión resoluble por el usuario, evalúa su respuesta, explica el error o acierto y encadena la siguiente misión sin que tenga que escribir "sigue". Usa dificultad progresiva, recuperación espaciada, variación de datos y boss/simulacro cuando proceda.',
       'PROTOCOLO VISIBLE PARA EL HUD: cuando presentes una misión termina el bloque con una línea EXACTA: 🎮 QUEST | <curso> | <mission_id> | ⭐<xp 0-500> XP | ⚔️<1-5>/5 | <título>. Si la pregunta admite opciones útiles, añade inmediatamente: 🎲 QUEST_CHOICES | <mission_id> | A=<opción> | B=<opción> | C=<opción> | D=<opción>. El HUD convertirá esas opciones en botones. Si es numérica/abierta, deja que el usuario responda desde la caja interactiva del HUD. Cuando evalúes una respuesta añade: 🏆 QUEST_RESULT | <mission_id> | PASS | +<xp> XP | 🔥<racha> o 🔁 QUEST_RESULT | <mission_id> | RETRY | +0 XP | 🔥0. Si haces PASS, presenta en esa misma respuesta la siguiente QUEST salvo boss, pausa pedagógica o gate humano real.',
       ] : []),
-      'Para el control local termina con EXACTAMENTE UNA línea JSON de metadatos, después del informe: AVANZA_CONTROL: {"status":"CONTINUE","process_id":"","objective":"","previous_pct":null,"current_pct":null,"delta_pp":null,"numerator":null,"denominator":null,"evidence":"","blocker":"","next_action":""}. Estos valores son declaraciones del asistente y NO recibos independientes. Usa VERIFIED_COMPLETE solo si el OBJETIVO PRINCIPAL está completamente verificado con fuente primaria, HUMAN_GATE_PROVEN solo si se agotaron alternativas legítimas, NO_SAFE_ACTION solo si realmente no queda acción segura positiva. Nunca afirmes resultado final por CI, cola DONE, pruebas aisladas, documentos o esta macro. Mantén el denominador del MISMO objetivo, no mezcles ámbitos.',
+      'Para el control local termina con EXACTAMENTE UNA línea JSON de metadatos, después del informe: AVANZA_CONTROL: {"status":"CONTINUE","process_id":"","objective":"","previous_pct":null,"current_pct":null,"delta_pp":null,"numerator":null,"denominator":null,"evidence":"","blocker":"","next_action":"","terminal_scope":"","route_classes_tried":[],"independent_frontiers_exhausted":false,"build_gap_assessed":false,"completion_verified":false}. Estos valores son declaraciones del asistente y NO recibos independientes. Usa VERIFIED_COMPLETE solo si el OBJETIVO PRINCIPAL está completamente verificado con fuente primaria y marca completion_verified=true. HUMAN_GATE_PROVEN y NO_SAFE_ACTION son TERMINALES DEL OBJETIVO únicamente si terminal_scope=OBJECTIVE, route_classes_tried enumera al menos cuatro CLASES materialmente distintas realmente examinadas, independent_frontiers_exhausted=true y build_gap_assessed=true. Un gate de una rama o una herramienta NUNCA es terminal del objetivo: status=CONTINUE y sigue otras fronteras. Nunca afirmes resultado final por CI, cola DONE, pruebas aisladas, documentos o esta macro. Mantén el denominador del MISMO objetivo, no mezcles ámbitos.',
       `${RECEIPT} ${ticket}`,
     ];
     if (state.terminalCandidate) core.push('TERMINAL_CANDIDATE EN REVISIÓN: no detengas por repetición verbal. Reabre el universo de rutas, busca una clase de solución no probada y revalida desde fuente primaria/recibo independiente la condición terminal anterior; si no se sostiene, vuelve a CONTINUE y ejecuta la mejor alternativa materialmente distinta.');
@@ -738,19 +758,38 @@
     if (state.repeatedResponses >= 4) { state.stalled=Math.max(state.stalled,3); state.lastStrategy='FORZAR_RUTA_MATERIALMENTE_DISTINTA'; setStatus('Respuesta repetida: cambio material de estrategia obligatorio; continúo.', true); }
     saveState();
     if (receipt && EXIT.has(receipt.status)) {
-      const candidateKey = receipt.status + '|' + (receipt.evidence || '').trim();
-      if (state.terminalCandidate === candidateKey && state.terminalConfirmations >= 1) {
-        pause(receipt.status === 'VERIFIED_COMPLETE' ? 'Cierre confirmado en dos ciclos: objetivo declarado completo con evidencia revalidada.' :
-          receipt.status === 'HUMAN_GATE_PROVEN' ? 'Gate humano confirmado en dos ciclos tras reauditoría.' :
-          'Ausencia de acción segura confirmada en dos ciclos tras reauditoría.', true);
-        return;
+      if (!terminalEligible(receipt)) {
+        state.terminalCandidate = '';
+        state.terminalConfirmations = 0;
+        state.lastStatus = 'CONTINUE';
+        state.stalled = Math.max(state.stalled, 3);
+        state.lastStrategy = 'TERMINAL_REJECTED_REOPEN_UNIVERSE';
+        saveState();
+        setStatus('Terminal rechazado por prueba insuficiente: reabro universo, conectores, rutas externas y build-gap.', true);
+      } else {
+        const candidateKey = receipt.status + '|' + (receipt.evidence || '').trim();
+        if (state.terminalCandidate === candidateKey && state.terminalConfirmations >= 1) {
+          if (receipt.status === 'VERIFIED_COMPLETE') {
+            pause('Cierre confirmado en dos ciclos con prueba terminal válida del objetivo.', false);
+            return;
+          }
+          // HUMAN_GATE / NO_SAFE_ACTION may halt one frontier, but not the whole objective automatically.
+          state.terminalCandidate = '';
+          state.terminalConfirmations = 0;
+          state.lastStatus = 'CONTINUE';
+          state.stalled = Math.max(state.stalled, 6);
+          state.lastStrategy = 'SOFT_TERMINAL_ROTATE_FRONTIER';
+          saveState();
+          setStatus('Gate terminal válido de una ruta: no detengo el objetivo; roto a fronteras independientes o gap-filler.', true);
+        } else {
+          state.terminalCandidate = candidateKey;
+          state.terminalConfirmations = 1;
+          state.lastStatus = 'CONTINUE';
+          state.stalled = Math.max(state.stalled, 3);
+          saveState();
+          setStatus('Terminal candidato: exijo segunda reauditoría y prueba de agotamiento antes de cerrar.', true);
+        }
       }
-      state.terminalCandidate = candidateKey;
-      state.terminalConfirmations = 1;
-      state.lastStatus = 'CONTINUE';
-      state.stalled = Math.max(state.stalled, 3);
-      saveState();
-      setStatus('Terminal candidato NO cerrado: ejecuto una reauditoría independiente antes de detener.', true);
     } else if (receipt) {
       state.terminalCandidate = '';
       state.terminalConfirmations = 0;
@@ -878,7 +917,13 @@
     // Rehydrate any visible PROCESS_ID first. This covers historical tagged chats.
     discoverVisibleProjects();
     const visibleReceipt=latestVisibleReceipt();
-    if (visibleReceipt && EXIT.has(visibleReceipt.status)) return false;
+    if (visibleReceipt && terminalEligible(visibleReceipt)) return false;
+    if (visibleReceipt && EXIT.has(visibleReceipt.status) && !terminalEligible(visibleReceipt)) {
+      state.lastStatus='CONTINUE';
+      state.stalled=Math.max(state.stalled||0,3);
+      state.lastStrategy='TERMINAL_REJECTED_REOPEN_UNIVERSE';
+      saveState();
+    }
     if (visibleReceipt?.percent !== null && visibleReceipt?.percent >= 100) return false;
 
     let continuityArmed = state.autoConsented === true || Boolean(state.processId);
@@ -921,14 +966,14 @@
     if(!mode.enabled||!mode.auto) return false;
     const L=id?learningFor(id):null; if(moduleOn('game')&&L?.status==='AWAITING_USER') return false;
     if(draft(findComposer())) return false;
-    if(state.lastStatus&&EXIT.has(state.lastStatus)) return false;
+    if(state.lastStatus==='VERIFIED_COMPLETE' && typeof state.lastPercent==='number' && state.lastPercent>=100) return false;
     if(typeof state.lastPercent==='number'&&state.lastPercent>=100) return false;
     state.retryAfter=0;
     return true;
   }
   function maybeAutoStart() {
     if(phase!==STATES.IDLE&&phase!==STATES.PAUSED) return;
-    if(stopReason&&/HUMAN_GATE|NO_SAFE_ACTION|completado/i.test(stopReason)) return;
+    if(stopReason&&/completado/i.test(stopReason)) return;
     if(!shouldAutoStart()) return;
     if(!acquireLease()) return;
     stopReason=''; phase=STATES.READY;
