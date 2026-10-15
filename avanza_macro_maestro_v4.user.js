@@ -878,25 +878,60 @@
   }
   function discoverVisibleProjects() {
     const nodes=[...document.querySelectorAll('[data-message-author-role="assistant"]')].slice(-30);
-    const detected = new Set(); // Avoid binding the first of multiple unrelated objectives.
-    for (const node of nodes) {
+    const headerIds=new Set();
+    const numeric=new Map();
+    const provisional=id=>/^CHAT-[A-Z0-9]+$/.test(id);
+    for(const node of nodes) {
       const text=(node.innerText||node.textContent||'');
+      // Identity and evidence are separate: a valid owner may have no defensible percentage.
+      for(const hit of text.matchAll(/^[ \t]*🧩\s*PROCESO\s+([A-Za-z0-9._:-]+)\s*\|\s*📈\s*AVANCE\b/gmi)) {
+        const id=safeId(hit[1]);
+        if(id && !provisional(id) && id!=='POR-RECUPERAR') headerIds.add(id);
+      }
       const re=/🧩\s*PROCESO\s+([A-Za-z0-9._:-]+)[^\n]*?📈\s*(?:AVANCE\s*)?([0-9]+(?:[.,][0-9]+)?)%\s*→\s*([0-9]+(?:[.,][0-9]+)?)%[^\n]*?(\d+)\s*\/\s*(\d+)/gi;
       let m;
       while((m=re.exec(text))) {
-        const id=safeId(m[1]), current=Number(m[3].replace(',','.')), previous=Number(m[2].replace(',','.')), numerator=Number(m[4]), denominator=Number(m[5]);
-        if(!id||denominator<=0||numerator>denominator||Math.abs(100*numerator/denominator-current)>0.5) continue;
+        const id=safeId(m[1]), current=Number(m[3].replace(',','.')),
+          previous=Number(m[2].replace(',','.')), n=Number(m[4]),d=Number(m[5]);
+        if(!id||provisional(id)||d<=0||n<0||n>d||Math.abs(100*n/d-current)>0.5) continue;
         const old=projects[id]||{};
-        detected.add(id);
-        projects[id]={...old,id,current_pct:current,previous_pct:previous,delta_pp:current-previous,numerator,denominator,chatKey,updated_at:new Date().toISOString(),objective:old.objective||id,status:old.status||'CONTINUE'};
+        numeric.set(id,{current,previous,n,d});
+        projects[id]={...old,id,current_pct:current,previous_pct:previous,
+          delta_pp:current-previous,numerator:n,denominator:d,chatKey,
+          updated_at:new Date().toISOString(),objective:old.objective||id,
+          status:old.status||'CONTINUE'};
       }
     }
-    // Bind automatically only when precisely one process is visible in this chat.
-    // Multiple processes remain visible as separate cards; the assistant recovers the correct active objective.
-    if(!state.processId && detected.size===1) {
-      const id=[...detected][0], p=projects[id];
-      state.processId=id; state.lastPercent=p.current_pct; state.lastDelta=p.delta_pp;
-      state.lastNumerator=p.numerator; state.lastDenominator=p.denominator;
+    // A receipt is client-visible reporting, NOT external verification.
+    const receipts=nodes.slice(-12)
+      .map(node=>parseReceipt(node.innerText||node.textContent||''))
+      .filter(r=>r?.processId && !provisional(r.processId) && r.processId!=='POR-RECUPERAR');
+    const receiptIds=new Set(receipts.map(r=>r.processId));
+    const allIds=new Set([...headerIds,...receiptIds]);
+    // Do not pick the last owner if this chat contains conflicting process identities.
+    if(allIds.size===1) {
+      const id=[...allIds][0], previousId=state.processId;
+      if(!previousId || provisional(previousId)) {
+        const receipt=receipts[receipts.length-1];
+        const metrics=numeric.get(id);
+        state.processId=id;
+        if(receipt?.objective) state.objective=receipt.objective;
+        else if(!state.objective) state.objective=projects[id]?.objective||id;
+        if(metrics) {
+          state.lastPercent=metrics.current; state.lastDelta=metrics.current-metrics.previous;
+          state.lastNumerator=metrics.n;state.lastDenominator=metrics.d;
+        } else if(receipt && Number.isInteger(receipt.numerator)
+          && Number.isInteger(receipt.denominator) && receipt.denominator>0
+          && typeof receipt.percent==='number' && receipt.numerator<=receipt.denominator
+          && Math.abs(100*receipt.numerator/receipt.denominator-receipt.percent)<0.31) {
+          state.lastPercent=receipt.percent;state.lastDelta=receipt.delta;
+          state.lastNumerator=receipt.numerator;state.lastDenominator=receipt.denominator;
+        }
+        if(receipt?.status) state.lastStatus=receipt.status;
+        state.lastProof='ASISTENTE_VISIBLE_NO_PRUEBA_PRIMARIA';
+        if(previousId && provisional(previousId)) delete projects[previousId];
+        saveState(); // Critical: survive reload/reinjection instead of returning to POR RECUPERAR.
+      }
     }
     if(Object.keys(projects).length){ try{localStorage.setItem(PROJECTS_KEY,JSON.stringify(projects));}catch{} renderProjects(); }
     if (Date.now() - lastPassiveProgressScan > 3500) {
