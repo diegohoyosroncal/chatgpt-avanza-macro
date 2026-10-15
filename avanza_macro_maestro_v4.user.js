@@ -47,7 +47,8 @@
   const EXIT = new Set(['VERIFIED_COMPLETE', 'HUMAN_GATE_PROVEN', 'NO_SAFE_ACTION']);
   const SOFT_TERMINAL = new Set(['HUMAN_GATE_PROVEN', 'NO_SAFE_ACTION']);
   // Processes explicitly archived by verified canonical state must never be resurrected by stale browser seeds.
-  const LOCKED_PROCESS_IDS = new Set(['BTS-LIMA']);
+  const LOCKED_PROCESS_IDS = new Set(['BTS-LIMA','AUGMENTED-LEARNING']);
+  const lockedStatus = id => id === 'AUGMENTED-LEARNING' ? 'FROZEN' : 'ARCHIVED';
   let phase = STATES.IDLE;
   let busy = false;
   let state = null;
@@ -132,7 +133,7 @@
     return { enabled:row.enabled!==false, auto:row.auto!==false };
   }
   function setProjectMode(id,patch) {
-    if(!id) return;
+    if (!id || LOCKED_PROCESS_IDS.has(id)) return;
     control.projectModes[id]={...projectMode(id),...patch};
     saveControl();
   }
@@ -251,11 +252,12 @@
       merged=raw&&typeof raw==='object'?{...seeds,...raw}:seeds;
     } catch { merged=seeds; }
     for (const id of LOCKED_PROCESS_IDS) {
-      if (merged[id]) merged[id]={...merged[id],status:'ARCHIVED',blocker:'ARCHIVED_LOCK'};
+      if (merged[id]) merged[id]={...merged[id],status:lockedStatus(id),blocker:'ARCHIVED_LOCK'};
     }
     return merged;
   }
   function saveProjects() {
+    for (const id of LOCKED_PROCESS_IDS) if (projects[id]) projects[id]={...projects[id],status:lockedStatus(id),blocker:'ARCHIVED_LOCK'};
     try { localStorage.setItem(PROJECTS_KEY,JSON.stringify(projects)); } catch {}
     renderProjects(); broadcast({type:'projects',projects});
   }
@@ -302,6 +304,8 @@
     return (x >>> 0).toString(36) + ':' + s.length;
   }
   function fallbackProcessId() { return 'CHAT-' + fingerprint(chatKey).split(':')[0].toUpperCase(); }
+  // CHAT-* is a provisional browser key, never the business/process owner.
+  function isProvisionalProcessId(id=projectKey()) { return /^CHAT-[A-Z0-9]+$/.test(String(id||'')); }
   function now() { return Date.now(); }
   function visible(e) {
     if (!e || !e.isConnected) return false;
@@ -453,6 +457,17 @@
     return 'AVANZAR_Y_VERIFICAR';
   }
   function buildMessage(ticket, step) {
+    if (isProvisionalProcessId()) {
+      return [
+        `${MARK} — IDENTIFICACIÓN DE OBJETIVO ${ticket}.`,
+        `AVANZA_CLIENT_PROOF: ${INSTALLED_VERSION} | ${ticket}`,
+        'Esta es exclusivamente una fase de identificación de este chat. Recupera el objetivo original, propietario y estado vigente; NO ejecutes acciones externas, publicaciones, envíos, compras, cambios de permisos, reactivaciones ni ediciones. No crees tareas ni alteres los proyectos.',
+        'Consulta primero el contexto visible y el canon global compartido de Google Drive ID 1epHKEGs6SjTzrfDi5SeHNaxH7CHX09VTfmYNa7WxIcY. Consulta después el checkpoint canónico específico del objetivo. Si este chat tiene varios objetivos, identifica el conductor sin activar las demás fronteras. Conserva ARCHIVED_READ_ONLY, FROZEN y DISABLED.',
+        'Devuelve un PROCESS_ID canónico ESTABLE, distinto del provisional CHAT-*, solo si está sustentado por este chat/canon. Si no es identificable, devuelve process_id vacío y bloqueo PROCESS_ID_UNRESOLVED; nunca inventes progreso o autorización.',
+        'Responde con una línea final AVANZA_CONTROL: {"status":"CONTINUE","process_id":"","objective":"","previous_pct":null,"current_pct":null,"delta_pp":null,"numerator":null,"denominator":null,"evidence":"","blocker":"","next_action":""}. Sus valores son declaraciones del asistente, no recibos externos. No ejecutes el siguiente hito todavía: esta vuelta solo recupera identidad y estado.',
+        `${RECEIPT} ${ticket}`
+      ].join('\n\n');
+    }
     const chosen = strategy();
     const core = [
       `${MARK} — CONTROL ADAPTATIVO ${ticket}. Esta señal AGREGA capacidades; NO reemplaza objetivo, autorizaciones, decisiones, instrucciones ni checkpoints de este chat.`,
@@ -598,12 +613,31 @@
   }
   // A Web Lock makes the final pre-send receipt check atomic between browser tabs
   // when supported. No profile-crossing or server-side lock is claimed.
+  // DOM-side second barrier: localStorage leases cover one browser profile, but
+  // two independent profiles may target the same conversation. If a previous
+  // AVANZA request is already visible without an assistant answer, do not
+  // synthesize or click another. This cannot prove global exactly-once delivery.
+  function unansweredMacroCycle() {
+    const nodes=[...document.querySelectorAll('[data-message-author-role="user"],[data-message-author-role="assistant"]')].slice(-80);
+    let outstanding='';
+    for (const node of nodes) {
+      const role=node.getAttribute('data-message-author-role');
+      if (role==='user') {
+        const match=(node.innerText||node.textContent||'').match(/AVANZA_CICLO_ID:\s*(AVZ4-[A-Za-z0-9._:-]+)/i);
+        if (match) outstanding=match[1];
+      } else if (role==='assistant' && outstanding) {
+        outstanding='';
+      }
+    }
+    return outstanding;
+  }
   async function claimAndSend(liveSend,ticket) {
     const commit=async()=>{
       let shared={};
       try { shared=JSON.parse(localStorage.getItem(storageKey())||'{}')||{}; }
       catch { return false; }
       if (shared.inFlightTicket && shared.inFlightTicket!==ticket) return false;
+      if (unansweredMacroCycle()) return false;
       if (!renewLease()) return false;
       state.inFlightTicket=ticket; state.inFlightSentAt=now();
       saveState(); // Write-ahead receipt: never retry a click of unknown outcome.
@@ -618,6 +652,12 @@
   }
   async function deliver(step) {
     if (checkConflicts() || !moduleOn('engine')) return;
+    if (unansweredMacroCycle()) { defer('Ya hay un AVANZA sin respuesta en este chat; no duplico envíos.',true,3000); return; }
+    if (LOCKED_PROCESS_IDS.has(projectKey())) {
+      state.autoConsented=false;
+      pause('Proceso archivado o congelado: envío bloqueado.',true);
+      return;
+    }
     if (busy || phase !== STATES.READY || pending) return;
     busy = true; render();
     try {
@@ -657,7 +697,7 @@
         return;
       }
       const delivered = await claimAndSend(liveSend,ticket);
-      if (!delivered) { defer('Otro panel o un mensaje pendiente tiene prioridad; AUTO reintentará sin duplicar.',true,3000); return; }
+      if (!delivered) { clearOwnUnsentDraft(c,message); defer('Otro panel o un mensaje pendiente tiene prioridad; AUTO reintentará sin duplicar.',true,3000); return; }
       // Click is not proof of delivery. Wait for the unique user-message receipt in the DOM.
       pending = { ticket, sentAt: now(), lastCheckAt: 0, receiptSeen: false };
       state.lastTicket = ticket;
@@ -682,6 +722,11 @@
   async function tick() {
     if (busy) return;
     syncRoute();
+    if (LOCKED_PROCESS_IDS.has(projectKey())) {
+      state.autoConsented=false;
+      pause('Proceso archivado o congelado: el ciclo no puede continuar.',true);
+      return;
+    }
     if (phase !== STATES.READY && phase !== STATES.WAITING) return;
     if (!renewLease()) { defer('El control está en otra pestaña; espero el lease y reanudo.', true, 3000); return; }
     if (document.hidden && !control.backgroundAuto) return;
@@ -727,12 +772,27 @@
     } else {
       state.missingReceipts = 0;
       state.lastStatus = receipt.status;
-      if (receipt.processId) { if (!state.processId) state.processId=receipt.processId; else if (state.processId!==receipt.processId) state.blocker='PROCESS_ID cambió: conservar '+state.processId+' sin mezclar métricas'; }
+      const wasProvisional = isProvisionalProcessId();
+      const canonicalReceipt = Boolean(receipt.processId && !isProvisionalProcessId(receipt.processId));
+      if (wasProvisional && canonicalReceipt) {
+        const provisionalId=state.processId;
+        state.processId=receipt.processId;
+        state.objective='';
+        state.lastPercent=null; state.lastDenominator=null; state.lastNumerator=null; state.lastDelta=null;
+        delete projects[provisionalId]; // Avoid duplicate CHAT-* cards after canonical adoption.
+      } else if (receipt.processId) {
+        if (!state.processId) state.processId=receipt.processId;
+        else if (state.processId!==receipt.processId) state.blocker='PROCESS_ID cambió: conservar '+state.processId+' sin mezclar métricas';
+      }
+      if (wasProvisional && !canonicalReceipt) {
+        state.blocker='PROCESS_ID_UNRESOLVED';
+        state.autoConsented=false;
+      }
       const previousObjective = state.objective;
       const changedObjective = Boolean(receipt.objective && previousObjective && receipt.objective.trim().toLocaleLowerCase() !== previousObjective.trim().toLocaleLowerCase());
       if (receipt.objective && !changedObjective) state.objective = receipt.objective;
       state.nextAction = receipt.nextAction || state.nextAction;
-      state.blocker = receipt.blocker || '';
+      state.blocker = (wasProvisional && !canonicalReceipt) ? 'PROCESS_ID_UNRESOLVED' : (receipt.blocker || '');
       const numbersPlausible = receipt.percent === null || (receipt.percent >= 0 && receipt.percent <= 100);
       const sameCohort = state.lastDenominator === null || receipt.denominator === state.lastDenominator;
       const mathematicallyConsistent = receipt.previous === null || receipt.delta === null || receipt.percent === null || Math.abs((receipt.percent - receipt.previous) - receipt.delta) <= 0.11;
@@ -757,6 +817,10 @@
     pending = null; state.inFlightTicket=''; state.inFlightSentAt=0;
     if (state.repeatedResponses >= 4) { state.stalled=Math.max(state.stalled,3); state.lastStrategy='FORZAR_RUTA_MATERIALMENTE_DISTINTA'; setStatus('Respuesta repetida: cambio material de estrategia obligatorio; continúo.', true); }
     saveState();
+    if (isProvisionalProcessId() && state.blocker==='PROCESS_ID_UNRESOLVED') {
+      pause('Identificación de objetivo pendiente; no enviaré más ciclos sin PROCESS_ID canónico.',true);
+      return;
+    }
     if (receipt && EXIT.has(receipt.status)) {
       if (!terminalEligible(receipt)) {
         state.terminalCandidate = '';
@@ -811,12 +875,18 @@
     if (checkConflicts()) return;
     if (busy) return;
     const id=projectKey();
+    if (LOCKED_PROCESS_IDS.has(id)) {
+      state.autoConsented=false;
+      pause('Proceso archivado o congelado: no se inicia ningún ciclo AUTO.',true);
+      return;
+    }
     if (phase === STATES.READY || phase === STATES.WAITING) {
       state.autoConsented=false;
       if (id) setProjectMode(id,{auto:false});
       pause('Pausada manualmente. Este proyecto queda en MANUAL hasta reactivar AUTO.', false);
       return;
     }
+    if (unansweredMacroCycle()) { setStatus('Otro ciclo AVANZA aguarda respuesta: no iniciaré un segundo envío.',true); return; }
     if (!moduleOn('engine')) { setStatus('⚡ MOTOR está OFF. Enciéndelo desde MACROS.', true); return; }
     if (!moduleOn('auto')) { control.modules.auto=true; saveControl(); }
     if (!acquireLease()) { setStatus('Este chat ya está controlado por otra pestaña; no duplico acciones.', true); return; }
@@ -891,12 +961,38 @@
         projects[id]={...old,id,current_pct:current,previous_pct:previous,delta_pp:current-previous,numerator,denominator,chatKey,updated_at:new Date().toISOString(),objective:old.objective||id,status:old.status||'CONTINUE'};
       }
     }
-    // Bind automatically only when precisely one process is visible in this chat.
-    // Multiple processes remain visible as separate cards; the assistant recovers the correct active objective.
-    if(!state.processId && detected.size===1) {
-      const id=[...detected][0], p=projects[id];
-      state.processId=id; state.lastPercent=p.current_pct; state.lastDelta=p.delta_pp;
-      state.lastNumerator=p.numerator; state.lastDenominator=p.denominator;
+    // Reconcile on-page evidence BEFORE constructing a new request. Earlier
+    // sessions could recognise a header only in memory; that identity was not
+    // durably persisted, so every new injection could restart at cycle 1.
+    // Use the single canonical receipt as fallback when headers are absent.
+    // Never bind a chat that visibly mixes different process identities.
+    const canonicalReceipts=nodes.slice(-12)
+      .map(node=>parseReceipt(node.innerText||node.textContent||''))
+      .filter(r=>r?.processId && !isProvisionalProcessId(r.processId));
+    const receiptIds=new Set(canonicalReceipts.map(r=>r.processId));
+    const headerId=detected.size===1?[...detected][0]:'';
+    const receipt=receiptIds.size===1?canonicalReceipts[canonicalReceipts.length-1]:null;
+    const candidate=receipt?.processId||headerId;
+    const consistent=detected.size<=1 && receiptIds.size<=1
+      && (!headerId || !receipt || headerId===receipt.processId);
+    if (candidate && consistent && (!state.processId || isProvisionalProcessId())) {
+      const previousId=state.processId, p=projects[candidate]||{};
+      state.processId=candidate;
+      state.objective=receipt?.objective||p.objective||state.objective;
+      // Reported metrics are UI hints; they are not primary-source evidence.
+      const n=receipt?.numerator, d=receipt?.denominator, pct=receipt?.percent;
+      const valid=Number.isInteger(n)&&Number.isInteger(d)&&d>0&&n>=0&&n<=d
+        &&typeof pct==='number'&&pct>=0&&pct<=100
+        &&Math.abs(100*n/d-pct)<0.31;
+      state.lastPercent=valid?pct:(Number.isFinite(p.current_pct)?p.current_pct:null);
+      state.lastNumerator=valid?n:(Number.isInteger(p.numerator)?p.numerator:null);
+      state.lastDenominator=valid?d:(Number.isInteger(p.denominator)?p.denominator:null);
+      state.lastDelta=valid?receipt.delta:(Number.isFinite(p.delta_pp)?p.delta_pp:null);
+      state.lastStatus=receipt?.status||p.status||state.lastStatus;
+      state.lastProof='ASISTENTE_VISIBLE_NO_PRUEBA_PRIMARIA';
+      state.blocker='';
+      if (previousId && isProvisionalProcessId(previousId)) delete projects[previousId];
+      saveState(); // Persist the canonical id across reloads and route changes.
     }
     if(Object.keys(projects).length){ try{localStorage.setItem(PROJECTS_KEY,JSON.stringify(projects));}catch{} renderProjects(); }
     if (Date.now() - lastPassiveProgressScan > 3500) {
@@ -952,6 +1048,8 @@
       }
     }
 
+    if (state.blocker==='PROCESS_ID_UNRESOLVED') return false;
+    if (unansweredMacroCycle()) return false;
     if (!continuityArmed || state.inFlightTicket) return false;
     if (state.retryAfter && now() < state.retryAfter) return false;
     if (state.parkFingerprint) {
