@@ -5,8 +5,8 @@ import {readFileSync} from 'node:fs';
 const source=readFileSync(new URL('../avanza_macro_maestro_v4.user.js',import.meta.url),'utf8');
 
 test('4.9 candidate keeps stable established-chat route identity',()=>{
-  assert.match(source,/const pathKey = location\.hostname \+ location\.pathname/);
-  assert.match(source,/c\\\/[A-Za-z0-9_-]+/);
+  assert.ok(source.includes('const pathKey = location.hostname + location.pathname;'));
+  assert.ok(source.includes("if (/(?:^|\\/)c\\/[A-Za-z0-9_-]{12,}(?:\\/|$)/.test(location.pathname)) return pathKey;"));
 });
 
 test('4.9 candidate preserves generic inactive-owner gates',()=>{
