@@ -1,6 +1,6 @@
 {
   "schema_version": 2,
-  "updated_at": "2026-10-14T00:48:00-05:00",
+  "updated_at": "2026-10-17T00:00:00-05:00",
   "purpose": "Single macro source of truth; user projects, economic state and native app execution are independent",
   "primary_repository": "diegohoyosroncal/chatgpt-avanza-macro",
   "channels": {
@@ -14,12 +14,12 @@
     },
     "candidate": {
       "path": "avanza_macro_maestro_v4.user.js",
-      "branch": "fix/universal-fixed-point-continuity-20261013",
-      "version": "4.8.0",
-      "status": "promoted_source_already_in_main",
+      "branch": "fix/avanza-490-canonical-id-readback-20261014",
+      "version": "4.9.1",
+      "status": "draft_release_candidate",
       "installed_profiles": "not_verified",
-      "purpose": "universal fixed-point bootstrap for existing/new ChatGPT web chats; terminal/manual/archived states still stop; no task scheduler continuity",
-      "note": "Branch retained for history; v4.8.0 exact source SHA matches main; PR #26 metadata may not reflect direct promotion. Authenticated canary pending."
+      "purpose": "persist canonical PROCESS_ID for NO DETERMINABLE headers while retaining PR28 conflict, inactive-owner, stable-route and duplicate-send invariants",
+      "note": "PR30 only. Distinct INSTALLED_VERSION 4.9.1-canonical-id-continuity-pr30. Exact-head CI required; authenticated ChatGPT/Tampermonkey canary still required before promotion."
     }
   },
   "variants": [
