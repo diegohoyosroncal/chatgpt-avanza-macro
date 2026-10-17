@@ -26,7 +26,7 @@ try {
     await host.locator('[data-action="collapse"]').click();
     assert.doesNotMatch(await dock.getAttribute('class'),/compact/);
     const localVersion = await host.locator('[data-value="health"]').innerText();
-    assert.match(localVersion,/4\.8\.[0-9]+-[a-z0-9-]+/);
+    assert.match(localVersion,/4\.9\.1-[a-z0-9-]+/);
     assert.match(localVersion,/remota NO verificada/);
     assert.equal(await host.locator('[data-module]').count(),6);
     assert.match(await host.locator('[data-module="auto"]').innerText(),/AUTO ON/);

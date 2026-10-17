@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         AVANZA — Macro Maestro · Piloto Automático
 // @namespace    https://chatgpt.com/
-// @version      4.9.0
+// @version      4.9.1
 // @description  Cockpit multiproyecto + Learn Quest: módulos ON/OFF, AUTO/MANUAL, progreso serio independiente, misiones jugables y sincronización entre pestañas.
 // @updateURL    https://raw.githubusercontent.com/diegohoyosroncal/chatgpt-avanza-macro/main/avanza_macro_maestro_v4.user.js
 // @downloadURL  https://raw.githubusercontent.com/diegohoyosroncal/chatgpt-avanza-macro/main/avanza_macro_maestro_v4.user.js
@@ -22,7 +22,7 @@
   const SINGLETON = 'data-avanza-maestro-v4-runner';
   if (document.documentElement?.getAttribute(SINGLETON) === '1') return;
   document.documentElement?.setAttribute(SINGLETON, '1');
-  const INSTALLED_VERSION = '4.9.0-terminal-proof-continuity';
+  const INSTALLED_VERSION = '4.9.1-canonical-id-continuity-pr30';
   document.documentElement?.setAttribute('data-avanza-client-version', INSTALLED_VERSION);
   const LEARN_KEY = 'avanza-v4-learn-quest-v1';
   const CONTROL_KEY = 'avanza-v4-control-center-v1';
@@ -77,8 +77,11 @@
   let routeHadGeneration = false;
 
   function currentChatKey() {
-    // Route is scoped to this web chat, not a global prompt or another chat.
-    return location.hostname + location.pathname + location.search.replace(/([?&])utm_[^&]*/g, '');
+    // Established /c/<conversation-id> identity survives query/model/UI flags.
+    const pathKey = location.hostname + location.pathname;
+    if (/(?:^|\/)c\/[A-Za-z0-9_-]{12,}(?:\/|$)/.test(location.pathname)) return pathKey;
+    // Keep query scoping only for new/unnamed chats to avoid collisions.
+    return pathKey + location.search.replace(/([?&])utm_[^&]*/g, '');
   }
   function storageKey() { return SESSION_PREFIX + chatKey; }
   function leaseKey() { return LEASE_PREFIX + chatKey; }
@@ -126,13 +129,20 @@
     renderModules(); renderProjects(); applyAura(); broadcast({type:'control',control});
   }
   function moduleOn(name) { return control.modules?.[name] !== false; }
+  const INACTIVE_PROCESS_STATUSES = new Set(['ARCHIVED','ARCHIVED_READ_ONLY','FROZEN','DISABLED']);
+  function isInactiveProcess(id) {
+    if (!id) return false;
+    const status=String(projects?.[id]?.status||'').trim().toUpperCase();
+    return INACTIVE_PROCESS_STATUSES.has(status);
+  }
   function projectMode(id) {
     if (LOCKED_PROCESS_IDS.has(id)) return { enabled:false, auto:false };
+    if (isInactiveProcess(id)) return { enabled:false, auto:false };
     const row=control.projectModes?.[id]||{};
     return { enabled:row.enabled!==false, auto:row.auto!==false };
   }
   function setProjectMode(id,patch) {
-    if(!id) return;
+    if(!id || LOCKED_PROCESS_IDS.has(id) || isInactiveProcess(id)) return;
     control.projectModes[id]={...projectMode(id),...patch};
     saveControl();
   }
@@ -598,12 +608,27 @@
   }
   // A Web Lock makes the final pre-send receipt check atomic between browser tabs
   // when supported. No profile-crossing or server-side lock is claimed.
+  function unansweredMacroCycle() {
+    const nodes=[...document.querySelectorAll('[data-message-author-role="user"],[data-message-author-role="assistant"]')].slice(-80);
+    let outstanding='';
+    for (const node of nodes) {
+      const role=node.getAttribute('data-message-author-role');
+      if (role==='user') {
+        const match=(node.innerText||node.textContent||'').match(/AVANZA_CICLO_ID:\s*(AVZ4-[A-Za-z0-9._:-]+)/i);
+        if (match) outstanding=match[1];
+      } else if (role==='assistant' && outstanding) {
+        outstanding='';
+      }
+    }
+    return outstanding;
+  }
   async function claimAndSend(liveSend,ticket) {
     const commit=async()=>{
       let shared={};
       try { shared=JSON.parse(localStorage.getItem(storageKey())||'{}')||{}; }
       catch { return false; }
       if (shared.inFlightTicket && shared.inFlightTicket!==ticket) return false;
+      if (unansweredMacroCycle()) return false;
       if (!renewLease()) return false;
       state.inFlightTicket=ticket; state.inFlightSentAt=now();
       saveState(); // Write-ahead receipt: never retry a click of unknown outcome.
@@ -618,6 +643,12 @@
   }
   async function deliver(step) {
     if (checkConflicts() || !moduleOn('engine')) return;
+    if (unansweredMacroCycle()) { defer('Ya hay un AVANZA sin respuesta en este chat; no duplico envíos.',true,3000); return; }
+    if (isInactiveProcess(projectKey()) || LOCKED_PROCESS_IDS.has(projectKey())) {
+      state.autoConsented=false;
+      pause('Proceso archivado, congelado o deshabilitado: envío bloqueado.',true);
+      return;
+    }
     if (busy || phase !== STATES.READY || pending) return;
     busy = true; render();
     try {
@@ -682,6 +713,11 @@
   async function tick() {
     if (busy) return;
     syncRoute();
+    if (isInactiveProcess(projectKey()) || LOCKED_PROCESS_IDS.has(projectKey())) {
+      state.autoConsented=false;
+      pause('Proceso archivado, congelado o deshabilitado: ciclo detenido.',true);
+      return;
+    }
     if (phase !== STATES.READY && phase !== STATES.WAITING) return;
     if (!renewLease()) { defer('El control está en otra pestaña; espero el lease y reanudo.', true, 3000); return; }
     if (document.hidden && !control.backgroundAuto) return;
@@ -811,6 +847,11 @@
     if (checkConflicts()) return;
     if (busy) return;
     const id=projectKey();
+    if (id && (LOCKED_PROCESS_IDS.has(id) || isInactiveProcess(id))) {
+      state.autoConsented=false;
+      pause('Proceso archivado, congelado o deshabilitado: no se reactiva desde AVANZAR.',true);
+      return;
+    }
     if (phase === STATES.READY || phase === STATES.WAITING) {
       state.autoConsented=false;
       if (id) setProjectMode(id,{auto:false});
@@ -878,25 +919,66 @@
   }
   function discoverVisibleProjects() {
     const nodes=[...document.querySelectorAll('[data-message-author-role="assistant"]')].slice(-30);
-    const detected = new Set(); // Avoid binding the first of multiple unrelated objectives.
-    for (const node of nodes) {
+    const headerIds=new Set();
+    const numeric=new Map();
+    const provisional=id=>/^CHAT-[A-Z0-9]+$/.test(id);
+    for(const node of nodes) {
       const text=(node.innerText||node.textContent||'');
+      // Identity and evidence are separate: a valid owner may have no defensible percentage.
+      for(const hit of text.matchAll(/^[ \t]*🧩\s*PROCESO\s+([A-Za-z0-9._:-]+)\s*\|\s*📈\s*AVANCE\b/gmi)) {
+        const id=safeId(hit[1]);
+        if(id && !provisional(id) && id!=='POR-RECUPERAR') headerIds.add(id);
+      }
       const re=/🧩\s*PROCESO\s+([A-Za-z0-9._:-]+)[^\n]*?📈\s*(?:AVANCE\s*)?([0-9]+(?:[.,][0-9]+)?)%\s*→\s*([0-9]+(?:[.,][0-9]+)?)%[^\n]*?(\d+)\s*\/\s*(\d+)/gi;
       let m;
       while((m=re.exec(text))) {
-        const id=safeId(m[1]), current=Number(m[3].replace(',','.')), previous=Number(m[2].replace(',','.')), numerator=Number(m[4]), denominator=Number(m[5]);
-        if(!id||denominator<=0||numerator>denominator||Math.abs(100*numerator/denominator-current)>0.5) continue;
+        const id=safeId(m[1]), current=Number(m[3].replace(',','.')),
+          previous=Number(m[2].replace(',','.')), n=Number(m[4]),d=Number(m[5]);
+        if(!id||provisional(id)||d<=0||n<0||n>d||Math.abs(100*n/d-current)>0.5) continue;
         const old=projects[id]||{};
-        detected.add(id);
-        projects[id]={...old,id,current_pct:current,previous_pct:previous,delta_pp:current-previous,numerator,denominator,chatKey,updated_at:new Date().toISOString(),objective:old.objective||id,status:old.status||'CONTINUE'};
+        numeric.set(id,{current,previous,n,d});
+        projects[id]={...old,id,current_pct:current,previous_pct:previous,
+          delta_pp:current-previous,numerator:n,denominator:d,chatKey,
+          updated_at:new Date().toISOString(),objective:old.objective||id,
+          status:old.status||'CONTINUE'};
       }
     }
-    // Bind automatically only when precisely one process is visible in this chat.
-    // Multiple processes remain visible as separate cards; the assistant recovers the correct active objective.
-    if(!state.processId && detected.size===1) {
-      const id=[...detected][0], p=projects[id];
-      state.processId=id; state.lastPercent=p.current_pct; state.lastDelta=p.delta_pp;
-      state.lastNumerator=p.numerator; state.lastDenominator=p.denominator;
+    // A receipt is client-visible reporting, NOT external verification.
+    const receipts=nodes.slice(-12)
+      .map(node=>parseReceipt(node.innerText||node.textContent||''))
+      .filter(r=>r?.processId && !provisional(r.processId) && r.processId!=='POR-RECUPERAR');
+    const receiptIds=new Set(receipts.map(r=>r.processId));
+    const allIds=new Set([...headerIds,...receiptIds]);
+    // Do not pick the last owner if this chat contains conflicting process identities.
+    if(allIds.size>1 && (!state.processId || provisional(state.processId))) {
+      state.blocker='PROCESS_ID_CONFLICT';
+      state.lastUpdated=new Date().toISOString();
+      saveState();
+    }
+    if(allIds.size===1) {
+      const id=[...allIds][0], previousId=state.processId;
+      if(!previousId || provisional(previousId)) {
+        const receipt=receipts[receipts.length-1];
+        const metrics=numeric.get(id);
+        state.processId=id;
+        if(state.blocker==='PROCESS_ID_CONFLICT') state.blocker='';
+        if(receipt?.objective) state.objective=receipt.objective;
+        else if(!state.objective) state.objective=projects[id]?.objective||id;
+        if(metrics) {
+          state.lastPercent=metrics.current; state.lastDelta=metrics.current-metrics.previous;
+          state.lastNumerator=metrics.n;state.lastDenominator=metrics.d;
+        } else if(receipt && Number.isInteger(receipt.numerator)
+          && Number.isInteger(receipt.denominator) && receipt.denominator>0
+          && typeof receipt.percent==='number' && receipt.numerator<=receipt.denominator
+          && Math.abs(100*receipt.numerator/receipt.denominator-receipt.percent)<0.31) {
+          state.lastPercent=receipt.percent;state.lastDelta=receipt.delta;
+          state.lastNumerator=receipt.numerator;state.lastDenominator=receipt.denominator;
+        }
+        if(receipt?.status) state.lastStatus=receipt.status;
+        state.lastProof='ASISTENTE_VISIBLE_NO_PRUEBA_PRIMARIA';
+        if(previousId && provisional(previousId)) delete projects[previousId];
+        saveState(); // Critical: survive reload/reinjection instead of returning to POR RECUPERAR.
+      }
     }
     if(Object.keys(projects).length){ try{localStorage.setItem(PROJECTS_KEY,JSON.stringify(projects));}catch{} renderProjects(); }
     if (Date.now() - lastPassiveProgressScan > 3500) {
@@ -916,6 +998,7 @@
   function shouldAutoStart() {
     // Rehydrate any visible PROCESS_ID first. This covers historical tagged chats.
     discoverVisibleProjects();
+    if (state.blocker==='PROCESS_ID_CONFLICT') return false;
     const visibleReceipt=latestVisibleReceipt();
     if (visibleReceipt && terminalEligible(visibleReceipt)) return false;
     if (visibleReceipt && EXIT.has(visibleReceipt.status) && !terminalEligible(visibleReceipt)) {
@@ -953,6 +1036,7 @@
     }
 
     if (!continuityArmed || state.inFlightTicket) return false;
+    if (unansweredMacroCycle()) return false;
     if (state.retryAfter && now() < state.retryAfter) return false;
     if (state.parkFingerprint) {
       // legacy parked chats must not remain permanently frozen: reopen with a challenger strategy.
@@ -961,7 +1045,7 @@
     }
     if(!moduleOn('engine')||!moduleOn('auto')||checkConflicts()||isGenerating()) return false;
     const id=projectKey();
-    if(id && LOCKED_PROCESS_IDS.has(id)) return false;
+    if(id && (LOCKED_PROCESS_IDS.has(id) || isInactiveProcess(id))) return false;
     const mode=id?projectMode(id):{enabled:true,auto:true};
     if(!mode.enabled||!mode.auto) return false;
     const L=id?learningFor(id):null; if(moduleOn('game')&&L?.status==='AWAITING_USER') return false;
