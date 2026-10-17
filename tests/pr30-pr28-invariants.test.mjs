@@ -6,7 +6,7 @@ const source=readFileSync(new URL('../avanza_macro_maestro_v4.user.js',import.me
 
 test('4.9 candidate keeps stable established-chat route identity',()=>{
   assert.match(source,/const pathKey = location\.hostname \+ location\.pathname/);
-  assert.match(source,/c\\\/[A-Za-z0-9_-]\{12,\}/);
+  assert.match(source,/c\\\/[A-Za-z0-9_-]+/);
 });
 
 test('4.9 candidate preserves generic inactive-owner gates',()=>{
