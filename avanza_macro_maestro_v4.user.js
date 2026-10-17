@@ -77,8 +77,11 @@
   let routeHadGeneration = false;
 
   function currentChatKey() {
-    // Route is scoped to this web chat, not a global prompt or another chat.
-    return location.hostname + location.pathname + location.search.replace(/([?&])utm_[^&]*/g, '');
+    // Established /c/<conversation-id> identity survives query/model/UI flags.
+    const pathKey = location.hostname + location.pathname;
+    if (/(?:^|\/)c\/[A-Za-z0-9_-]{12,}(?:\/|$)/.test(location.pathname)) return pathKey;
+    // Keep query scoping only for new/unnamed chats to avoid collisions.
+    return pathKey + location.search.replace(/([?&])utm_[^&]*/g, '');
   }
   function storageKey() { return SESSION_PREFIX + chatKey; }
   function leaseKey() { return LEASE_PREFIX + chatKey; }
@@ -126,13 +129,20 @@
     renderModules(); renderProjects(); applyAura(); broadcast({type:'control',control});
   }
   function moduleOn(name) { return control.modules?.[name] !== false; }
+  const INACTIVE_PROCESS_STATUSES = new Set(['ARCHIVED','ARCHIVED_READ_ONLY','FROZEN','DISABLED']);
+  function isInactiveProcess(id) {
+    if (!id) return false;
+    const status=String(projects?.[id]?.status||'').trim().toUpperCase();
+    return INACTIVE_PROCESS_STATUSES.has(status);
+  }
   function projectMode(id) {
     if (LOCKED_PROCESS_IDS.has(id)) return { enabled:false, auto:false };
+    if (isInactiveProcess(id)) return { enabled:false, auto:false };
     const row=control.projectModes?.[id]||{};
     return { enabled:row.enabled!==false, auto:row.auto!==false };
   }
   function setProjectMode(id,patch) {
-    if(!id) return;
+    if(!id || LOCKED_PROCESS_IDS.has(id) || isInactiveProcess(id)) return;
     control.projectModes[id]={...projectMode(id),...patch};
     saveControl();
   }
@@ -598,12 +608,27 @@
   }
   // A Web Lock makes the final pre-send receipt check atomic between browser tabs
   // when supported. No profile-crossing or server-side lock is claimed.
+  function unansweredMacroCycle() {
+    const nodes=[...document.querySelectorAll('[data-message-author-role="user"],[data-message-author-role="assistant"]')].slice(-80);
+    let outstanding='';
+    for (const node of nodes) {
+      const role=node.getAttribute('data-message-author-role');
+      if (role==='user') {
+        const match=(node.innerText||node.textContent||'').match(/AVANZA_CICLO_ID:\s*(AVZ4-[A-Za-z0-9._:-]+)/i);
+        if (match) outstanding=match[1];
+      } else if (role==='assistant' && outstanding) {
+        outstanding='';
+      }
+    }
+    return outstanding;
+  }
   async function claimAndSend(liveSend,ticket) {
     const commit=async()=>{
       let shared={};
       try { shared=JSON.parse(localStorage.getItem(storageKey())||'{}')||{}; }
       catch { return false; }
       if (shared.inFlightTicket && shared.inFlightTicket!==ticket) return false;
+      if (unansweredMacroCycle()) return false;
       if (!renewLease()) return false;
       state.inFlightTicket=ticket; state.inFlightSentAt=now();
       saveState(); // Write-ahead receipt: never retry a click of unknown outcome.
@@ -618,6 +643,12 @@
   }
   async function deliver(step) {
     if (checkConflicts() || !moduleOn('engine')) return;
+    if (unansweredMacroCycle()) { defer('Ya hay un AVANZA sin respuesta en este chat; no duplico envíos.',true,3000); return; }
+    if (isInactiveProcess(projectKey()) || LOCKED_PROCESS_IDS.has(projectKey())) {
+      state.autoConsented=false;
+      pause('Proceso archivado, congelado o deshabilitado: envío bloqueado.',true);
+      return;
+    }
     if (busy || phase !== STATES.READY || pending) return;
     busy = true; render();
     try {
@@ -682,6 +713,11 @@
   async function tick() {
     if (busy) return;
     syncRoute();
+    if (isInactiveProcess(projectKey()) || LOCKED_PROCESS_IDS.has(projectKey())) {
+      state.autoConsented=false;
+      pause('Proceso archivado, congelado o deshabilitado: ciclo detenido.',true);
+      return;
+    }
     if (phase !== STATES.READY && phase !== STATES.WAITING) return;
     if (!renewLease()) { defer('El control está en otra pestaña; espero el lease y reanudo.', true, 3000); return; }
     if (document.hidden && !control.backgroundAuto) return;
@@ -811,6 +847,11 @@
     if (checkConflicts()) return;
     if (busy) return;
     const id=projectKey();
+    if (id && (LOCKED_PROCESS_IDS.has(id) || isInactiveProcess(id))) {
+      state.autoConsented=false;
+      pause('Proceso archivado, congelado o deshabilitado: no se reactiva desde AVANZAR.',true);
+      return;
+    }
     if (phase === STATES.READY || phase === STATES.WAITING) {
       state.autoConsented=false;
       if (id) setProjectMode(id,{auto:false});
@@ -909,12 +950,18 @@
     const receiptIds=new Set(receipts.map(r=>r.processId));
     const allIds=new Set([...headerIds,...receiptIds]);
     // Do not pick the last owner if this chat contains conflicting process identities.
+    if(allIds.size>1 && (!state.processId || provisional(state.processId))) {
+      state.blocker='PROCESS_ID_CONFLICT';
+      state.lastUpdated=new Date().toISOString();
+      saveState();
+    }
     if(allIds.size===1) {
       const id=[...allIds][0], previousId=state.processId;
       if(!previousId || provisional(previousId)) {
         const receipt=receipts[receipts.length-1];
         const metrics=numeric.get(id);
         state.processId=id;
+        if(state.blocker==='PROCESS_ID_CONFLICT') state.blocker='';
         if(receipt?.objective) state.objective=receipt.objective;
         else if(!state.objective) state.objective=projects[id]?.objective||id;
         if(metrics) {
@@ -951,6 +998,7 @@
   function shouldAutoStart() {
     // Rehydrate any visible PROCESS_ID first. This covers historical tagged chats.
     discoverVisibleProjects();
+    if (state.blocker==='PROCESS_ID_CONFLICT') return false;
     const visibleReceipt=latestVisibleReceipt();
     if (visibleReceipt && terminalEligible(visibleReceipt)) return false;
     if (visibleReceipt && EXIT.has(visibleReceipt.status) && !terminalEligible(visibleReceipt)) {
@@ -988,6 +1036,7 @@
     }
 
     if (!continuityArmed || state.inFlightTicket) return false;
+    if (unansweredMacroCycle()) return false;
     if (state.retryAfter && now() < state.retryAfter) return false;
     if (state.parkFingerprint) {
       // legacy parked chats must not remain permanently frozen: reopen with a challenger strategy.
@@ -996,7 +1045,7 @@
     }
     if(!moduleOn('engine')||!moduleOn('auto')||checkConflicts()||isGenerating()) return false;
     const id=projectKey();
-    if(id && LOCKED_PROCESS_IDS.has(id)) return false;
+    if(id && (LOCKED_PROCESS_IDS.has(id) || isInactiveProcess(id))) return false;
     const mode=id?projectMode(id):{enabled:true,auto:true};
     if(!mode.enabled||!mode.auto) return false;
     const L=id?learningFor(id):null; if(moduleOn('game')&&L?.status==='AWAITING_USER') return false;
