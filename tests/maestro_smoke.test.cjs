@@ -241,7 +241,7 @@ test('recoverable editor and macro-conflict failures defer instead of clearing A
 });
 
 test('v4.9 preserves the full-screen Mission Control visual mode', () => {
-  assert.match(script,/const INSTALLED_VERSION = '4\.9\.0-[^']+'/);
+  assert.match(script,/const INSTALLED_VERSION = '4\.9\.1-[^']+'/);
   assert.match(script,/data-action="cinema"/);
   assert.match(script,/function renderMissionControl\(\)/);
   assert.match(script,/function toggleMissionControl\(force\)/);
