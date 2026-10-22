@@ -55,14 +55,27 @@ test('completion and archived projects remain terminal while recognized unfinish
   assert.equal(makeAuto({processId:'BTS-LIMA'}).start,false);
   assert.equal(makeAuto({}, {visibleReceipt:{status:'VERIFIED_COMPLETE',percent:100,evidence:'provider receipt',completionVerified:true}}).start,false);
 });
-test('domain-specific learning instructions do not leak to business chats',()=>{
+test('unknown owner receives identity-only bootstrap; known owners retain specialized instructions',()=>{
   const sourcePart=section('  function buildMessage(ticket, step) {','  function setStatus(');
-  const message=(learning)=>new Function('state','strategy','MARK','RECEIPT','looksLearningProcess','MAX_STALLED_CYCLES','INSTALLED_VERSION',sourcePart+'return buildMessage;')(
-    {processId:'',stalled:4,missingReceipts:0,lastPercent:null,lastDenominator:null,lastDelta:null},()=> 'REVISAR_RUTA_Y_CAMBIAR_ESTRATEGIA','AVANZA','AVANZA_CICLO_ID:',()=>learning,6,'4.8.0-test')('TEST',1);
-  assert.doesNotMatch(message(false),/LEARN QUEST:|CFI\/APRENDIZAJE:/);
-  assert.match(message(true),/LEARN QUEST:/);
-  assert.match(message(false),/NO reemplaza objetivo/);
-  assert.match(message(false),/AUDITORÍA DE ESTANCAMIENTO:/);
+  const message=(learning,id)=>{
+    const state={processId:id,stalled:4,missingReceipts:0,lastPercent:null,lastDenominator:null,lastDelta:null};
+    const fn=new Function('state','strategy','MARK','RECEIPT','looksLearningProcess',
+      'MAX_STALLED_CYCLES','INSTALLED_VERSION','provisionalProcessId',
+      sourcePart+'return buildMessage;');
+    return fn(state,()=> 'REVISAR_RUTA_Y_CAMBIAR_ESTRATEGIA',
+      'AVANZA','AVANZA_CICLO_ID:',()=>learning,6,'4.9.1-test',
+      ()=>!state.processId||/^CHAT-[A-Z0-9]+$/.test(state.processId))('TEST',1);
+  };
+  const unknown=message(false,'CHAT-TEST');
+  assert.match(unknown,/RECUPERAR PROCESS_ID/);
+  assert.match(unknown,/AVANZA_CONTROL/);
+  assert.doesNotMatch(unknown,/CONTRATO OPERADOR TOTAL|LEARN QUEST:/);
+  const business=message(false,'AR-TRACKER-MARKETPLACE');
+  const learning=message(true,'CFI-E2-2026-10-16');
+  assert.doesNotMatch(business,/LEARN QUEST:|CFI\/APRENDIZAJE:/);
+  assert.match(learning,/LEARN QUEST:/);
+  assert.match(business,/NO reemplaza objetivo/);
+  assert.match(business,/AUDITORÍA DE ESTANCAMIENTO:/);
 });
 test('continuity separates chat resumption from scheduled tasks',()=>{
   assert.match(source,/continuidad conversacional ≠ tareas programadas ≠ ejecución externa/);
