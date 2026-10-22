@@ -118,7 +118,7 @@
   }
 
   function readControl() {
-    const defaults = { modules:{engine:true,auto:true,progress:true,sync:true,game:true,aura:true}, backgroundAuto:true, projectModes:{} };
+    const defaults = { modules:{engine:true,auto:false,progress:true,sync:true,game:true,aura:true}, backgroundAuto:false, projectModes:{} };
     try {
       const raw = JSON.parse(localStorage.getItem(CONTROL_KEY) || 'null');
       return raw && typeof raw === 'object' ? { ...defaults, ...raw, modules:{...defaults.modules,...(raw.modules||{})}, projectModes:{...(raw.projectModes||{})} } : defaults;
@@ -139,7 +139,7 @@
     if (LOCKED_PROCESS_IDS.has(id)) return { enabled:false, auto:false };
     if (isInactiveProcess(id)) return { enabled:false, auto:false };
     const row=control.projectModes?.[id]||{};
-    return { enabled:row.enabled!==false, auto:row.auto!==false };
+    return { enabled:row.enabled!==false, auto:row.auto===true };
   }
   function setProjectMode(id,patch) {
     if(!id || LOCKED_PROCESS_IDS.has(id) || isInactiveProcess(id)) return;
@@ -1045,7 +1045,7 @@
     }
     if (visibleReceipt?.percent !== null && visibleReceipt?.percent >= 100) return false;
 
-    let continuityArmed = state.autoConsented === true || Boolean(state.processId);
+    let continuityArmed = state.autoConsented === true && Boolean(state.processId);
     if (!continuityArmed && routeSettleUntil && now() < routeSettleUntil) {
       routeHadGeneration = routeHadGeneration || isGenerating();
       if (!routeHadGeneration) pageBaselineAssistantFingerprint = lastVisibleAssistantFingerprint();
@@ -1065,13 +1065,14 @@
       if (latestFingerprint && hasConversation) {
         state.processId = visibleReceipt?.processId || fallbackProcessId();
         state.objective = visibleReceipt?.objective || state.objective || 'Objetivo actual de este chat';
-        state.autoConsented = true;
+        // Recover a project label without activating automation: a visible chat is not consent.
+        state.autoConsented = false;
         saveState();
-        continuityArmed = true;
+        continuityArmed = false;
       }
     }
 
-    if (!continuityArmed || state.inFlightTicket) return false;
+    if (!continuityArmed || provisionalProcessId() || state.inFlightTicket) return false;
     if (unansweredMacroCycle()) return false;
     if (state.retryAfter && now() < state.retryAfter) return false;
     if (state.parkFingerprint) {
