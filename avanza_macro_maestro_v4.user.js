@@ -312,6 +312,7 @@
     return (x >>> 0).toString(36) + ':' + s.length;
   }
   function fallbackProcessId() { return 'CHAT-' + fingerprint(chatKey).split(':')[0].toUpperCase(); }
+  function provisionalProcessId(id=state.processId) { return !id || /^CHAT-[A-Z0-9]+$/.test(String(id)); }
   function now() { return Date.now(); }
   function visible(e) {
     if (!e || !e.isConnected) return false;
@@ -463,6 +464,18 @@
     return 'AVANZAR_Y_VERIFICAR';
   }
   function buildMessage(ticket, step) {
+    // One identity-only bootstrap when the owner is unknown. Never execute the
+    // full operator macro under an invented CHAT-* business identity.
+    if (provisionalProcessId()) {
+      return [
+        `${MARK} — RECUPERAR PROCESS_ID ${ticket}.`,
+        `AVANZA_CLIENT_PROOF: ${INSTALLED_VERSION} | ${ticket}`,
+        'Esta vuelta SOLO identifica el propietario canónico de este chat. Recupera el contexto visible y el canon global 1epHKEGs6SjTzrfDi5SeHNaxH7CHX09VTfmYNa7WxIcY. NO ejecutas acciones externas, publicaciones, pagos, instalaciones, permisos ni tareas en esta vuelta.',
+        'Devuelve un process_id ESTABLE únicamente con evidencia concordante. Si es ambiguo, usa process_id vacío, blocker PROCESS_ID_UNRESOLVED y no inventes métricas ni propietario.',
+        'Termina con una sola línea AVANZA_CONTROL: {"status":"CONTINUE","process_id":"","objective":"","previous_pct":null,"current_pct":null,"delta_pp":null,"numerator":null,"denominator":null,"evidence":"","blocker":"","next_action":""}.',
+        `${RECEIPT} ${ticket}`
+      ].join('\n\n');
+    }
     const chosen = strategy();
     const core = [
       `${MARK} — CONTROL ADAPTATIVO ${ticket}. Esta señal AGREGA capacidades; NO reemplaza objetivo, autorizaciones, decisiones, instrucciones ni checkpoints de este chat.`,
@@ -763,12 +776,22 @@
     } else {
       state.missingReceipts = 0;
       state.lastStatus = receipt.status;
-      if (receipt.processId) { if (!state.processId) state.processId=receipt.processId; else if (state.processId!==receipt.processId) state.blocker='PROCESS_ID cambió: conservar '+state.processId+' sin mezclar métricas'; }
+      const wasProvisional=provisionalProcessId();
+      const canonicalReceipt=Boolean(receipt.processId && !/^CHAT-[A-Z0-9]+$/.test(receipt.processId));
+      if (wasProvisional && canonicalReceipt) {
+        const oldId=state.processId;
+        state.processId=receipt.processId;
+        state.objective='';
+        state.lastPercent=null; state.lastDenominator=null; state.lastNumerator=null; state.lastDelta=null;
+        if (oldId && oldId!==state.processId) delete projects[oldId];
+      } else if (receipt.processId && !wasProvisional && state.processId!==receipt.processId) {
+        state.blocker='PROCESS_ID_CONFLICT';
+      }
       const previousObjective = state.objective;
       const changedObjective = Boolean(receipt.objective && previousObjective && receipt.objective.trim().toLocaleLowerCase() !== previousObjective.trim().toLocaleLowerCase());
       if (receipt.objective && !changedObjective) state.objective = receipt.objective;
       state.nextAction = receipt.nextAction || state.nextAction;
-      state.blocker = receipt.blocker || '';
+      state.blocker = wasProvisional && !canonicalReceipt ? 'PROCESS_ID_UNRESOLVED' : (receipt.blocker || '');
       const numbersPlausible = receipt.percent === null || (receipt.percent >= 0 && receipt.percent <= 100);
       const sameCohort = state.lastDenominator === null || receipt.denominator === state.lastDenominator;
       const mathematicallyConsistent = receipt.previous === null || receipt.delta === null || receipt.percent === null || Math.abs((receipt.percent - receipt.previous) - receipt.delta) <= 0.11;
@@ -793,6 +816,14 @@
     pending = null; state.inFlightTicket=''; state.inFlightSentAt=0;
     if (state.repeatedResponses >= 4) { state.stalled=Math.max(state.stalled,3); state.lastStrategy='FORZAR_RUTA_MATERIALMENTE_DISTINTA'; setStatus('Respuesta repetida: cambio material de estrategia obligatorio; continúo.', true); }
     saveState();
+    // No second unknown-owner request: the sole bootstrap must either bind
+    // a canonical owner or wait for new evidence / deliberate manual action.
+    if (provisionalProcessId() && (!receipt || !receipt.processId || /^CHAT-[A-Z0-9]+$/.test(receipt.processId))) {
+      state.blocker='PROCESS_ID_UNRESOLVED';
+      state.autoConsented=false;
+      pause('PROCESS_ID pendiente: identificación sin recibo canónico; no genero más ciclos.',true);
+      return;
+    }
     if (receipt && EXIT.has(receipt.status)) {
       if (!terminalEligible(receipt)) {
         state.terminalCandidate = '';
@@ -865,7 +896,7 @@
     if (id && !projectMode(id).auto) setProjectMode(id,{auto:true});
     state.autoConsented=true; state.parkFingerprint=''; state.parkSince=0; state.retryAfter=0;
     saveState();
-    state.stalled=0; state.missingReceipts=0;
+    // Manual reactivation must preserve real stagnation counters until new evidence arrives.
     if (state.inFlightTicket) { restoreOutstanding(); render(); return; }
     phase=STATES.READY; lastAudit=0;
     setStatus('Evaluando el contexto para avanzar…'); render(); tick();
@@ -998,7 +1029,7 @@
   function shouldAutoStart() {
     // Rehydrate any visible PROCESS_ID first. This covers historical tagged chats.
     discoverVisibleProjects();
-    if (state.blocker==='PROCESS_ID_CONFLICT') return false;
+    if (state.blocker==='PROCESS_ID_CONFLICT' || state.blocker==='PROCESS_ID_UNRESOLVED') return false;
     const visibleReceipt=latestVisibleReceipt();
     if (visibleReceipt && terminalEligible(visibleReceipt)) return false;
     if (visibleReceipt && EXIT.has(visibleReceipt.status) && !terminalEligible(visibleReceipt)) {
