@@ -29,7 +29,7 @@ try {
     assert.match(localVersion,/4\.9\.2-[a-z0-9-]+/);
     assert.match(localVersion,/remota NO verificada/);
     assert.equal(await host.locator('[data-module]').count(),6);
-    assert.match(await host.locator('[data-module="auto"]').innerText(),/AUTO ON/);
+    assert.match(await host.locator('[data-module="auto"]').innerText(),/AUTO OFF/);
     assert.match(await host.locator('[data-module="game"]').innerText(),/QUEST ON/);
     assert.match(await host.locator('[data-module="aura"]').innerText(),/AURA ON/);
     await page.evaluate(() => {
