@@ -17,7 +17,7 @@ test('4.9 candidate preserves generic inactive-owner gates',()=>{
 
 test('conflicting visible owners fail closed',()=>{
   assert.match(source,/state\.blocker='PROCESS_ID_CONFLICT'/);
-  assert.match(source,/if \(state\.blocker==='PROCESS_ID_CONFLICT'\) return false;/);
+  assert.match(source,/if \(state\.blocker==='PROCESS_ID_CONFLICT' \|\| state\.blocker==='PROCESS_ID_UNRESOLVED'\) return false;/);
 });
 
 test('unanswered AVANZA cycle blocks a second synthetic send',()=>{
@@ -28,4 +28,30 @@ test('unanswered AVANZA cycle blocks a second synthetic send',()=>{
 
 test('manual AVANZAR cannot reactivate inactive owners',()=>{
   assert.match(source,/no se reactiva desde AVANZAR/);
+});
+
+test('one-shot bootstrap returns canonical adoption path without inheriting provisional numbers',()=>{
+  const a=source.indexOf('      const wasProvisional=provisionalProcessId();');
+  const b=source.indexOf('      const previousObjective = state.objective;',a);
+  assert.ok(a>0&&b>a,'canonical owner adoption source exists');
+  const state={processId:'CHAT-TEMP',objective:'unknown chat',lastPercent:90,
+    lastDenominator:10,lastNumerator:9,lastDelta:0,blocker:''};
+  const projects={'CHAT-TEMP':{id:'CHAT-TEMP'}};
+  const receipt={processId:'AVANZA-MACRO'};
+  new Function('state','projects','receipt','provisionalProcessId',source.slice(a,b))(
+    state,projects,receipt,()=>/^CHAT-/.test(state.processId));
+  assert.equal(state.processId,'AVANZA-MACRO');
+  assert.equal(state.lastPercent,null);
+  assert.equal(state.lastDenominator,null);
+  assert.equal(state.objective,'');
+  assert.equal(projects['CHAT-TEMP'],undefined);
+});
+
+test('identity conflict remains blocking and terminal guard halts retry',()=>{
+  assert.match(source,/state\.processId!==receipt\.processId \? 'PROCESS_ID_CONFLICT'/);
+  assert.match(source,/pause\('PROCESS_ID_CONFLICT: recibos de propietarios distintos/);
+  assert.match(source,/pause\('PROCESS_ID pendiente: identificación sin recibo canónico/);
+  assert.match(source,/function provisionalProcessId/);
+  assert.match(source,/if \(provisionalProcessId\(\)\) \{/);
+  assert.match(source,/state\.autoConsented=false;/);
 });
