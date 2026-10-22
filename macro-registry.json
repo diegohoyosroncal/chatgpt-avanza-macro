@@ -1,6 +1,6 @@
 {
   "schema_version": 2,
-  "updated_at": "2026-10-17T00:00:00-05:00",
+  "updated_at": "2026-10-22T16:10:00-05:00",
   "purpose": "Single macro source of truth; user projects, economic state and native app execution are independent",
   "primary_repository": "diegohoyosroncal/chatgpt-avanza-macro",
   "channels": {
@@ -15,11 +15,12 @@
     "candidate": {
       "path": "avanza_macro_maestro_v4.user.js",
       "branch": "fix/avanza-490-canonical-id-readback-20261014",
-      "version": "4.9.1",
+      "version": "4.9.2",
       "status": "draft_release_candidate",
       "installed_profiles": "not_verified",
-      "purpose": "persist canonical PROCESS_ID for NO DETERMINABLE headers while retaining PR28 conflict, inactive-owner, stable-route and duplicate-send invariants",
-      "note": "PR30 only. Distinct INSTALLED_VERSION 4.9.1-canonical-id-continuity-pr30. Exact-head CI required; authenticated ChatGPT/Tampermonkey canary still required before promotion."
+      "purpose": "One-shot unknown-owner bootstrap; canonical adoption instead of retaining CHAT-*; no ambiguous owner resend, preserved manual/off and inactive-owner gates",
+      "note": "PR30 DRAFT only; candidate branch updateURL/downloadURL isolated from main. Syntax and CI must pass exact-head; Firefox/Tampermonkey authenticated canary and rollback remain mandatory before promotion.",
+      "last_commit_phase": "ready_for_exact_head_CI"
     }
   },
   "variants": [
