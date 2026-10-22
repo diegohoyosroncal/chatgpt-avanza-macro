@@ -1,25 +1,26 @@
 {
   "schema_version": 2,
-  "updated_at": "2026-10-14T00:48:00-05:00",
+  "updated_at": "2026-10-22T16:10:00-05:00",
   "purpose": "Single macro source of truth; user projects, economic state and native app execution are independent",
   "primary_repository": "diegohoyosroncal/chatgpt-avanza-macro",
   "channels": {
     "stable": {
       "path": "avanza_macro_maestro_v4.user.js",
       "branch": "main",
-      "version_verified_in_repository": "4.8.0",
+      "version_verified_in_repository": "4.9.0",
       "installed_profiles": "not_verified",
-      "ci": "4.7.1 PR #25: 45/45 unit PASS, headless Chromium PASS. Main 4.8.0 commit b703df2185ad349c9dd9bdc4905e7644b67a63ab claims smoke PASS; independent 4.8 CI and authenticated Firefox/Tampermonkey installation NOT VERIFIED here.",
-      "production_commit": "b703df2185ad349c9dd9bdc4905e7644b67a63ab"
+      "ci": "Source main @version 4.9.0, INSTALLED_VERSION 4.9.0-terminal-proof-continuity observed by GitHub readback 14-Oct-2026. Browser authentication/install and real-client canary remain NOT VERIFIED; CI for PR30 is tracked separately.",
+      "production_commit": "49c68ac3f51e391227aabcead5956fb280cf6803"
     },
     "candidate": {
       "path": "avanza_macro_maestro_v4.user.js",
-      "branch": "fix/universal-fixed-point-continuity-20261013",
-      "version": "4.8.0",
-      "status": "promoted_source_already_in_main",
+      "branch": "fix/avanza-490-canonical-id-readback-20261014",
+      "version": "4.9.2",
+      "status": "draft_release_candidate",
       "installed_profiles": "not_verified",
-      "purpose": "universal fixed-point bootstrap for existing/new ChatGPT web chats; terminal/manual/archived states still stop; no task scheduler continuity",
-      "note": "Branch retained for history; v4.8.0 exact source SHA matches main; PR #26 metadata may not reflect direct promotion. Authenticated canary pending."
+      "purpose": "One-shot unknown-owner bootstrap; canonical adoption instead of retaining CHAT-*; no ambiguous owner resend, preserved manual/off and inactive-owner gates",
+      "note": "PR30 DRAFT only; candidate branch updateURL/downloadURL isolated from main. Syntax and CI must pass exact-head; Firefox/Tampermonkey authenticated canary and rollback remain mandatory before promotion.",
+      "last_commit_phase": "ready_for_exact_head_CI"
     }
   },
   "variants": [
