@@ -55,3 +55,13 @@ test('identity conflict remains blocking and terminal guard halts retry',()=>{
   assert.match(source,/if \(provisionalProcessId\(\)\) \{/);
   assert.match(source,/state\.autoConsented=false;/);
 });
+
+test('4.9.2 candidate has branch-isolated update channel and does not overwrite stable',()=>{
+  const candidate='fix/avanza-490-canonical-id-readback-20261014';
+  const url='https://raw.githubusercontent.com/diegohoyosroncal/chatgpt-avanza-macro/'+candidate+'/avanza_macro_maestro_v4.user.js';
+  assert.match(source,/\/\/ @version\s+4\.9\.2/);
+  assert.match(source,/const INSTALLED_VERSION = '4\.9\.2-identity-once-pr30';/);
+  assert.ok(source.includes('// @updateURL    '+url));
+  assert.ok(source.includes('// @downloadURL  '+url));
+  assert.ok(!source.includes('// @updateURL    https://raw.githubusercontent.com/diegohoyosroncal/chatgpt-avanza-macro/main/'));
+});
