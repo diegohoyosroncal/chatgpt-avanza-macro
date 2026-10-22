@@ -1,10 +1,10 @@
 // ==UserScript==
 // @name         AVANZA — Macro Maestro · Piloto Automático
 // @namespace    https://chatgpt.com/
-// @version      4.9.1
+// @version      4.9.2
 // @description  Cockpit multiproyecto + Learn Quest: módulos ON/OFF, AUTO/MANUAL, progreso serio independiente, misiones jugables y sincronización entre pestañas.
-// @updateURL    https://raw.githubusercontent.com/diegohoyosroncal/chatgpt-avanza-macro/main/avanza_macro_maestro_v4.user.js
-// @downloadURL  https://raw.githubusercontent.com/diegohoyosroncal/chatgpt-avanza-macro/main/avanza_macro_maestro_v4.user.js
+// @updateURL    https://raw.githubusercontent.com/diegohoyosroncal/chatgpt-avanza-macro/fix/avanza-490-canonical-id-readback-20261014/avanza_macro_maestro_v4.user.js
+// @downloadURL  https://raw.githubusercontent.com/diegohoyosroncal/chatgpt-avanza-macro/fix/avanza-490-canonical-id-readback-20261014/avanza_macro_maestro_v4.user.js
 // @match        https://chatgpt.com/*
 // @match        https://www.chatgpt.com/*
 // @match        https://chat.openai.com/*
@@ -22,7 +22,7 @@
   const SINGLETON = 'data-avanza-maestro-v4-runner';
   if (document.documentElement?.getAttribute(SINGLETON) === '1') return;
   document.documentElement?.setAttribute(SINGLETON, '1');
-  const INSTALLED_VERSION = '4.9.1-canonical-id-continuity-pr30';
+  const INSTALLED_VERSION = '4.9.2-identity-once-pr30';
   document.documentElement?.setAttribute('data-avanza-client-version', INSTALLED_VERSION);
   const LEARN_KEY = 'avanza-v4-learn-quest-v1';
   const CONTROL_KEY = 'avanza-v4-control-center-v1';
