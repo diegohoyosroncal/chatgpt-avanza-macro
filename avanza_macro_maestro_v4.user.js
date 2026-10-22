@@ -791,7 +791,7 @@
       const changedObjective = Boolean(receipt.objective && previousObjective && receipt.objective.trim().toLocaleLowerCase() !== previousObjective.trim().toLocaleLowerCase());
       if (receipt.objective && !changedObjective) state.objective = receipt.objective;
       state.nextAction = receipt.nextAction || state.nextAction;
-      state.blocker = wasProvisional && !canonicalReceipt ? 'PROCESS_ID_UNRESOLVED' : (receipt.blocker || '');
+      state.blocker = wasProvisional && !canonicalReceipt ? 'PROCESS_ID_UNRESOLVED' : (!wasProvisional && canonicalReceipt && state.processId!==receipt.processId ? 'PROCESS_ID_CONFLICT' : (receipt.blocker || ''));
       const numbersPlausible = receipt.percent === null || (receipt.percent >= 0 && receipt.percent <= 100);
       const sameCohort = state.lastDenominator === null || receipt.denominator === state.lastDenominator;
       const mathematicallyConsistent = receipt.previous === null || receipt.delta === null || receipt.percent === null || Math.abs((receipt.percent - receipt.previous) - receipt.delta) <= 0.11;
@@ -822,6 +822,11 @@
       state.blocker='PROCESS_ID_UNRESOLVED';
       state.autoConsented=false;
       pause('PROCESS_ID pendiente: identificación sin recibo canónico; no genero más ciclos.',true);
+      return;
+    }
+    if (state.blocker==='PROCESS_ID_CONFLICT') {
+      state.autoConsented=false;
+      pause('PROCESS_ID_CONFLICT: recibos de propietarios distintos; no envío ciclos automáticos.',true);
       return;
     }
     if (receipt && EXIT.has(receipt.status)) {
