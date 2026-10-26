@@ -39,7 +39,7 @@ test('one-shot bootstrap returns canonical adoption path without inheriting prov
   const projects={'CHAT-TEMP':{id:'CHAT-TEMP'}};
   const receipt={processId:'AVANZA-MACRO'};
   new Function('state','projects','receipt','provisionalProcessId',source.slice(a,b))(
-    state,projects,receipt,()=>/^CHAT-/.test(state.processId));
+    state,projects,receipt,(id=state.processId)=>/^CHAT-[A-Z0-9]+$/.test(id) || /^POR-RECUPERAR$/i.test(id));
   assert.equal(state.processId,'AVANZA-MACRO');
   assert.equal(state.lastPercent,null);
   assert.equal(state.lastDenominator,null);
