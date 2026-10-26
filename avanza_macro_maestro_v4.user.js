@@ -273,6 +273,8 @@
   function projectKey() { return safeId(state.processId)||''; }
   function upsertProjectSnapshot() {
     const id=projectKey(); if(!id) return;
+    // Retired canonical processes must not be demoted by a stale assistant receipt.
+    if (LOCKED_PROCESS_IDS.has(id) || isInactiveProcess(id)) return;
     const prev=projects[id]||{};
     projects[id]={...prev,id,chatKey,objective:state.objective||prev.objective||id,current_pct:state.lastPercent,previous_pct:state.lastDelta!==null&&state.lastPercent!==null?state.lastPercent-state.lastDelta:(prev.previous_pct??null),delta_pp:state.lastDelta,numerator:state.lastNumerator,denominator:state.lastDenominator,next_action:state.nextAction||prev.next_action||'',blocker:state.blocker||'',updated_at:state.lastUpdated||new Date().toISOString(),status:state.lastStatus||prev.status||'CONTINUE'};
     saveProjects();
@@ -299,7 +301,19 @@
       channel?.close?.(); channel=new BroadcastChannel(CHANNEL_NAME);
       channel.onmessage=event=>{
         const msg=event.data||{}; if(msg.source===TAB_OWNER) return;
-        if(msg.type==='projects'&&msg.projects&&typeof msg.projects==='object'){ projects={...projects,...msg.projects}; try{localStorage.setItem(PROJECTS_KEY,JSON.stringify(projects));}catch{} renderProjects(); }
+        if(msg.type==='projects'&&msg.projects&&typeof msg.projects==='object'){
+          // A stale sibling tab may not reactivate an already inactive local owner.
+          for(const [id,row] of Object.entries(msg.projects)){
+            if(LOCKED_PROCESS_IDS.has(id) || isInactiveProcess(id)) continue;
+            if(!row || typeof row!=='object' || Array.isArray(row)) continue;
+            projects[id]=row;
+          }
+          for(const id of LOCKED_PROCESS_IDS){
+            if(projects[id]) projects[id]={...projects[id],status:'ARCHIVED',blocker:'ARCHIVED_LOCK'};
+          }
+          try{localStorage.setItem(PROJECTS_KEY,JSON.stringify(projects));}catch{}
+          renderProjects();
+        }
         if(msg.type==='control'&&msg.control&&typeof msg.control==='object'){ control={...control,...msg.control,modules:{...control.modules,...(msg.control.modules||{})},projectModes:{...control.projectModes,...(msg.control.projectModes||{})}}; try{localStorage.setItem(CONTROL_KEY,JSON.stringify(control));}catch{} renderModules();renderProjects();applyAura(); }
         if(msg.type==='learning'&&msg.learning&&typeof msg.learning==='object'){ learning={...learning,...msg.learning}; try{localStorage.setItem(LEARN_KEY,JSON.stringify(learning));}catch{} renderGame(); }
       };
@@ -312,7 +326,7 @@
     return (x >>> 0).toString(36) + ':' + s.length;
   }
   function fallbackProcessId() { return 'CHAT-' + fingerprint(chatKey).split(':')[0].toUpperCase(); }
-  function provisionalProcessId(id=state.processId) { return !id || /^CHAT-[A-Z0-9]+$/.test(String(id)); }
+  function provisionalProcessId(id=state.processId) { return !id || /^CHAT-[A-Z0-9]+$/.test(String(id)) || /^POR-RECUPERAR$/i.test(String(id)); }
   function now() { return Date.now(); }
   function visible(e) {
     if (!e || !e.isConnected) return false;
@@ -777,7 +791,7 @@
       state.missingReceipts = 0;
       state.lastStatus = receipt.status;
       const wasProvisional=provisionalProcessId();
-      const canonicalReceipt=Boolean(receipt.processId && !/^CHAT-[A-Z0-9]+$/.test(receipt.processId));
+      const canonicalReceipt=Boolean(receipt.processId && !provisionalProcessId(receipt.processId));
       if (wasProvisional && canonicalReceipt) {
         const oldId=state.processId;
         state.processId=receipt.processId;
@@ -818,7 +832,7 @@
     saveState();
     // No second unknown-owner request: the sole bootstrap must either bind
     // a canonical owner or wait for new evidence / deliberate manual action.
-    if (provisionalProcessId() && (!receipt || !receipt.processId || /^CHAT-[A-Z0-9]+$/.test(receipt.processId))) {
+    if (provisionalProcessId() && (!receipt || provisionalProcessId(receipt.processId))) {
       state.blocker='PROCESS_ID_UNRESOLVED';
       state.autoConsented=false;
       pause('PROCESS_ID pendiente: identificación sin recibo canónico; no genero más ciclos.',true);
