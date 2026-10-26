@@ -28,13 +28,13 @@ test('BroadcastChannel cannot revive a locally retired owner',()=>{
   const body=between('  function initChannel() {','  state = recoverState();');
   class FakeBC { constructor(){this.onmessage=null;}close(){} }
   const run=new Function('BroadcastChannel','moduleOn','CHANNEL_NAME','TAB_OWNER','projects','control','learning','PROJECTS_KEY','localStorage','renderProjects','renderModules','renderGame','applyAura','LOCKED_PROCESS_IDS','isInactiveProcess',
-    'let channel=null;'+body+\`
+    'let channel=null;'+body+`
     initChannel();
     channel.onmessage({data:{source:'sibling',type:'projects',projects:{
       X:{id:'X',status:'CONTINUE'},NEW:{id:'NEW',status:'CONTINUE'},
       'BTS-LIMA':{id:'BTS-LIMA',status:'CONTINUE'}
     }}});
-    return projects;\`);
+    return projects;`);
   for(const status of [...statuses,'CONTINUE']){
     const projects={X:{id:'X',status},'BTS-LIMA':{id:'BTS-LIMA',status:'ARCHIVED'}};
     let persisted='';
