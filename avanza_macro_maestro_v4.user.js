@@ -1066,23 +1066,22 @@
       return false;
     }
 
-    if (!continuityArmed) {
+    if (!continuityArmed && provisionalProcessId()) {
       const latestFingerprint = lastVisibleAssistantFingerprint();
       const hasConversation = Boolean(
         document.querySelector('[data-message-author-role="user"]')
         && document.querySelector('[data-message-author-role="assistant"]')
       );
-      // Universal fixed-point bootstrap: opening an existing unfinished web chat
-      // is sufficient to recover a durable fallback process. New chats arm after
-      // their first assistant response. Explicit MANUAL/OFF and terminal states
-      // still win below.
-      if (latestFingerprint && hasConversation) {
-        state.processId = visibleReceipt?.processId || fallbackProcessId();
-        state.objective = visibleReceipt?.objective || state.objective || 'Objetivo actual de este chat';
-        // Recover a project label without activating automation: a visible chat is not consent.
+      // An existing canonical PROCESS_ID must survive MANUAL/OFF and navigation.
+      // The fallback is only for an actually unknown owner, never a replacement.
+      // Visible assistant receipts require canonical reconciliation separately.
+      const needsFallback = !state.processId || /^POR-RECUPERAR$/i.test(String(state.processId));
+      if (latestFingerprint && hasConversation && needsFallback) {
+        state.processId = fallbackProcessId();
+        if (!state.objective) state.objective = 'Objetivo actual de este chat';
+        // Recover a project label without granting AUTO consent.
         state.autoConsented = false;
         saveState();
-        continuityArmed = false;
       }
     }
 
