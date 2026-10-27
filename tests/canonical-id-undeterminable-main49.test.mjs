@@ -16,8 +16,8 @@ const parseReceipt=new Function('safeId',
 const discoverBody=get('  function discoverVisibleProjects() {',
   '  function latestVisibleReceipt() {');
 
-function check(texts,initial='') {
-  const state={processId:initial,objective:'',lastPercent:null,
+function check(texts,initial='',autoConsented=false) {
+  const state={processId:initial,objective:'',autoConsented,lastPercent:null,
     lastNumerator:null,lastDenominator:null,lastDelta:null,lastStatus:''};
   const projects=initial?{[initial]:{id:initial}}:{};
   let saves=0;
@@ -79,8 +79,27 @@ test('recovered identity is durably persisted once',()=>{
   assert.equal(state.processId,'CROSS-CHAT-LEARNING');
   assert.equal(saves,1);
 });
-test('a pre-existing canonical owner cannot be replaced by a new header',()=>{
-  const {state,saves}=check(['🧩 PROCESO WRONG-OTHER | 📈 AVANCE NO DETERMINABLE'],'CROSS-CHAT-LEARNING');
+test('a pre-existing canonical owner rejects a foreign header and disarms AUTO',()=>{
+  const {state,saves}=check(['🧩 PROCESO WRONG-OTHER | 📈 AVANCE NO DETERMINABLE'],'CROSS-CHAT-LEARNING',true);
   assert.equal(state.processId,'CROSS-CHAT-LEARNING');
+  assert.equal(state.blocker,'PROCESS_ID_CONFLICT');
+  assert.equal(state.autoConsented,false);
+  assert.equal(saves,1);
+});
+test('a matching known owner preserves AUTO with no unnecessary writes',()=>{
+  const {state,saves}=check(['🧩 PROCESO CROSS-CHAT-LEARNING | 📈 AVANCE NO DETERMINABLE'],'CROSS-CHAT-LEARNING',true);
+  assert.equal(state.processId,'CROSS-CHAT-LEARNING');
+  assert.equal(state.blocker,undefined);
+  assert.equal(state.autoConsented,true);
   assert.equal(saves,0);
+});
+test('multiple visible owners block a previously known AUTO owner',()=>{
+  const {state,saves}=check([
+    '🧩 PROCESO CROSS-CHAT-LEARNING | 📈 AVANCE NO DETERMINABLE',
+    '🧩 PROCESO WRONG-OTHER | 📈 AVANCE NO DETERMINABLE'
+  ],'CROSS-CHAT-LEARNING',true);
+  assert.equal(state.processId,'CROSS-CHAT-LEARNING');
+  assert.equal(state.blocker,'PROCESS_ID_CONFLICT');
+  assert.equal(state.autoConsented,false);
+  assert.equal(saves,1);
 });
