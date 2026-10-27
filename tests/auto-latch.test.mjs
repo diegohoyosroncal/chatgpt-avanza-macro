@@ -99,7 +99,9 @@ test('only one active chat writer and no shell/network API introduced',()=>{
 test('boot snapshots route state but existing unfinished chats no longer require a fresh assistant response',()=>{
   assert.match(source,/pageBaselineAssistantFingerprint = lastVisibleAssistantFingerprint\(\);/);
   assert.match(source,/Universal fixed-point bootstrap/);
-  assert.match(source,/state\.processId = visibleReceipt\?\.processId \|\| fallbackProcessId\(\)/);
+  assert.match(source,/if \(!continuityArmed && provisionalProcessId\(\)\)/);
+  assert.match(source,/state\.processId = fallbackProcessId\(\)/);
+  assert.doesNotMatch(section('  function shouldAutoStart() {','  function maybeAutoStart() {'),/state\.processId = visibleReceipt\?\.processId \|\| fallbackProcessId\(\)/);
   assert.doesNotMatch(section('  function shouldAutoStart() {','  function maybeAutoStart() {'),/latestFingerprint !== pageBaselineAssistantFingerprint/);
 });
 
