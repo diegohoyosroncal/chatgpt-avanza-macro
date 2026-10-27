@@ -16,23 +16,27 @@ test('complete user script parses without side effects',()=>{
 function makeAuto(input={},env={}){
   const state={autoConsented:false,inFlightTicket:'',parkFingerprint:'',parkSince:0,retryAfter:0,stalled:4,missingReceipts:2,lastPercent:40,lastStatus:'',processId:'',...input};
   let saves=0;
-  const fn=new Function('state','moduleOn','checkConflicts','isGenerating','discoverVisibleProjects','projectKey','projectMode','learningFor','draft','findComposer','EXIT','lastVisibleAssistantFingerprint','pageBaselineAssistantFingerprint','fallbackProcessId','routeSettleUntil','routeHadGeneration','saveState','now','latestVisibleReceipt','document','LOCKED_PROCESS_IDS',section('  function shouldAutoStart() {','  function maybeAutoStart() {')+'return shouldAutoStart;')(
+  const fn=new Function('state','moduleOn','checkConflicts','isGenerating','discoverVisibleProjects','projectKey','projectMode','learningFor','draft','findComposer','EXIT','lastVisibleAssistantFingerprint','pageBaselineAssistantFingerprint','fallbackProcessId','routeSettleUntil','routeHadGeneration','saveState','now','latestVisibleReceipt','document','LOCKED_PROCESS_IDS','terminalEligible','unansweredMacroCycle','isInactiveProcess','provisionalProcessId',section('  function shouldAutoStart() {','  function maybeAutoStart() {')+'return shouldAutoStart;')(
     state,()=>true,()=>false,()=>false,()=>{ if(state.projectId&&!state.processId) state.processId=state.projectId; },()=>state.projectId||state.processId||'',()=>({enabled:true,auto:true}),
-    ()=>null,()=>'',()=>null,new Set(['VERIFIED_COMPLETE','NO_SAFE_ACTION','HUMAN_GATE_PROVEN']),()=>state.newFingerprint||'old',env.pageBaseline??'old',()=> 'CHAT-TEST',env.routeSettleUntil??0,false,()=>{saves++;},()=>Date.now(),()=>env.visibleReceipt||null,{querySelector:()=>env.hasConversation===false?null:{}},new Set(['BTS-LIMA']));
+    ()=>null,()=>'',()=>null,new Set(['VERIFIED_COMPLETE','NO_SAFE_ACTION','HUMAN_GATE_PROVEN']),()=>state.newFingerprint||'old',env.pageBaseline??'old',()=> 'CHAT-TEST',env.routeSettleUntil??0,false,()=>{saves++;},()=>Date.now(),()=>env.visibleReceipt||null,{querySelector:()=>env.hasConversation===false?null:{}},new Set(['BTS-LIMA']),(receipt)=>Boolean(receipt && receipt.status==='VERIFIED_COMPLETE' && receipt.percent>=100 && receipt.completionVerified===true && Boolean(receipt.evidence?.trim())),()=>'',()=>false,()=>!state.processId||/^CHAT-/.test(state.processId));
   return {start:fn(),state,saves};
 }
-test('AUTO resumes recognized processes and bootstraps existing/new unfinished web chats',()=>{
+test('unidentified and unconsented chats never AUTO-start; recognized explicit consent resumes',()=>{
   const old=makeAuto();
-  assert.equal(old.start,true);
+  assert.equal(old.start,false);
   assert.equal(old.state.processId,'CHAT-TEST');
-  assert.equal(old.state.autoConsented,true);
+  assert.equal(old.state.autoConsented,false);
   const fresh=makeAuto({newFingerprint:'new'},{pageBaseline:'old'});
-  assert.equal(fresh.start,true);
+  assert.equal(fresh.start,false);
   assert.equal(fresh.state.processId,'CHAT-TEST');
-  assert.equal(makeAuto({processId:'BUSINESS'}).start,true);
-  assert.equal(makeAuto({projectId:'BUSINESS'}).start,true);
-  assert.equal(makeAuto({autoConsented:true}).start,true);
+  assert.equal(makeAuto({processId:'BUSINESS'}).start,false);
+  assert.equal(makeAuto({projectId:'BUSINESS'}).start,false);
+  assert.equal(makeAuto({autoConsented:true}).start,false);
+  assert.equal(makeAuto({processId:'BUSINESS',autoConsented:true}).start,true);
   assert.equal(makeAuto({}, {hasConversation:false}).start,false);
+  assert.match(source,/auto:false,progress:true/);
+  assert.match(source,/backgroundAuto:false/);
+  assert.match(source,/auto:row.auto===true/);
 });
 test('pending unique ticket blocks duplicate action on reload',()=>{
   assert.equal(makeAuto({autoConsented:true,inFlightTicket:'AVZ4-unique'}).start,false);
@@ -40,7 +44,7 @@ test('pending unique ticket blocks duplicate action on reload',()=>{
   assert.match(source,/restoreOutstanding\(\)/);
 });
 test('legacy parked chats migrate back into continuity and deep review rotates strategy',()=>{
-  const woke=makeAuto({processId:'BUSINESS',parkFingerprint:'old'});
+  const woke=makeAuto({processId:'BUSINESS',autoConsented:true,parkFingerprint:'old'});
   assert.equal(woke.start,true);
   assert.equal(woke.state.parkFingerprint,'');
   assert.equal(woke.saves,1);
@@ -49,19 +53,33 @@ test('legacy parked chats migrate back into continuity and deep review rotates s
   assert.doesNotMatch(section('  async function tick() {','  function toggle() {'),/parkUnproductiveLoop\(\)/);
 });
 test('completion and archived projects remain terminal while recognized unfinished processes resume',()=>{
-  assert.equal(makeAuto({autoConsented:true,lastStatus:'VERIFIED_COMPLETE'}).start,false);
-  assert.equal(makeAuto({processId:'BUSINESS'}).start,true);
-  assert.equal(makeAuto({processId:'BTS-LIMA'}).start,false);
-  assert.equal(makeAuto({}, {visibleReceipt:{status:'VERIFIED_COMPLETE',percent:100}}).start,false);
+  assert.equal(makeAuto({processId:'BUSINESS',autoConsented:true,lastStatus:'VERIFIED_COMPLETE',lastPercent:40}).start,true); // unverified title alone is not completion
+  assert.equal(makeAuto({processId:'BUSINESS',autoConsented:true,lastStatus:'VERIFIED_COMPLETE',lastPercent:100}).start,false);
+  assert.equal(makeAuto({processId:'BUSINESS'}).start,false);
+  assert.equal(makeAuto({processId:'BTS-LIMA',autoConsented:true}).start,false);
+  assert.equal(makeAuto({}, {visibleReceipt:{status:'VERIFIED_COMPLETE',percent:100,evidence:'provider receipt',completionVerified:true}}).start,false);
 });
-test('domain-specific learning instructions do not leak to business chats',()=>{
+test('unknown owner receives identity-only bootstrap; known owners retain specialized instructions',()=>{
   const sourcePart=section('  function buildMessage(ticket, step) {','  function setStatus(');
-  const message=(learning)=>new Function('state','strategy','MARK','RECEIPT','looksLearningProcess','MAX_STALLED_CYCLES','INSTALLED_VERSION',sourcePart+'return buildMessage;')(
-    {processId:'',stalled:4,missingReceipts:0,lastPercent:null,lastDenominator:null,lastDelta:null},()=> 'REVISAR_RUTA_Y_CAMBIAR_ESTRATEGIA','AVANZA','AVANZA_CICLO_ID:',()=>learning,6,'4.8.0-test')('TEST',1);
-  assert.doesNotMatch(message(false),/LEARN QUEST:|CFI\/APRENDIZAJE:/);
-  assert.match(message(true),/LEARN QUEST:/);
-  assert.match(message(false),/NO reemplaza objetivo/);
-  assert.match(message(false),/AUDITORÍA DE ESTANCAMIENTO:/);
+  const message=(learning,id)=>{
+    const state={processId:id,stalled:4,missingReceipts:0,lastPercent:null,lastDenominator:null,lastDelta:null};
+    const fn=new Function('state','strategy','MARK','RECEIPT','looksLearningProcess',
+      'MAX_STALLED_CYCLES','INSTALLED_VERSION','provisionalProcessId',
+      sourcePart+'return buildMessage;');
+    return fn(state,()=> 'REVISAR_RUTA_Y_CAMBIAR_ESTRATEGIA',
+      'AVANZA','AVANZA_CICLO_ID:',()=>learning,6,'4.9.1-test',
+      ()=>!state.processId||/^CHAT-[A-Z0-9]+$/.test(state.processId))('TEST',1);
+  };
+  const unknown=message(false,'CHAT-TEST');
+  assert.match(unknown,/RECUPERAR PROCESS_ID/);
+  assert.match(unknown,/AVANZA_CONTROL/);
+  assert.doesNotMatch(unknown,/CONTRATO OPERADOR TOTAL|LEARN QUEST:/);
+  const business=message(false,'AR-TRACKER-MARKETPLACE');
+  const learning=message(true,'CFI-E2-2026-10-16');
+  assert.doesNotMatch(business,/LEARN QUEST:|CFI\/APRENDIZAJE:/);
+  assert.match(learning,/LEARN QUEST:/);
+  assert.match(business,/NO reemplaza objetivo/);
+  assert.match(business,/AUDITORÍA DE ESTANCAMIENTO:/);
 });
 test('continuity separates chat resumption from scheduled tasks',()=>{
   assert.match(source,/continuidad conversacional ≠ tareas programadas ≠ ejecución externa/);
@@ -81,7 +99,9 @@ test('only one active chat writer and no shell/network API introduced',()=>{
 test('boot snapshots route state but existing unfinished chats no longer require a fresh assistant response',()=>{
   assert.match(source,/pageBaselineAssistantFingerprint = lastVisibleAssistantFingerprint\(\);/);
   assert.match(source,/Universal fixed-point bootstrap/);
-  assert.match(source,/state\.processId = visibleReceipt\?\.processId \|\| fallbackProcessId\(\)/);
+  assert.match(source,/if \(!continuityArmed && provisionalProcessId\(\)\)/);
+  assert.match(source,/state\.processId = fallbackProcessId\(\)/);
+  assert.doesNotMatch(section('  function shouldAutoStart() {','  function maybeAutoStart() {'),/state\.processId = visibleReceipt\?\.processId \|\| fallbackProcessId\(\)/);
   assert.doesNotMatch(section('  function shouldAutoStart() {','  function maybeAutoStart() {'),/latestFingerprint !== pageBaselineAssistantFingerprint/);
 });
 
@@ -93,8 +113,8 @@ test('SPA route settle prevents sends before the new route is stable',()=>{
 });
 
 test('terminal declarations are challenged once before any permanent stop',()=>{
-  assert.match(source,/Terminal candidato NO cerrado: ejecuto una reauditoría independiente/);
-  assert.match(source,/TERMINAL_CANDIDATE EN REVISIÓN/);
+  assert.match(source,/Terminal candidato: exijo segunda reauditoría/);
+  assert.match(source,/SOFT_TERMINAL_ROTATE_FRONTIER/);
   assert.match(source,/terminalConfirmations/);
   assert.match(source,/state\.lastStatus = 'CONTINUE'/);
 });

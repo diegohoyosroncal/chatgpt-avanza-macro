@@ -7,8 +7,8 @@ const source = fs.readFileSync(new URL('../avanza_macro_maestro_v4.user.js', imp
 new Function(source);
 
 const mustContain = [
-  '@version      4.9.0',
-  "4.9.0-terminal-proof-continuity",
+  '@version      4.9.2',
+  "4.9.2-identity-once-pr30",
   'function terminalEligible(receipt)',
   'route_classes_tried',
   'independent_frontiers_exhausted',
