@@ -999,11 +999,19 @@
       .filter(r=>r?.processId && !provisional(r.processId) && r.processId!=='POR-RECUPERAR');
     const receiptIds=new Set(receipts.map(r=>r.processId));
     const allIds=new Set([...headerIds,...receiptIds]);
-    // Do not pick the last owner if this chat contains conflicting process identities.
-    if(allIds.size>1 && (!state.processId || provisional(state.processId))) {
-      state.blocker='PROCESS_ID_CONFLICT';
-      state.lastUpdated=new Date().toISOString();
-      saveState();
+    // Treat any conflict against a persisted canonical owner as a hard stop.
+    // A later assistant header or receipt cannot silently switch owners in AUTO.
+    const canonicalOwner = state.processId && !provisional(state.processId);
+    const ownerConflict = allIds.size>1
+      || Boolean(canonicalOwner && allIds.size>0 && !allIds.has(state.processId));
+    if (ownerConflict) {
+      if (state.blocker!=='PROCESS_ID_CONFLICT' || state.autoConsented!==false) {
+        state.blocker='PROCESS_ID_CONFLICT';
+        state.autoConsented=false;
+        state.lastUpdated=new Date().toISOString();
+        saveState();
+      }
+      return;
     }
     if(allIds.size===1) {
       const id=[...allIds][0], previousId=state.processId;
