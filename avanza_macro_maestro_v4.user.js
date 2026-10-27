@@ -1073,7 +1073,7 @@
         && document.querySelector('[data-message-author-role="assistant"]')
       );
       // An existing canonical PROCESS_ID must survive MANUAL/OFF and navigation.
-      // The fallback is only for an actually unknown owner, never a replacement.
+      // Universal fixed-point bootstrap: only for an unknown owner, never a replacement.
       // Visible assistant receipts require canonical reconciliation separately.
       const needsFallback = !state.processId || /^POR-RECUPERAR$/i.test(String(state.processId));
       if (latestFingerprint && hasConversation && needsFallback) {
