@@ -1,25 +1,25 @@
 {
   "schema_version": 2,
-  "updated_at": "2026-10-14T00:48:00-05:00",
+  "updated_at": "2026-10-31T00:00:00-05:00",
   "purpose": "Single macro source of truth; user projects, economic state and native app execution are independent",
   "primary_repository": "diegohoyosroncal/chatgpt-avanza-macro",
   "channels": {
     "stable": {
       "path": "avanza_macro_maestro_v4.user.js",
       "branch": "main",
-      "version_verified_in_repository": "4.8.0",
+      "version_verified_in_repository": "4.9.0",
       "installed_profiles": "not_verified",
-      "ci": "4.7.1 PR #25: 45/45 unit PASS, headless Chromium PASS. Main 4.8.0 commit b703df2185ad349c9dd9bdc4905e7644b67a63ab claims smoke PASS; independent 4.8 CI and authenticated Firefox/Tampermonkey installation NOT VERIFIED here.",
-      "production_commit": "b703df2185ad349c9dd9bdc4905e7644b67a63ab"
+      "ci": "4.9.0 main commit 128c3e9 (terminal-proof continuity): offline unit tests realigned 2026-10-31; headless Chromium smoke and authenticated Firefox/Tampermonkey installation NOT VERIFIED here.",
+      "production_commit": "128c3e9cfa64cd4d8ce2532ee433cb800957a21a"
     },
     "candidate": {
       "path": "avanza_macro_maestro_v4.user.js",
       "branch": "fix/universal-fixed-point-continuity-20261013",
-      "version": "4.8.0",
+      "version": "4.9.0",
       "status": "promoted_source_already_in_main",
       "installed_profiles": "not_verified",
-      "purpose": "universal fixed-point bootstrap for existing/new ChatGPT web chats; terminal/manual/archived states still stop; no task scheduler continuity",
-      "note": "Branch retained for history; v4.8.0 exact source SHA matches main; PR #26 metadata may not reflect direct promotion. Authenticated canary pending."
+      "purpose": "terminal-proof continuity: VERIFIED_COMPLETE needs evidence plus completionVerified or 100%; soft terminals only stop a frontier, not the objective",
+      "note": "v4.9.0 was committed directly to main (128c3e9) without the usual test/registry alignment; aligned 2026-10-31. Authenticated canary pending."
     }
   },
   "variants": [
@@ -139,6 +139,10 @@
     "main_4_8_0_commit": "b703df2185ad349c9dd9bdc4905e7644b67a63ab",
     "main_4_8_0_source_sha": "7dfcefef41d77ff20cf86cd8f2b7738d1926414e",
     "main_4_8_0_browser_canary": "not_verified",
-    "registry_reconciliation": "2026-10-14: main source v4.8.0 readback differs from registry stable v4.7.1; this commit corrects metadata only."
+    "registry_reconciliation": "2026-10-14: main source v4.8.0 readback differs from registry stable v4.7.1; this commit corrects metadata only.",
+    "main_4_9_0_commit": "128c3e9cfa64cd4d8ce2532ee433cb800957a21a",
+    "main_4_9_0_source_sha": "334f1aaac7dca5a04c1d5eb2ca5fc43fe975592d",
+    "main_4_9_0_browser_canary": "not_verified",
+    "test_alignment_4_9_0": "2026-10-31: 4 stale v4.8 assertions on main realigned to the intentional v4.9.0 terminal-proof behaviour; macro source unchanged."
   }
 }

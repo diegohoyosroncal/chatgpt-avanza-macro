@@ -110,10 +110,11 @@ test('permanent health badge names the installed version without pretending the 
   assert.match(script, /function updateHealth\(\)/);
   assert.match(script, /updateHealth\(\)/);
 });
-test('registry preserves stable v4.7.1 and records v4.8.0 candidate', () => {
-  assert.equal(registry.channels.stable.version_verified_in_repository, '4.7.1');
-  assert.equal(registry.channels.candidate.version, '4.8.0');
-  assert.equal(registry.channels.candidate.status, 'candidate');
+test('registry stable version matches the script header and records the promoted candidate', () => {
+  const header = script.match(/@version\s+([0-9.]+)/)[1];
+  assert.equal(registry.channels.stable.version_verified_in_repository, header);
+  assert.equal(registry.channels.candidate.version, header);
+  assert.equal(registry.channels.candidate.status, 'promoted_source_already_in_main');
   assert.ok(registry.limitations.some(text => text.includes('Native Android/iOS')));
   assert.ok(registry.release_gates.includes('authenticated_chatgpt_browser_smoke_pass'));
   assert.ok(registry.variants.some(v => v.name === 'AVANZA Neon Mission Control' && v.status === 'stable'));
@@ -240,8 +241,8 @@ test('recoverable editor and macro-conflict failures defer instead of clearing A
   assert.match(script,/Conflicto de macro detectado: bloqueo envíos y reevalúo automáticamente/);
 });
 
-test('v4.8 preserves the full-screen Mission Control visual mode', () => {
-  assert.match(script,/const INSTALLED_VERSION = '4\.8\.[0-9]+-[^']+'/);
+test('v4.8+ preserves the full-screen Mission Control visual mode', () => {
+  assert.match(script,/const INSTALLED_VERSION = '4\.(?:[89]|[1-9][0-9])\.[0-9]+-[^']+'/);
   assert.match(script,/data-action="cinema"/);
   assert.match(script,/function renderMissionControl\(\)/);
   assert.match(script,/function toggleMissionControl\(force\)/);
