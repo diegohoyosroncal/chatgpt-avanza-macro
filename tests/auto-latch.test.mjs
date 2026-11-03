@@ -16,9 +16,9 @@ test('complete user script parses without side effects',()=>{
 function makeAuto(input={},env={}){
   const state={autoConsented:false,inFlightTicket:'',parkFingerprint:'',parkSince:0,retryAfter:0,stalled:4,missingReceipts:2,lastPercent:40,lastStatus:'',processId:'',...input};
   let saves=0;
-  const fn=new Function('state','moduleOn','checkConflicts','isGenerating','discoverVisibleProjects','projectKey','projectMode','learningFor','draft','findComposer','EXIT','lastVisibleAssistantFingerprint','pageBaselineAssistantFingerprint','fallbackProcessId','routeSettleUntil','routeHadGeneration','saveState','now','latestVisibleReceipt','document','LOCKED_PROCESS_IDS',section('  function shouldAutoStart() {','  function maybeAutoStart() {')+'return shouldAutoStart;')(
+  const fn=new Function('state','moduleOn','checkConflicts','isGenerating','discoverVisibleProjects','projectKey','projectMode','learningFor','draft','findComposer','EXIT','lastVisibleAssistantFingerprint','pageBaselineAssistantFingerprint','fallbackProcessId','routeSettleUntil','routeHadGeneration','saveState','now','latestVisibleReceipt','document','LOCKED_PROCESS_IDS','SOFT_TERMINAL',section('  function terminalEligible(receipt) {','  function strategy() {')+section('  function shouldAutoStart() {','  function maybeAutoStart() {')+'return shouldAutoStart;')(
     state,()=>true,()=>false,()=>false,()=>{ if(state.projectId&&!state.processId) state.processId=state.projectId; },()=>state.projectId||state.processId||'',()=>({enabled:true,auto:true}),
-    ()=>null,()=>'',()=>null,new Set(['VERIFIED_COMPLETE','NO_SAFE_ACTION','HUMAN_GATE_PROVEN']),()=>state.newFingerprint||'old',env.pageBaseline??'old',()=> 'CHAT-TEST',env.routeSettleUntil??0,false,()=>{saves++;},()=>Date.now(),()=>env.visibleReceipt||null,{querySelector:()=>env.hasConversation===false?null:{}},new Set(['BTS-LIMA']));
+    ()=>null,()=>'',()=>null,new Set(['VERIFIED_COMPLETE','NO_SAFE_ACTION','HUMAN_GATE_PROVEN']),()=>state.newFingerprint||'old',env.pageBaseline??'old',()=> 'CHAT-TEST',env.routeSettleUntil??0,false,()=>{saves++;},()=>Date.now(),()=>env.visibleReceipt||null,{querySelector:()=>env.hasConversation===false?null:{}},new Set(['BTS-LIMA']),new Set(['HUMAN_GATE_PROVEN','NO_SAFE_ACTION']));
   return {start:fn(),state,saves};
 }
 test('AUTO resumes recognized processes and bootstraps existing/new unfinished web chats',()=>{
@@ -49,10 +49,16 @@ test('legacy parked chats migrate back into continuity and deep review rotates s
   assert.doesNotMatch(section('  async function tick() {','  function toggle() {'),/parkUnproductiveLoop\(\)/);
 });
 test('completion and archived projects remain terminal while recognized unfinished processes resume',()=>{
-  assert.equal(makeAuto({autoConsented:true,lastStatus:'VERIFIED_COMPLETE'}).start,false);
+  assert.equal(makeAuto({autoConsented:true,lastStatus:'VERIFIED_COMPLETE',lastPercent:100}).start,false);
+  // v4.9.0: a completion claim without 100%/proof is a terminal candidate, not a stop.
+  assert.equal(makeAuto({autoConsented:true,lastStatus:'VERIFIED_COMPLETE'}).start,true);
   assert.equal(makeAuto({processId:'BUSINESS'}).start,true);
   assert.equal(makeAuto({processId:'BTS-LIMA'}).start,false);
   assert.equal(makeAuto({}, {visibleReceipt:{status:'VERIFIED_COMPLETE',percent:100}}).start,false);
+  assert.equal(makeAuto({}, {visibleReceipt:{status:'VERIFIED_COMPLETE',percent:100,evidence:'commit abc'}}).start,false);
+  const unproven=makeAuto({}, {visibleReceipt:{status:'VERIFIED_COMPLETE',percent:40,evidence:''}});
+  assert.equal(unproven.start,true);
+  assert.equal(unproven.state.lastStrategy,'TERMINAL_REJECTED_REOPEN_UNIVERSE');
 });
 test('domain-specific learning instructions do not leak to business chats',()=>{
   const sourcePart=section('  function buildMessage(ticket, step) {','  function setStatus(');
@@ -93,7 +99,8 @@ test('SPA route settle prevents sends before the new route is stable',()=>{
 });
 
 test('terminal declarations are challenged once before any permanent stop',()=>{
-  assert.match(source,/Terminal candidato NO cerrado: ejecuto una reauditoría independiente/);
+  assert.match(source,/Terminal candidato: exijo segunda reauditoría y prueba de agotamiento antes de cerrar/);
+  assert.match(source,/Terminal rechazado por prueba insuficiente/);
   assert.match(source,/TERMINAL_CANDIDATE EN REVISIÓN/);
   assert.match(source,/terminalConfirmations/);
   assert.match(source,/state\.lastStatus = 'CONTINUE'/);

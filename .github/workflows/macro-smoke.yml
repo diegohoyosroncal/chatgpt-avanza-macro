@@ -6,6 +6,7 @@ on:
       - 'avanza_macro_maestro_v4.user.js'
       - 'tests/maestro_smoke.test.cjs'
       - 'tests/auto-latch.test.mjs'
+      - 'tests/continuity_terminal_guard.test.mjs'
       - 'tests/maestro_ui_smoke.mjs'
       - 'macro-registry.json'
       - '.github/workflows/macro-smoke.yml'
@@ -15,6 +16,7 @@ on:
       - 'avanza_macro_maestro_v4.user.js'
       - 'tests/maestro_smoke.test.cjs'
       - 'tests/auto-latch.test.mjs'
+      - 'tests/continuity_terminal_guard.test.mjs'
       - 'tests/maestro_ui_smoke.mjs'
       - 'macro-registry.json'
       - '.github/workflows/macro-smoke.yml'
@@ -36,7 +38,7 @@ jobs:
       - name: Check JavaScript syntax
         run: node --check avanza_macro_maestro_v4.user.js
       - name: Run offline non-network unit tests
-        run: node --test tests/maestro_smoke.test.cjs tests/auto-latch.test.mjs
+        run: node --test tests/maestro_smoke.test.cjs tests/auto-latch.test.mjs tests/continuity_terminal_guard.test.mjs
       - name: Install small browser test harness
         run: |
           npm install --no-save --ignore-scripts playwright-core@1.56.1
