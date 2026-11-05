@@ -1,6 +1,6 @@
 {
   "schema_version": 2,
-  "updated_at": "2026-10-22T16:10:00-05:00",
+  "updated_at": "2026-11-05T16:19:00-05:00",
   "purpose": "Single macro source of truth; user projects, economic state and native app execution are independent",
   "primary_repository": "diegohoyosroncal/chatgpt-avanza-macro",
   "channels": {
@@ -9,8 +9,9 @@
       "branch": "main",
       "version_verified_in_repository": "4.9.0",
       "installed_profiles": "not_verified",
-      "ci": "Source main @version 4.9.0, INSTALLED_VERSION 4.9.0-terminal-proof-continuity observed by GitHub readback 14-Oct-2026. Browser authentication/install and real-client canary remain NOT VERIFIED; CI for PR30 is tracked separately.",
-      "production_commit": "49c68ac3f51e391227aabcead5956fb280cf6803"
+      "ci": "4.9.0 main commit 128c3e9 (terminal-proof continuity): offline unit tests realigned 2026-10-31; headless Chromium smoke and authenticated Firefox/Tampermonkey installation NOT VERIFIED here.",
+      "production_commit": "128c3e9cfa64cd4d8ce2532ee433cb800957a21a",
+      "latest_main_commit": "62ececc231eac24c7523afe41799c552b9f6c09e"
     },
     "candidate": {
       "path": "avanza_macro_maestro_v4.user.js",
@@ -19,7 +20,7 @@
       "status": "draft_release_candidate",
       "installed_profiles": "not_verified",
       "purpose": "One-shot unknown-owner bootstrap; canonical adoption instead of retaining CHAT-*; no ambiguous owner resend, preserved manual/off and inactive-owner gates",
-      "note": "PR30 DRAFT only; candidate branch updateURL/downloadURL isolated from main. Syntax and CI must pass exact-head; Firefox/Tampermonkey authenticated canary and rollback remain mandatory before promotion.",
+      "note": "PR30 DRAFT 4.9.2 only, on isolated updateURL/downloadURL; exact-head 6b6b3729 CI Actions 40427085667 completed success (75/75 Node tests, syntax and headless Chromium). No authenticated Firefox/Tampermonkey installed-client readback, no old/new-chat canaries; promotion not authorized. Main PR31 merged 2026-11-03, branch requires reconciliation before release.",
       "last_commit_phase": "ready_for_exact_head_CI"
     }
   },
@@ -140,6 +141,10 @@
     "main_4_8_0_commit": "b703df2185ad349c9dd9bdc4905e7644b67a63ab",
     "main_4_8_0_source_sha": "7dfcefef41d77ff20cf86cd8f2b7738d1926414e",
     "main_4_8_0_browser_canary": "not_verified",
-    "registry_reconciliation": "2026-10-14: main source v4.8.0 readback differs from registry stable v4.7.1; this commit corrects metadata only."
+    "registry_reconciliation": "2026-10-14: main source v4.8.0 readback differs from registry stable v4.7.1; this commit corrects metadata only.",
+    "main_4_9_0_commit": "128c3e9cfa64cd4d8ce2532ee433cb800957a21a",
+    "main_4_9_0_source_sha": "334f1aaac7dca5a04c1d5eb2ca5fc43fe975592d",
+    "main_4_9_0_browser_canary": "not_verified",
+    "test_alignment_4_9_0": "2026-10-31: 4 stale v4.8 assertions on main realigned to the intentional v4.9.0 terminal-proof behaviour; macro source unchanged."
   }
 }
