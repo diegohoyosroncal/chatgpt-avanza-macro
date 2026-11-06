@@ -10,6 +10,10 @@ Agrega el botón **▶ AVANZAR AL OBJETIVO** a conversaciones web antiguas y nue
 
 Si no aparece la pantalla de instalación, abre Tampermonkey > Utilities > Install from URL y pega el enlace directo. También puedes importar un archivo local .user.js.
 
+## Hosting
+
+El repositorio se publica en Railway como sitio estático (nginx, ver `Dockerfile`). Solo se sirven `avanza_macro.user.js`, `avanza_macro_maestro_v4.user.js` y `macro-registry.json`. URL de instalación: `https://<service-domain>/avanza_macro_maestro_v4.user.js`.
+
 ## Seguridad y alcance
 
 - Sólo actúa en chatgpt.com y chat.openai.com dentro de navegadores compatibles; **no se instala dentro de la app nativa ChatGPT Android**.
