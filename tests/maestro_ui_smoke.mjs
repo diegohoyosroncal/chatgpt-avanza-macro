@@ -27,11 +27,12 @@ try {
     assert.doesNotMatch(await dock.getAttribute('class'),/compact/);
     const localVersion = await host.locator('[data-value="health"]').innerText();
     const headerVersion = script.match(/@version\s+([0-9.]+)/)[1];
-    assert.ok(localVersion.includes(headerVersion + '-'), 'health badge must show the header version ' + headerVersion);
+    assert.equal(headerVersion,'4.9.2');
+    assert.ok(localVersion.includes(headerVersion + '-'), 'health badge must match candidate script version');
     assert.match(localVersion,/[0-9]+\.[0-9]+\.[0-9]+-[a-z0-9-]+/);
     assert.match(localVersion,/remota NO verificada/);
     assert.equal(await host.locator('[data-module]').count(),6);
-    assert.match(await host.locator('[data-module="auto"]').innerText(),/AUTO ON/);
+    assert.match(await host.locator('[data-module="auto"]').innerText(),/AUTO OFF/);
     assert.match(await host.locator('[data-module="game"]').innerText(),/QUEST ON/);
     assert.match(await host.locator('[data-module="aura"]').innerText(),/AURA ON/);
     await page.evaluate(() => {
