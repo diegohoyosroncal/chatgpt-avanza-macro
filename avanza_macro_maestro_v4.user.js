@@ -973,7 +973,8 @@
     const nodes=[...document.querySelectorAll('[data-message-author-role="assistant"]')].slice(-30);
     const headerIds=new Set();
     const numeric=new Map();
-    const provisional=id=>/^CHAT-[A-Z0-9]+$/.test(id);
+    // Use one provisional-owner rule across bootstrap, DOM reconciliation and snapshots.
+    const provisional=id=>provisionalProcessId(id);
     for(const node of nodes) {
       const text=(node.innerText||node.textContent||'');
       // Identity and evidence are separate: a valid owner may have no defensible percentage.

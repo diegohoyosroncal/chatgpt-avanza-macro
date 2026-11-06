@@ -22,11 +22,11 @@ function check(texts,initial='',autoConsented=false) {
   const projects=initial?{[initial]:{id:initial}}:{};
   let saves=0;
   const document={querySelectorAll:()=>texts.map(innerText=>({innerText}))};
-  const fn=new Function('document','parseReceipt','isProvisionalProcessId',
+  const fn=new Function('document','parseReceipt','provisionalProcessId',
     'safeId','projects','state','saveState','localStorage','PROJECTS_KEY',
     'renderProjects','hydrateVisibleReportedProgress','lastPassiveProgressScan',
     'Date','chatKey',discoverBody+'discoverVisibleProjects();return {state,projects};');
-  const result=fn(document,parseReceipt,(id=state.processId)=>/^CHAT-[A-Z0-9]+$/.test(id),
+  const result=fn(document,parseReceipt,(id=state.processId)=>!id||/^CHAT-[A-Z0-9]+$/.test(id)||/^POR-RECUPERAR$/i.test(id),
     safeId,projects,state,()=>{saves++;},{setItem(){}},
     'test-projects',()=>{},()=>{},0,Date,'chatgpt.com/c/actual');
   return {...result,saves};
@@ -69,6 +69,44 @@ test('provisional CHAT-* label is replaced without leaving a phantom project',()
   assert.equal(state.processId,'DIEGO-CHAT-DIPLOMACY');
   assert.equal(projects['CHAT-TEST'],undefined);
 });
+test('preexisting POR-RECUPERAR adopts canonical header and removes phantom without AUTO opt-in',()=>{
+  const {state,projects,saves}=check(
+    ['🧩 PROCESO CROSS-CHAT-LEARNING | 📈 AVANCE 60%→60% | 3/5 gates | Δ 0 pp'],
+    'POR-RECUPERAR',false);
+  assert.equal(state.processId,'CROSS-CHAT-LEARNING');
+  assert.equal(state.blocker,undefined);
+  assert.equal(state.autoConsented,false);
+  assert.equal(state.lastPercent,60);
+  assert.equal(state.lastNumerator,3);
+  assert.equal(state.lastDenominator,5);
+  assert.equal(projects['POR-RECUPERAR'],undefined);
+  assert.equal(saves,1);
+});
+test('preexisting POR-RECUPERAR accepts unambiguous canonical receipt with unknown percent',()=>{
+  const {state,saves}=check([
+    'AVANZA_CONTROL: {"status":"CONTINUE","process_id":"CROSS-CHAT-LEARNING","current_pct":null,"denominator":null,"numerator":null,"delta_pp":null}'
+  ],'POR-RECUPERAR',false);
+  assert.equal(state.processId,'CROSS-CHAT-LEARNING');
+  assert.equal(state.lastPercent,null);
+  assert.equal(saves,1);
+});
+test('provisional POR-RECUPERAR header never impersonates a canonical owner',()=>{
+  const {state,saves}=check(
+    ['🧩 PROCESO POR-RECUPERAR | 📈 AVANCE NO DETERMINABLE'], '',false);
+  assert.equal(state.processId,'');
+  assert.equal(saves,0);
+});
+test('ambiguous owners under POR-RECUPERAR disarm AUTO without adopting either',()=>{
+  const {state,saves}=check([
+    '🧩 PROCESO CROSS-CHAT-LEARNING | 📈 AVANCE NO DETERMINABLE',
+    '🧩 PROCESO WRONG-OTHER | 📈 AVANCE NO DETERMINABLE'
+  ],'POR-RECUPERAR',true);
+  assert.equal(state.processId,'POR-RECUPERAR');
+  assert.equal(state.autoConsented,false);
+  assert.equal(state.blocker,'PROCESS_ID_CONFLICT');
+  assert.equal(saves,1);
+});
+
 test('ordinary assistant prose does not invent an owner',()=>{
   const {state}=check(['El país se llama Cashlandia; todavía no tiene un porcentaje verificable.']);
   assert.equal(state.processId,'');
