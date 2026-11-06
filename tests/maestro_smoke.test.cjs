@@ -112,7 +112,9 @@ test('permanent health badge names the installed version without pretending the 
 });
 test('registry identifies 4.9 source and retains historical 4.8 branch', () => {
   assert.equal(registry.channels.stable.version_verified_in_repository, '4.9.0');
-  assert.equal(registry.channels.candidate.version, '4.9.2');
+  const headerVersion = script.match(/@version\s+([0-9.]+)/)[1];
+  assert.equal(headerVersion, '4.9.2');
+  assert.equal(registry.channels.candidate.version, headerVersion);
   assert.equal(registry.channels.candidate.status, 'draft_release_candidate');
   assert.ok(registry.limitations.some(text => text.includes('Native Android/iOS')));
   assert.ok(registry.release_gates.includes('authenticated_chatgpt_browser_smoke_pass'));
