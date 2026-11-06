@@ -272,7 +272,9 @@
   function safeId(value) { return String(value||'').replace(/[^A-Za-z0-9._:-]/g,'-').replace(/-+/g,'-').slice(0,96); }
   function projectKey() { return safeId(state.processId)||''; }
   function upsertProjectSnapshot() {
-    const id=projectKey(); if(!id) return;
+    const id=projectKey();
+    // Provisional identities are UI-only: never persist a phantom project.
+    if(!id || provisionalProcessId(id)) return;
     // Retired canonical processes must not be demoted by a stale assistant receipt.
     if (LOCKED_PROCESS_IDS.has(id) || isInactiveProcess(id)) return;
     const prev=projects[id]||{};

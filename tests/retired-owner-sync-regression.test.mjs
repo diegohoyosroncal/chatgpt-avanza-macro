@@ -13,12 +13,12 @@ const set=new Set(statuses);
 
 test('retired owners cannot be demoted by stale assistant snapshots',()=>{
   const body=between('  function upsertProjectSnapshot() {','  function freshState() {');
-  const fn=new Function('projects','state','LOCKED_PROCESS_IDS','isInactiveProcess','projectKey','saveProjects','chatKey',body+'upsertProjectSnapshot();');
+  const fn=new Function('projects','state','LOCKED_PROCESS_IDS','isInactiveProcess','projectKey','saveProjects','chatKey','provisionalProcessId',body+'upsertProjectSnapshot();');
   for(const status of [...statuses,'CONTINUE']){
     const projects={X:{id:'X',status}};
     const state={processId:'X',lastStatus:'CONTINUE',lastPercent:null,lastDelta:null,lastUpdated:'today'};
     let saves=0;
-    fn(projects,state,new Set(),id=>set.has(projects[id]?.status),()=>state.processId,()=>{saves++},'/c/x');
+    fn(projects,state,new Set(),id=>set.has(projects[id]?.status),()=>state.processId,()=>{saves++},'/c/x',id=>!id||/^CHAT-[A-Z0-9]+$/.test(id)||id==='POR-RECUPERAR');
     assert.equal(saves,status==='CONTINUE'?1:0,status);
     assert.equal(projects.X.status,status);
   }
@@ -55,4 +55,18 @@ test('unknown POR-RECUPERAR is provisional, never a canonical owner',()=>{
   assert.equal(fn('CHAT-ABC'),true);
   assert.equal(fn('AVANZA-MACRO'),false);
   assert.match(source,/const canonicalReceipt=Boolean\(receipt.processId && !provisionalProcessId\(receipt.processId\)\)/);
+});
+
+
+test('provisional and unresolved IDs never create snapshot rows or overwrite canonical projects',()=>{
+  const body=between('  function upsertProjectSnapshot() {','  function freshState() {');
+  const run=new Function('projects','state','LOCKED_PROCESS_IDS','isInactiveProcess','projectKey','saveProjects','chatKey','provisionalProcessId',body+'upsertProjectSnapshot();');
+  for(const id of ['', 'CHAT-PROVISIONAL', 'POR-RECUPERAR', 'POR-RECUPERAR-OTHER']){
+    const state={processId:id,lastStatus:'CONTINUE',lastPercent:60,lastDelta:0};
+    const projects={'CROSS-CHAT-LEARNING':{id:'CROSS-CHAT-LEARNING',status:'CONTINUE',current_pct:60}};
+    let writes=0;
+    run(projects,state,new Set(),()=>false,()=>state.processId,()=>{writes++;},'/c/test',value=>!value||/^CHAT-[A-Z0-9]+$/.test(value)||/^POR-RECUPERAR$/i.test(value));
+    assert.equal(writes,id==='POR-RECUPERAR-OTHER'?1:0,'unexpected write: '+id);
+    assert.deepEqual(projects['CROSS-CHAT-LEARNING'],{id:'CROSS-CHAT-LEARNING',status:'CONTINUE',current_pct:60});
+  }
 });
