@@ -328,7 +328,7 @@
     return (x >>> 0).toString(36) + ':' + s.length;
   }
   function fallbackProcessId() { return 'CHAT-' + fingerprint(chatKey).split(':')[0].toUpperCase(); }
-  function provisionalProcessId(id=state.processId) { return !id || /^CHAT-[A-Z0-9]+$/.test(String(id)) || /^POR-RECUPERAR$/i.test(String(id)); }
+  function provisionalProcessId(id=state.processId) { return !id || /^CHAT-[A-Z0-9]+$/.test(String(id)) || /^POR[-_]RECUPERAR$/i.test(String(id)); }
   function now() { return Date.now(); }
   function visible(e) {
     if (!e || !e.isConnected) return false;
@@ -1086,7 +1086,7 @@
       // An existing canonical PROCESS_ID must survive MANUAL/OFF and navigation.
       // Universal fixed-point bootstrap: only for an unknown owner, never a replacement.
       // Visible assistant receipts require canonical reconciliation separately.
-      const needsFallback = !state.processId || /^POR-RECUPERAR$/i.test(String(state.processId));
+      const needsFallback = !state.processId || /^POR[-_]RECUPERAR$/i.test(String(state.processId));
       if (latestFingerprint && hasConversation && needsFallback) {
         state.processId = fallbackProcessId();
         if (!state.objective) state.objective = 'Objetivo actual de este chat';

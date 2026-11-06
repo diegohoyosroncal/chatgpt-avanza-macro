@@ -26,7 +26,7 @@ function check(texts,initial='',autoConsented=false) {
     'safeId','projects','state','saveState','localStorage','PROJECTS_KEY',
     'renderProjects','hydrateVisibleReportedProgress','lastPassiveProgressScan',
     'Date','chatKey',discoverBody+'discoverVisibleProjects();return {state,projects};');
-  const result=fn(document,parseReceipt,(id=state.processId)=>!id||/^CHAT-[A-Z0-9]+$/.test(id)||/^POR-RECUPERAR$/i.test(id),
+  const result=fn(document,parseReceipt,(id=state.processId)=>!id||/^CHAT-[A-Z0-9]+$/.test(id)||/^POR[-_]RECUPERAR$/i.test(id),
     safeId,projects,state,()=>{saves++;},{setItem(){}},
     'test-projects',()=>{},()=>{},0,Date,'chatgpt.com/c/actual');
   return {...result,saves};
@@ -105,6 +105,34 @@ test('ambiguous owners under POR-RECUPERAR disarm AUTO without adopting either',
   assert.equal(state.autoConsented,false);
   assert.equal(state.blocker,'PROCESS_ID_CONFLICT');
   assert.equal(saves,1);
+});
+
+test('legacy POR_RECUPERAR header is provisional, not a conflicting owner',()=>{
+  const history=[
+    '🧩 PROCESO POR_RECUPERAR | 📈 AVANCE NO DETERMINABLE',
+    '🧩 PROCESO CROSS-CHAT-LEARNING | 📈 AVANCE 60%→60% | 3/5 gates | Δ 0 pp'
+  ];
+  const adopted=check(history,'POR_RECUPERAR',false);
+  assert.equal(adopted.state.processId,'CROSS-CHAT-LEARNING');
+  assert.equal(adopted.state.blocker,undefined);
+  assert.equal(adopted.projects['POR_RECUPERAR'],undefined);
+  assert.equal(adopted.state.autoConsented,false);
+  assert.equal(adopted.saves,1);
+  const known=check(history,'CROSS-CHAT-LEARNING',true);
+  assert.equal(known.state.processId,'CROSS-CHAT-LEARNING');
+  assert.equal(known.state.blocker,undefined);
+  assert.equal(known.state.autoConsented,true);
+});
+
+test('legacy POR_RECUPERAR does not mask a genuine other-owner conflict',()=>{
+  const checked=check([
+    '🧩 PROCESO POR_RECUPERAR | 📈 AVANCE NO DETERMINABLE',
+    '🧩 PROCESO CROSS-CHAT-LEARNING | 📈 AVANCE NO DETERMINABLE',
+    '🧩 PROCESO WRONG-OTHER | 📈 AVANCE NO DETERMINABLE'
+  ],'CROSS-CHAT-LEARNING',true);
+  assert.equal(checked.state.processId,'CROSS-CHAT-LEARNING');
+  assert.equal(checked.state.blocker,'PROCESS_ID_CONFLICT');
+  assert.equal(checked.state.autoConsented,false);
 });
 
 test('ordinary assistant prose does not invent an owner',()=>{
