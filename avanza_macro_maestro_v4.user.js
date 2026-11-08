@@ -707,6 +707,14 @@
     const reply = assistantAfter(pending.ticket);
     if (reply === '<<USER_INTERRUPTED>>') { pending=null; phase=STATES.IDLE; state.inFlightTicket=''; state.inFlightSentAt=0; replyCandidate={fingerprint:'',firstSeen:0}; state.lastUpdated=new Date().toISOString(); saveState(); setStatus('Intervención humana detectada: conservo continuidad y reanudo tras la respuesta del chat.'); return; }
     if (!reply || isGenerating()) return;
+    // ChatGPT can pause its visible text while tools are still executing.
+    // Text stability is not a completion proof: await the final control line.
+    const lastLine = reply.trim().split(/\r?\n/).pop() || '';
+    const receipt = /^AVANZA_CONTROL:\s*\{[^\n]*\}$/.test(lastLine) ? parseReceipt(lastLine) : null;
+    if (!receipt) {
+      if (now() - pending.sentAt > 12000) setStatus('Esperando AVANZA_CONTROL final; no envío otra señal durante herramientas.', true);
+      return;
+    }
     const key = fingerprint(reply);
     if (key !== replyCandidate.fingerprint) {
       replyCandidate = { fingerprint: key, firstSeen: now() };
@@ -719,7 +727,6 @@
     const identicalResponse = state.lastResponseFingerprint === key;
     state.repeatedResponses = identicalResponse ? (state.repeatedResponses || 0) + 1 : 0;
     state.lastResponseFingerprint = key;
-    const receipt = parseReceipt(reply);
     if (!receipt) {
       state.missingReceipts++;
       state.stalled++;
