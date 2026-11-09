@@ -19,6 +19,35 @@ try {
     await page.addScriptTag({content:script});
     const host = page.locator('#'+hostId);
     await host.waitFor({timeout:7000});
+    // Double-manager injection regression: two enabled Tampermonkey installations
+    // may hold the same script. Re-inject the exact script; only one writer/UI
+    // may survive. This does NOT emulate authenticated Firefox extensions.
+    const firstRunner = await page.evaluate(() => ({
+      runner: document.documentElement.getAttribute('data-avanza-maestro-v4-runner'),
+      version: document.documentElement.getAttribute('data-avanza-client-version'),
+      panels: document.querySelectorAll('#avanza-macro-maestro-v4').length
+    }));
+    assert.equal(firstRunner.runner,'1');
+    assert.equal(firstRunner.panels,1);
+    await page.evaluate(() => {
+      const original=window.setInterval;
+      window.__avanzaSecondInjectionIntervals=0;
+      window.setInterval=(...args)=>{
+        window.__avanzaSecondInjectionIntervals++;
+        return original(...args);
+      };
+    });
+    await page.addScriptTag({content:script});
+    const secondRunner = await page.evaluate(() => ({
+      runner: document.documentElement.getAttribute('data-avanza-maestro-v4-runner'),
+      version: document.documentElement.getAttribute('data-avanza-client-version'),
+      panels: document.querySelectorAll('#avanza-macro-maestro-v4').length,
+      duplicateIntervals: window.__avanzaSecondInjectionIntervals
+    }));
+    assert.deepEqual(secondRunner,{
+      ...firstRunner,
+      duplicateIntervals:0
+    },'second manager injection must be an idempotent no-op');
     const dock = host.locator('.panel');
     // AVANZA starts compact: one prominent control, percentages visible.
     assert.match(await dock.getAttribute('class'),/compact/);
@@ -27,11 +56,12 @@ try {
     assert.doesNotMatch(await dock.getAttribute('class'),/compact/);
     const localVersion = await host.locator('[data-value="health"]').innerText();
     const headerVersion = script.match(/@version\s+([0-9.]+)/)[1];
-    assert.ok(localVersion.includes(headerVersion + '-'), 'health badge must show the header version ' + headerVersion);
+    assert.equal(headerVersion,'4.9.2');
+    assert.ok(localVersion.includes(headerVersion + '-'), 'health badge must match candidate script version');
     assert.match(localVersion,/[0-9]+\.[0-9]+\.[0-9]+-[a-z0-9-]+/);
     assert.match(localVersion,/remota NO verificada/);
     assert.equal(await host.locator('[data-module]').count(),6);
-    assert.match(await host.locator('[data-module="auto"]').innerText(),/AUTO ON/);
+    assert.match(await host.locator('[data-module="auto"]').innerText(),/AUTO OFF/);
     assert.match(await host.locator('[data-module="game"]').innerText(),/QUEST ON/);
     assert.match(await host.locator('[data-module="aura"]').innerText(),/AURA ON/);
     await page.evaluate(() => {

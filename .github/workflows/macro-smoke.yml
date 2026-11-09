@@ -4,9 +4,10 @@ on:
   pull_request:
     paths:
       - 'avanza_macro_maestro_v4.user.js'
+      - 'tests/**/*.test.*'
       - 'tests/maestro_smoke.test.cjs'
       - 'tests/auto-latch.test.mjs'
-      - 'tests/continuity_terminal_guard.test.mjs'
+      - 'tests/canonical-id-undeterminable-main49.test.mjs'
       - 'tests/maestro_ui_smoke.mjs'
       - 'macro-registry.json'
       - '.github/workflows/macro-smoke.yml'
@@ -16,7 +17,6 @@ on:
       - 'avanza_macro_maestro_v4.user.js'
       - 'tests/maestro_smoke.test.cjs'
       - 'tests/auto-latch.test.mjs'
-      - 'tests/continuity_terminal_guard.test.mjs'
       - 'tests/maestro_ui_smoke.mjs'
       - 'macro-registry.json'
       - '.github/workflows/macro-smoke.yml'
@@ -30,15 +30,15 @@ concurrency:
 
 jobs:
   smoke:
-    runs-on: ubuntu-latest
-    timeout-minutes: 3
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
     steps:
       - name: Check out sources
         uses: actions/checkout@v4
       - name: Check JavaScript syntax
         run: node --check avanza_macro_maestro_v4.user.js
       - name: Run offline non-network unit tests
-        run: node --test tests/maestro_smoke.test.cjs tests/auto-latch.test.mjs tests/continuity_terminal_guard.test.mjs
+        run: node --test tests/*.test.cjs tests/*.test.mjs
       - name: Install small browser test harness
         run: |
           npm install --no-save --ignore-scripts playwright-core@1.56.1
@@ -47,3 +47,7 @@ jobs:
           echo "CHROME_PATH=$CHROME_PATH" >> "$GITHUB_ENV"
       - name: Headless Chromium UI controls
         run: node tests/maestro_ui_smoke.mjs
+      - name: Install Firefox test engine
+        run: npx --no-install playwright-core install --with-deps firefox
+      - name: Headless Firefox continuity smoke
+        run: node tests/maestro_firefox_smoke.mjs
