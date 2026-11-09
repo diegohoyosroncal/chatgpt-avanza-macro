@@ -31,7 +31,7 @@ concurrency:
 jobs:
   smoke:
     runs-on: ubuntu-latest
-    timeout-minutes: 3
+    timeout-minutes: 8
     steps:
       - name: Check out sources
         uses: actions/checkout@v4
@@ -47,3 +47,7 @@ jobs:
           echo "CHROME_PATH=$CHROME_PATH" >> "$GITHUB_ENV"
       - name: Headless Chromium UI controls
         run: node tests/maestro_ui_smoke.mjs
+      - name: Install Firefox test engine
+        run: npx playwright install --with-deps firefox
+      - name: Headless Firefox continuity smoke
+        run: node tests/maestro_firefox_smoke.mjs
