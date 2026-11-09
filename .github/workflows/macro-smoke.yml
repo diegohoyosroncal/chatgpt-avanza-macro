@@ -48,6 +48,6 @@ jobs:
       - name: Headless Chromium UI controls
         run: node tests/maestro_ui_smoke.mjs
       - name: Install Firefox test engine
-        run: npx playwright install --with-deps firefox
+        run: npx --no-install playwright-core install --with-deps firefox
       - name: Headless Firefox continuity smoke
         run: node tests/maestro_firefox_smoke.mjs
